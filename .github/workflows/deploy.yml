@@ -27,6 +27,19 @@ jobs:
      - name: Build Tailwind CSS
        run: npx tailwindcss -i ./input.css -o ./assets/tailwind.css
        
+     - name: Cache Rust dependencies
+       uses: actions/cache@v3
+       with:
+         path: |
+           ~/.cargo/bin/
+           ~/.cargo/registry/index/
+           ~/.cargo/registry/cache/
+           ~/.cargo/git/db/
+           target/
+         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+         restore-keys: |
+           ${{ runner.os }}-cargo-
+       
      - name: Install Rust
        uses: dtolnay/rust-toolchain@stable
        
@@ -34,7 +47,7 @@ jobs:
        run: cargo install dioxus-cli
        
      - name: Build
-       run: dx build --release --output-dir ./dist
+       run: dx build --release -- --output-dir ./dist
        
      - name: Debug directory
        run: |
