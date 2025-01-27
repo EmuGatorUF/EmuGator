@@ -36,6 +36,17 @@ jobs:
       - name: Build
         run: dx build --release
         
+      - name: Debug directory
+        run: |
+          echo "Current directory:"
+          pwd
+          echo "Directory contents:"
+          ls -la
+          echo "Looking for dist:"
+          find . -name "dist"
+          echo "Dist contents (if exists):"
+          ls -la dist || echo "No dist directory found"
+        
       - name: Setup Pages
         uses: actions/configure-pages@v4
         
