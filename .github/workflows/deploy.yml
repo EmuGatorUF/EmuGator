@@ -1,67 +1,67 @@
 name: Deploy to GitHub Pages
 
 on:
-  push:
-    branches: [ "main" ]
-  workflow_dispatch:
+ push:
+   branches: [ "main" ]
+ workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+ contents: read
+ pages: write
+ id-token: write
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install Node.js and npm
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          
-      - name: Install Tailwind CSS CLI
-        run: npm install -D tailwindcss
-        
-      - name: Build Tailwind CSS
-        run: npx tailwindcss -i ./input.css -o ./assets/tailwind.css
-        
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        
-      - name: Install Dioxus CLI
-        run: cargo install dioxus-cli
-        
-      - name: Build
-        run: dx build --release
-        
-      - name: Debug directory
-        run: |
-          echo "Current directory:"
-          pwd
-          echo "Directory contents:"
-          ls -la
-          echo "Looking for dist:"
-          find . -name "dist"
-          echo "Dist contents (if exists):"
-          ls -la dist || echo "No dist directory found"
-        
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-        
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: './dist'
+ build:
+   runs-on: ubuntu-latest
+   steps:
+     - uses: actions/checkout@v4
+     
+     - name: Install Node.js and npm
+       uses: actions/setup-node@v4
+       with:
+         node-version: '20'
+         
+     - name: Install Tailwind CSS CLI
+       run: npm install -D tailwindcss
+       
+     - name: Build Tailwind CSS
+       run: npx tailwindcss -i ./input.css -o ./assets/tailwind.css
+       
+     - name: Install Rust
+       uses: dtolnay/rust-toolchain@stable
+       
+     - name: Install Dioxus CLI
+       run: cargo install dioxus-cli
+       
+     - name: Build
+       run: dx build --release --output-dir ./dist
+       
+     - name: Debug directory
+       run: |
+         echo "Current directory:"
+         pwd
+         echo "Directory contents:"
+         ls -la
+         echo "Looking for dist:"
+         find . -name "dist"
+         echo "Dist contents (if exists):"
+         ls -la dist || echo "No dist directory found"
+       
+     - name: Setup Pages
+       uses: actions/configure-pages@v4
+       
+     - name: Upload artifact
+       uses: actions/upload-pages-artifact@v3
+       with:
+         path: './dist'
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+ deploy:
+   needs: build
+   runs-on: ubuntu-latest
+   environment:
+     name: github-pages
+     url: ${{ steps.deployment.outputs.page_url }}
+   steps:
+     - name: Deploy to GitHub Pages
+       id: deployment
+       uses: actions/deploy-pages@v4
