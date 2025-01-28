@@ -127,7 +127,11 @@ fn on_mouse_click(e: IEditorMouseEvent, mut breakpoints: Signal<BTreeSet<usize>>
     let on_margin = e.target().type_() == MouseTargetType::GutterGlyphMargin;
     if on_margin {
         if let Some(line) = e.target().position().map(|p| p.line_number() as usize) {
-            breakpoints.write().insert(line);
+            if breakpoints.peek().contains(&line) {
+                breakpoints.write().remove(&line);
+            } else {
+                breakpoints.write().insert(line);
+            }
         }
     }
 }
