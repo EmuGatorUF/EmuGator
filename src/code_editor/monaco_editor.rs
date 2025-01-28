@@ -1,12 +1,12 @@
-use std::ops::Deref;
+use std::{collections::BTreeSet, ops::Deref, vec};
 
 use dioxus::prelude::*;
-use dioxus_logger::tracing::info;
 use monaco::{
-    api::{CodeEditor as MonacoController, TextModel},
+    api::{CodeEditor as MonacoController, DisposableClosure, TextModel},
     sys::{
         editor::{
-            IModelDecorationOptions, IModelDeltaDecoration, IStandaloneEditorConstructionOptions,
+            IEditorMouseEvent, IModelDecorationOptions, IModelDeltaDecoration,
+            IStandaloneEditorConstructionOptions, MouseTargetType,
         },
         IRange, Range,
     },
@@ -26,11 +26,17 @@ pub fn MonacoEditor(
     options: ReadOnlySignal<Option<IStandaloneEditorConstructionOptions>>,
     model: ReadOnlySignal<Option<TextModel>>,
     line_highlights: ReadOnlySignal<Vec<LineHighlight>>,
+    breakpoints: Signal<BTreeSet<usize>>,
 ) -> Element {
     let mut editor = use_signal::<Option<MonacoController>>(|| None);
     let element_id = "monaco-editor";
 
     let mut curr_decorations = use_signal(|| js_sys::Array::new());
+
+    let mut mouse_handlers: Signal<Vec<DisposableClosure<dyn FnMut(IEditorMouseEvent)>>> =
+        use_signal(|| vec![]);
+
+    let breakpoint_hover_line: Signal<Option<usize>> = use_signal(|| None);
 
     // create editor
     use_effect(move || {
@@ -40,7 +46,14 @@ pub fn MonacoEditor(
             .and_then(|e| e.dyn_into::<web_sys::HtmlElement>().ok())
         {
             let options = options.read().deref().clone();
-            *editor.write() = Some(MonacoController::create(&el, options));
+            let controller = MonacoController::create(&el, options);
+            mouse_handlers
+                .write()
+                .push(controller.on_mouse_move(move |e| on_mouse_move(e, breakpoint_hover_line)));
+            mouse_handlers
+                .write()
+                .push(controller.on_mouse_down(move |e| on_mouse_click(e, breakpoints)));
+            *editor.write() = Some(controller);
         }
     });
 
@@ -54,18 +67,30 @@ pub fn MonacoEditor(
         }
     });
 
-    // handle line highlight changes
+    // handle decorators
     use_effect(move || {
         if let Some(editor_instance) = editor.write().as_mut() {
             if let Some(model) = editor_instance.get_model().as_ref() {
-                // find new highlights
                 let new_decor = js_sys::Array::new();
-                info!("line_highlights: {:?}", line_highlights.read());
+
+                // find new highlights
                 for line_highlight in line_highlights.read().iter() {
                     new_decor.push(&line_decoration(
                         line_highlight.line,
                         line_highlight.css_class,
                     ));
+                }
+
+                // add breakpoint hover dot
+                if let Some(line) = *breakpoint_hover_line.read() {
+                    if !breakpoints.read().contains(&line) {
+                        new_decor.push(&breakpoint_decoration(line, "monaco-breakpoint-preview"));
+                    }
+                }
+
+                // add breakpoints
+                for line in breakpoints.read().iter() {
+                    new_decor.push(&breakpoint_decoration(*line, "monaco-breakpoint"));
                 }
 
                 // apply highlights
@@ -85,8 +110,29 @@ pub fn MonacoEditor(
     }
 }
 
-// Example usage function
-pub fn line_decoration(line_number: usize, color: &'static str) -> IModelDeltaDecoration {
+fn on_mouse_move(e: IEditorMouseEvent, mut breakpoint_hover_line: Signal<Option<usize>>) {
+    let hover_target = e.target().type_();
+    let on_margin_or_number = hover_target == MouseTargetType::GutterGlyphMargin
+        || hover_target == MouseTargetType::GutterLineNumbers;
+    if on_margin_or_number {
+        if let Some(line) = e.target().position().map(|p| p.line_number() as usize) {
+            breakpoint_hover_line.set(Some(line));
+        }
+    } else {
+        breakpoint_hover_line.set(None);
+    }
+}
+
+fn on_mouse_click(e: IEditorMouseEvent, mut breakpoints: Signal<BTreeSet<usize>>) {
+    let on_margin = e.target().type_() == MouseTargetType::GutterGlyphMargin;
+    if on_margin {
+        if let Some(line) = e.target().position().map(|p| p.line_number() as usize) {
+            breakpoints.write().insert(line);
+        }
+    }
+}
+
+fn line_decoration(line_number: usize, class: &'static str) -> IModelDeltaDecoration {
     let decoration: IModelDeltaDecoration = new_object().into();
     let range = Range::new(line_number as f64, 0.0, line_number as f64, 1.0);
     decoration.set_range(&IRange::from(range.dyn_into::<JsValue>().unwrap()));
@@ -94,7 +140,20 @@ pub fn line_decoration(line_number: usize, color: &'static str) -> IModelDeltaDe
     let options: IModelDecorationOptions = new_object().into();
     options.set_is_whole_line(Some(true));
     options.set_z_index(Some(9999.0));
-    options.set_class_name(Some(color));
+    options.set_class_name(Some(class));
+
+    decoration.set_options(&options);
+
+    decoration.into()
+}
+
+fn breakpoint_decoration(line_number: usize, class: &'static str) -> IModelDeltaDecoration {
+    let decoration: IModelDeltaDecoration = new_object().into();
+    let range = Range::new(line_number as f64, 1.0, line_number as f64, 1.0);
+    decoration.set_range(&IRange::from(range.dyn_into::<JsValue>().unwrap()));
+
+    let options: IModelDecorationOptions = new_object().into();
+    options.set_glyph_margin_class_name(Some(class));
 
     decoration.set_options(&options);
 
