@@ -14,4 +14,23 @@
         outline: #d97706 2px solid;
         outline-offset: -2px;
     }
+
+    .monaco-breakpoint {
+        width: 8px !important;
+        height: 8px !important;
+        border-radius: 100%;
+        background-color: #e51400;
+        margin: 4px 0 0 8px;
+        cursor: pointer;
+    }
+
+    .monaco-breakpoint-preview {
+        width: 8px !important;
+        height: 8px !important;
+        border-radius: 100%;
+        background-color: #e51400;
+        margin: 4px 0 0 8px;
+        cursor: pointer;
+        opacity: 0.4 !important;
+    }
 }

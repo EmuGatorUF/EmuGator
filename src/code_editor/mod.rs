@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use dioxus::prelude::*;
 
 mod highlight;
@@ -15,6 +17,7 @@ pub use monaco_editor::LineHighlight;
 pub fn CodeEditor(
     mut source: Signal<String>,
     line_highlights: ReadOnlySignal<Vec<LineHighlight>>,
+    breakpoints: Signal<BTreeSet<usize>>,
 ) -> Element {
     // basic model
     // TODO: support external changes to source being reflected in the model
@@ -38,6 +41,7 @@ pub fn CodeEditor(
             .with_automatic_layout(true)
             .with_builtin_theme(monaco::sys::editor::BuiltinTheme::VsDark)
             .to_sys_options();
+        options.set_glyph_margin(Some(true));
 
         // disable the minimap
         let disable_minimap = IEditorMinimapOptions::default();
@@ -48,6 +52,11 @@ pub fn CodeEditor(
     });
 
     rsx! {
-        MonacoEditor { model: model(), options: options(), line_highlights }
+        MonacoEditor {
+            model: model(),
+            options: options(),
+            line_highlights,
+            breakpoints,
+        }
     }
 }
