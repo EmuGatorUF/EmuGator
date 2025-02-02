@@ -79,6 +79,7 @@ fn rw_memory(
 
 pub fn clock(org_state: &EmulatorState, program: &mut AssembledProgram) -> EmulatorState {
     let mut next_state = org_state.clone();
+    next_state.pipeline.datapath.debug_req_i = false;
 
     // Load the fetched instruction into the instr_rdata lines
     if next_state.pipeline.datapath.instr_req_o {
@@ -91,10 +92,17 @@ pub fn clock(org_state: &EmulatorState, program: &mut AssembledProgram) -> Emula
             0,
         ) {
             Ok(instr) => {
-                next_state.pipeline.datapath.instr_rdata_i = instr;
-                next_state.pipeline.datapath.instr_gnt_i = true;
-                next_state.pipeline.datapath.instr_rvalid_i = true;
-                next_state.pipeline.datapath.instr_err_i = false;
+                // if instruction fetched is default, i.e invalid
+                if instr == 0 {
+                    next_state.pipeline.datapath.instr_gnt_i = true;
+                    next_state.pipeline.datapath.instr_rvalid_i = false;
+                    next_state.pipeline.datapath.instr_err_i = true;
+                } else {
+                    next_state.pipeline.datapath.instr_rdata_i = instr;
+                    next_state.pipeline.datapath.instr_gnt_i = true;
+                    next_state.pipeline.datapath.instr_rvalid_i = true;
+                    next_state.pipeline.datapath.instr_err_i = false;
+                }
 
                 next_state.pipeline.IF = next_state.pipeline.datapath.instr_rdata_i;
                 next_state.pipeline.IF_pc = next_state.pipeline.datapath.instr_addr_o;
@@ -143,6 +151,11 @@ pub fn clock(org_state: &EmulatorState, program: &mut AssembledProgram) -> Emula
         next_state.pipeline.ID = next_state.pipeline.IF;
         next_state.pipeline.ID_pc = next_state.pipeline.IF_pc;
         next_state.pipeline.datapath.instr_addr_o += 4;
+    } else {
+        // if instruction is acutally a branch instruction, then the next fetch isn't gonna happen, so it isn't invalid.
+        next_state.pipeline.datapath.instr_gnt_i = true;
+        next_state.pipeline.datapath.instr_rvalid_i = true;
+        next_state.pipeline.datapath.instr_err_i = false;
     }
     return next_state;
 }
