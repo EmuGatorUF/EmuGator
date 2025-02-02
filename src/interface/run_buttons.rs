@@ -4,6 +4,7 @@ use crate::emulator::{self, EmulatorState};
 use dioxus::prelude::*;
 use dioxus_logger::tracing::info;
 use std::ops::Deref;
+use std::collections::BTreeSet;
 
 #[component]
 #[allow(non_snake_case)]
@@ -11,6 +12,7 @@ pub fn RunButtons(
     source: Signal<String>,
     assembled_program: Signal<Option<AssembledProgram>>,
     emulator_state: Signal<EmulatorState>,
+    breakpoints: Signal<BTreeSet<usize>>,
 ) -> Element {
     rsx! {
         // bottom margin
@@ -56,13 +58,24 @@ pub fn RunButtons(
                                 &mut *program,
                             );
                             *(emulator_state.write()) = new_state;
-                            while !emulator_state.read().deref().pipeline.datapath.debug_req_i && !emulator_state.read().deref().pipeline.datapath.instr_err_i {
+
+                            // TODO: Change to use function in interface/mod.rs or turn into function?
+                            let mut reached_breakpoint = false;
+                            if let Some(line) = (*program).source_map.get_by_left(&emulator_state.read().pipeline.ID_pc).copied(){
+                                reached_breakpoint = breakpoints.read().contains(&line);
+                            }
+
+                            // while emulator hasn't hit an EBREAK, end of program, or a breakpoint
+                            while !emulator_state.read().deref().pipeline.datapath.debug_req_i && !emulator_state.read().deref().pipeline.datapath.instr_err_i && !reached_breakpoint {
                                 let new_state = emulator::clock(
                                     emulator_state.read().deref(),
                                     &mut *program,
                                 );
                                 *(emulator_state.write()) = new_state;
-                                println!("Clock");
+
+                                if let Some(line) = (*program).source_map.get_by_left(&emulator_state.read().pipeline.ID_pc).copied(){
+                                    reached_breakpoint = breakpoints.read().contains(&line);
+                                }
                             }
                         }
                     },

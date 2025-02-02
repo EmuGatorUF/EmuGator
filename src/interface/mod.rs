@@ -69,7 +69,7 @@ pub fn App() -> Element {
 
         div { class: "flex h-screen w-full",
             div { class: "w-1/2 pt-4 flex flex-col h-full bg-[#1E1E1E]",
-                RunButtons { source, assembled_program, emulator_state }
+                RunButtons { source, assembled_program, emulator_state, breakpoints }
                 div { class: "flex-grow",
                     CodeEditor { source, line_highlights, breakpoints }
                 }
