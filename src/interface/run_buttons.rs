@@ -47,6 +47,27 @@ pub fn RunButtons(
                     },
                     "Next Clock"
                 }
+                button {
+                    class: "bg-purple-500 hover:bg-purple-600 text-s text-white font-bold py-1 px-2 rounded",
+                    onclick: move |_| {
+                        if let Some(mut program) = assembled_program.as_mut() {
+                            let new_state = emulator::clock(
+                                emulator_state.read().deref(),
+                                &mut *program,
+                            );
+                            *(emulator_state.write()) = new_state;
+                            while !emulator_state.read().deref().pipeline.datapath.debug_req_i && !emulator_state.read().deref().pipeline.datapath.instr_err_i {
+                                let new_state = emulator::clock(
+                                    emulator_state.read().deref(),
+                                    &mut *program,
+                                );
+                                *(emulator_state.write()) = new_state;
+                                println!("Clock");
+                            }
+                        }
+                    },
+                    "Run to Break"
+                }
             }
         }
     }
