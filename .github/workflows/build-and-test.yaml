@@ -1,15 +1,13 @@
 on: [push]
 
-name: CI
+name: Rust Tests
 
 jobs:
   build_and_test:
     name: Rust project
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Build Tailwind
-        run: npm run tailwind
+      - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
