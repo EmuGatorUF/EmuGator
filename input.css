@@ -1,6 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@layer base, components, utilities;
 
 @layer utilities {
     .if-pc-decoration {
