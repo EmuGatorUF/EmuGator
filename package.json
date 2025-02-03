@@ -4,6 +4,6 @@
     "tailwind": "tailwindcss -i ./input.css -o ./assets/tailwind.css --watch"
   },
   "devDependencies": {
-    "tailwindcss": "^3.4.13"
+    "tailwindcss": "^3.4.17"
   }
 }

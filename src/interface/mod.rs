@@ -68,7 +68,7 @@ pub fn App() -> Element {
         document::Stylesheet { href: asset!("/assets/tailwind.css") }
 
         div { class: "flex h-screen w-full",
-            div { class: "w-1/2 pt-4 flex flex-col h-full bg-[#1E1E1E]",
+            div { class: "w-1/2 pt-4 flex flex-col h-full bg-[#1E1E1E] overflow-hidden",
                 RunButtons { source, assembled_program, emulator_state }
                 div { class: "flex-grow",
                     CodeEditor { source, line_highlights, breakpoints }
