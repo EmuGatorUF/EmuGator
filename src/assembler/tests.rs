@@ -40,6 +40,25 @@ fn print_some_output() {
 }
 
 #[test]
+fn test_large_word() {
+    let program = ".data\nwords: .word 12345678";
+    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let (_, _, data_mem) = assembled_program.emulator_maps();
+
+    // these bytes are just 12345678 in little endian so essentially what .word should store
+    let expected_bytes = [0x4E, 0x61, 0xBC, 0x00];
+
+    for i in 0..4 {
+        assert_eq!(
+            data_mem.get(&(i as u32)),
+            Some(&expected_bytes[i]),
+            "Mismatch at byte {} of word value",
+            i
+        );
+    }
+}
+
+#[test]
 fn test_ADD() {
     let program = ".text\nADD X1, X2, X3";
     let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));

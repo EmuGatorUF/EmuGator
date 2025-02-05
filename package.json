@@ -7,5 +7,16 @@
   "devDependencies": {
     "@tailwindcss/cli": "^4.0.3",
     "tailwindcss": "^4.0.3"
-  }
+  },
+  "name": "emugator",
+  "version": "1.0.0",
+  "description": "University of Florida Computer Engineering Design Project",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }

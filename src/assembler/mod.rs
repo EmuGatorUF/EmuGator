@@ -189,7 +189,7 @@ fn parse_data_line(line: &str) -> Result<Option<(String, DataItem)>, String> {
         ".byte" => {
             let bytes = values
                 .iter()
-                .map(|v| parse_number(v))
+                .map(|v| parse_number(v).map(|n| n as u8))
                 .collect::<Result<Vec<u8>, _>>()?;
             Ok(Some((
                 String::new(),
@@ -202,7 +202,7 @@ fn parse_data_line(line: &str) -> Result<Option<(String, DataItem)>, String> {
         ".word" => {
             let mut bytes = Vec::new();
             for value in &values {
-                let word = parse_number(value)? as u32;
+                let word = parse_number(value)?;
                 bytes.extend_from_slice(&word.to_le_bytes());
             }
             Ok(Some((
@@ -236,12 +236,12 @@ fn parse_data_line(line: &str) -> Result<Option<(String, DataItem)>, String> {
     }
 }
 
-fn parse_number(value: &str) -> Result<u8, String> {
+fn parse_number(value: &str) -> Result<u32, String> {
     let value = value.trim();
     if value.starts_with("0x") {
-        u8::from_str_radix(&value[2..], 16)
+        u32::from_str_radix(&value[2..], 16)
     } else {
-        value.parse::<u8>()
+        value.parse::<u32>()
     }
     .map_err(|_| format!("Invalid numeric value: {}", value))
 }
