@@ -9,7 +9,15 @@ use crate::include_test_file;
 #[test]
 fn print_some_output() {
     let program = include_test_file!("simple-loop.s");
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, source_map, data_mem) = assembled_program.emulator_maps();
 
     println!("Instruction Memory (Address -> Byte):");
@@ -42,7 +50,15 @@ fn print_some_output() {
 #[test]
 fn test_large_word() {
     let program = ".data\nwords: .word 12345678";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (_, _, data_mem) = assembled_program.emulator_maps();
 
     // these bytes are just 12345678 in little endian so essentially what .word should store
@@ -61,7 +77,15 @@ fn test_large_word() {
 #[test]
 fn test_ADD() {
     let program = ".text\nADD X1, X2, X3";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0xB3, 0x00, 0x31, 0x00];
@@ -79,7 +103,15 @@ fn test_ADD() {
 #[test]
 fn test_SUB() {
     let program = ".text\nSUB X1, X2, X3";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0xB3, 0x00, 0x31, 0x40];
@@ -97,7 +129,15 @@ fn test_SUB() {
 #[test]
 fn test_SLT() {
     let program = ".text\nSLT X1, X2, X3";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0xB3, 0x20, 0x31, 0x00];
@@ -115,7 +155,15 @@ fn test_SLT() {
 #[test]
 fn test_SLTU() {
     let program = ".text\nSLTU X1, X2, X3";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0xB3, 0x30, 0x31, 0x00];
@@ -133,7 +181,15 @@ fn test_SLTU() {
 #[test]
 fn test_AND() {
     let program = ".text\nAND X1, X2, X3";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0xB3, 0x70, 0x31, 0x00];
@@ -151,7 +207,15 @@ fn test_AND() {
 #[test]
 fn test_OR() {
     let program = ".text\nOR X1, X2, X3";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0xB3, 0x60, 0x31, 0x00];
@@ -169,7 +233,15 @@ fn test_OR() {
 #[test]
 fn test_XOR() {
     let program = ".text\nXOR X1, X2, X3";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0xB3, 0x40, 0x31, 0x00];
@@ -187,7 +259,15 @@ fn test_XOR() {
 #[test]
 fn test_SLL() {
     let program = ".text\nSLL X1, X2, X3";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0xB3, 0x10, 0x31, 0x00];
@@ -205,7 +285,15 @@ fn test_SLL() {
 #[test]
 fn test_SRL() {
     let program = ".text\nSRL X1, X2, X3";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0xB3, 0x50, 0x31, 0x00];
@@ -223,7 +311,15 @@ fn test_SRL() {
 #[test]
 fn test_SRA() {
     let program = ".text\nSRA X1, X2, X3";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0xB3, 0x50, 0x31, 0x40];
@@ -241,7 +337,15 @@ fn test_SRA() {
 #[test]
 fn test_ADDI() {
     let program = ".text\nADDI X1, X2, 10";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0x93, 0x00, 0xA1, 0x00];
@@ -259,7 +363,15 @@ fn test_ADDI() {
 #[test]
 fn test_SLTI() {
     let program = ".text\nSLTI X1, X2, 10";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0x93, 0x20, 0xA1, 0x00];
@@ -277,7 +389,15 @@ fn test_SLTI() {
 #[test]
 fn test_SLTIU() {
     let program = ".text\nSLTIU X1, X2, 10";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0x93, 0x30, 0xA1, 0x00];
@@ -295,7 +415,15 @@ fn test_SLTIU() {
 #[test]
 fn test_ANDI() {
     let program = ".text\nANDI X1, X2, 0xFF";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0x93, 0x70, 0xF1, 0x0F];
@@ -313,7 +441,15 @@ fn test_ANDI() {
 #[test]
 fn test_ORI() {
     let program = ".text\nORI X1, X2, 0xFF";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0x93, 0x60, 0xF1, 0x0F];
@@ -331,7 +467,15 @@ fn test_ORI() {
 #[test]
 fn test_XORI() {
     let program = ".text\nXORI X1, X2, 0xFF";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0x93, 0x40, 0xF1, 0x0F];
@@ -349,7 +493,15 @@ fn test_XORI() {
 #[test]
 fn test_SLLI() {
     let program = ".text\nSLLI X1, X2, 2";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0x93, 0x10, 0x21, 0x00];
@@ -367,7 +519,15 @@ fn test_SLLI() {
 #[test]
 fn test_SRLI() {
     let program = ".text\nSRLI X1, X2, 2";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0x93, 0x50, 0x21, 0x00];
@@ -385,7 +545,15 @@ fn test_SRLI() {
 #[test]
 fn test_SRAI() {
     let program = ".text\nSRAI X1, X2, 2";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0x93, 0x50, 0x21, 0x40];
@@ -403,7 +571,15 @@ fn test_SRAI() {
 #[test]
 fn test_JALR() {
     let program = ".text\nJALR X1, X2, 0x100";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0xE7, 0x00, 0x01, 0x10];
@@ -421,7 +597,15 @@ fn test_JALR() {
 #[test]
 fn test_LW() {
     let program = ".text\nLW X1, 0(X2)";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0x83, 0x20, 0x01, 0x00];
@@ -439,7 +623,15 @@ fn test_LW() {
 #[test]
 fn test_LH() {
     let program = ".text\nLH X1, 0(X2)";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0x83, 0x10, 0x01, 0x00];
@@ -457,7 +649,15 @@ fn test_LH() {
 #[test]
 fn test_LHU() {
     let program = ".text\nLHU X1, 0(X2)";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0x83, 0x50, 0x01, 0x00];
@@ -475,7 +675,15 @@ fn test_LHU() {
 #[test]
 fn test_LB() {
     let program = ".text\nLB X1, 0(X2)";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0x83, 0x00, 0x01, 0x00];
@@ -493,7 +701,15 @@ fn test_LB() {
 #[test]
 fn test_LBU() {
     let program = ".text\nLBU X1, 0(X2)";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0x83, 0x40, 0x01, 0x00];
@@ -511,7 +727,15 @@ fn test_LBU() {
 #[test]
 fn test_FENCE() {
     let program = ".text\nFENCE";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0x0F, 0x00, 0x00, 0x00];
@@ -529,7 +753,15 @@ fn test_FENCE() {
 #[test]
 fn test_ECALL() {
     let program = ".text\nECALL";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0x73, 0x00, 0x00, 0x00];
@@ -547,7 +779,15 @@ fn test_ECALL() {
 #[test]
 fn test_EBREAK() {
     let program = ".text\nEBREAK";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0x73, 0x00, 0x10, 0x00];
@@ -565,7 +805,15 @@ fn test_EBREAK() {
 #[test]
 fn test_BEQ() {
     let program = ".text\nlabel:\nBEQ X1, X2, label";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0x63, 0x80, 0x20, 0x00];
@@ -583,7 +831,15 @@ fn test_BEQ() {
 #[test]
 fn test_BNE() {
     let program = ".text\nlabel:\nBNE X1, X2, label";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0x63, 0x90, 0x20, 0x00];
@@ -601,7 +857,15 @@ fn test_BNE() {
 #[test]
 fn test_BLT() {
     let program = ".text\nlabel:\nBLT X1, X2, label";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0x63, 0xC0, 0x20, 0x00];
@@ -619,7 +883,15 @@ fn test_BLT() {
 #[test]
 fn test_BLTU() {
     let program = ".text\nlabel:\nBLTU X1, X2, label";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0x63, 0xE0, 0x20, 0x00];
@@ -637,7 +909,15 @@ fn test_BLTU() {
 #[test]
 fn test_BGE() {
     let program = ".text\nlabel:\nBGE X1, X2, label";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0x63, 0xD0, 0x20, 0x00];
@@ -655,7 +935,15 @@ fn test_BGE() {
 #[test]
 fn test_BGEU() {
     let program = ".text\nlabel:\nBGEU X1, X2, label";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0x63, 0xF0, 0x20, 0x00];
@@ -673,7 +961,15 @@ fn test_BGEU() {
 #[test]
 fn test_LUI() {
     let program = ".text\nLUI X1, 0xFFF";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0xB7, 0xF0, 0xFF, 0x00];
@@ -691,7 +987,15 @@ fn test_LUI() {
 #[test]
 fn test_AUIPC() {
     let program = ".text\nAUIPC X1, 0xFFF";
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0x97, 0xF0, 0xFF, 0x00];
@@ -709,7 +1013,15 @@ fn test_AUIPC() {
 #[test]
 fn assembler_different_locations() {
     let program = include_test_file!("different-locations.s");
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, source_map, data_mem) = assembled_program.emulator_maps();
 
     // actual instruction memory
@@ -805,7 +1117,15 @@ fn assembler_different_locations() {
 #[test]
 fn assembler_simple_loop() {
     let program = include_test_file!("simple-loop.s");
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, source_map, data_mem) = assembled_program.emulator_maps();
 
     // Verify instruction memory
@@ -972,7 +1292,15 @@ fn assembler_simple_loop() {
 #[test]
 fn assembler_all_instructions() {
     let program = include_test_file!("syntax-check.s");
-    let assembled_program = assemble(program).unwrap_or_else(|e| panic!("Assembly Error: {}", e));
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
     let (inst_mem, source_map, data_mem) = assembled_program.emulator_maps();
 
     // actual instruction memory

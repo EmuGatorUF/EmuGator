@@ -1,8 +1,8 @@
+use bimap::BiBTreeMap;
 use std::{
     collections::{BTreeMap, HashMap},
     str::FromStr,
 };
-use bimap::BiBTreeMap;
 
 #[derive(Debug)]
 pub struct AssembledProgram {
@@ -40,12 +40,17 @@ impl AssembledProgram {
         }
     }
 
-    pub fn add_label(&mut self, label: String, address: u32, is_data: bool) {
+    pub fn add_label(&mut self, label: String, address: u32, is_data: bool) -> Result<(), String> {
+        if self.labels.contains_key(&label) || self.data_labels.contains_key(&label) {
+            return Err(format!("Label '{}' is already defined", label));
+        }
+
         if is_data {
             self.data_labels.insert(label, address);
         } else {
             self.labels.insert(label, address);
         }
+        Ok(())
     }
 
     pub fn add_instruction(&mut self, address: u32, encoded: u32, line_num: usize) {

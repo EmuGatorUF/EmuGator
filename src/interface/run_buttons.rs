@@ -26,8 +26,13 @@ pub fn RunButtons(
                             emulator_state.set(new_state);
                             assembled_program.set(Some(assembled));
                         }
-                        Err(e) => {
-                            info!("Error assembling program: {}", e);
+                        Err(errors) => {
+                            for error in errors {
+                                info!(
+                                    "Assembly Error on line {}, column {}: {}", error.line_number,
+                                    error.column, error.error_message
+                                );
+                            }
                         }
                     }
                 },
