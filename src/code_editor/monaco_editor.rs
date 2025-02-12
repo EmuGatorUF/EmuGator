@@ -1,5 +1,6 @@
 use std::{collections::BTreeSet, ops::Deref, vec};
 
+use super::new_object;
 use dioxus::prelude::*;
 use monaco::{
     api::{CodeEditor as MonacoController, DisposableClosure, TextModel},
@@ -162,9 +163,4 @@ fn breakpoint_decoration(line_number: usize, class: &'static str) -> IModelDelta
     decoration.set_options(&options);
 
     decoration.into()
-}
-
-// Creates a new `JsValue`. Done for convenience and readability.
-fn new_object() -> JsValue {
-    js_sys::Object::new().into()
 }

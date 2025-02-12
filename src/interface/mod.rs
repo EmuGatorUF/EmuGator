@@ -16,7 +16,7 @@ use self::{
     register_view::RegisterView, run_buttons::RunButtons, uart_view::UartView,
 };
 use crate::{
-    assembler::AssembledProgram,
+    assembler::{AssembledProgram, AssemblerError},
     code_editor::{CodeEditor, LineHighlight},
     emulator::EmulatorState,
     include_test_file,
@@ -28,6 +28,7 @@ use crate::{
 pub fn App() -> Element {
     let source = use_signal(|| include_test_file!("prototype-demo.s").to_string());
     let assembled_program: Signal<Option<AssembledProgram>> = use_signal(|| None);
+    let assembler_errors: Signal<Vec<AssemblerError>> = use_signal(|| Vec::new());
     let emulator_state: Signal<EmulatorState> = use_signal(|| EmulatorState::default());
     let breakpoints: Signal<BTreeSet<usize>> = use_signal(|| BTreeSet::new());
     let uart_module: Signal<Uart> = use_signal(|| Uart::default());

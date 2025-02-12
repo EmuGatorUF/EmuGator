@@ -1,9 +1,8 @@
-use crate::assembler::{self, AssembledProgram, Section};
+use crate::assembler::{self, AssembledProgram, AssemblerError, Section};
 use crate::emulator::{self, EmulatorState};
 use crate::uart::{trigger_uart, Uart};
 
 use dioxus::prelude::*;
-use dioxus_logger::tracing::info;
 use std::ops::Deref;
 
 #[component]
@@ -11,6 +10,7 @@ use std::ops::Deref;
 pub fn RunButtons(
     source: Signal<String>,
     assembled_program: Signal<Option<AssembledProgram>>,
+    assembler_errors: Signal<Vec<AssemblerError>>,
     emulator_state: Signal<EmulatorState>,
     uart_module: Signal<Uart>,
 ) -> Element {
@@ -36,14 +36,11 @@ pub fn RunButtons(
                             assembled.data_memory.insert(new_uart.lsr_address, 0);
 
                             assembled_program.set(Some(assembled));
+                            assembler_errors.set(Vec::new());
                         }
                         Err(errors) => {
-                            for error in errors {
-                                info!(
-                                    "Assembly Error on line {}, column {}: {}", error.line_number,
-                                    error.column, error.error_message
-                                );
-                            }
+                            assembled_program.set(None);
+                            assembler_errors.set(errors);
                         }
                     }
                 },
