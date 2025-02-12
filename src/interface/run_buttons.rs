@@ -1,8 +1,7 @@
-use crate::assembler::{self, AssembledProgram, Section};
+use crate::assembler::{self, AssembledProgram, AssemblerError, Section};
 use crate::emulator::{self, EmulatorState};
 
 use dioxus::prelude::*;
-use dioxus_logger::tracing::info;
 use std::ops::Deref;
 
 #[component]
@@ -10,6 +9,7 @@ use std::ops::Deref;
 pub fn RunButtons(
     source: Signal<String>,
     assembled_program: Signal<Option<AssembledProgram>>,
+    assembler_errors: Signal<Vec<AssemblerError>>,
     emulator_state: Signal<EmulatorState>,
 ) -> Element {
     rsx! {
@@ -25,14 +25,11 @@ pub fn RunButtons(
                             new_state.pipeline.datapath.instr_addr_o = start_addr;
                             emulator_state.set(new_state);
                             assembled_program.set(Some(assembled));
+                            assembler_errors.set(Vec::new());
                         }
                         Err(errors) => {
-                            for error in errors {
-                                info!(
-                                    "Assembly Error on line {}, column {}: {}", error.line_number,
-                                    error.column, error.error_message
-                                );
-                            }
+                            assembled_program.set(None);
+                            assembler_errors.set(errors);
                         }
                     }
                 },

@@ -15,7 +15,7 @@ use self::{
     register_view::RegisterView, run_buttons::RunButtons,
 };
 use crate::{
-    assembler::AssembledProgram,
+    assembler::{AssembledProgram, AssemblerError},
     code_editor::{CodeEditor, LineHighlight},
     emulator::EmulatorState,
     include_test_file,
@@ -26,6 +26,7 @@ use crate::{
 pub fn App() -> Element {
     let source = use_signal(|| include_test_file!("prototype-demo.s").to_string());
     let assembled_program: Signal<Option<AssembledProgram>> = use_signal(|| None);
+    let assembler_errors: Signal<Vec<AssemblerError>> = use_signal(|| Vec::new());
     let emulator_state: Signal<EmulatorState> = use_signal(|| EmulatorState::default());
     let breakpoints: Signal<BTreeSet<usize>> = use_signal(|| BTreeSet::new());
 
@@ -69,9 +70,19 @@ pub fn App() -> Element {
 
         div { class: "flex h-screen w-full",
             div { class: "w-1/2 pt-4 flex flex-col h-full bg-[#1E1E1E] overflow-hidden",
-                RunButtons { source, assembled_program, emulator_state }
+                RunButtons {
+                    source,
+                    assembled_program,
+                    assembler_errors,
+                    emulator_state,
+                }
                 div { class: "flex-grow",
-                    CodeEditor { source, line_highlights, breakpoints }
+                    CodeEditor {
+                        source,
+                        line_highlights,
+                        breakpoints,
+                        assembler_errors,
+                    }
                 }
             }
             div { class: "w-1/2 flex flex-col",
