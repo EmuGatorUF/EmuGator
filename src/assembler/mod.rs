@@ -5,7 +5,7 @@ mod assembled_program;
 mod lexer;
 
 pub use assembled_program::{AssembledProgram, Section};
-pub use lexer::Lexer;
+pub use lexer::*;
 
 use std::{
     collections::{BTreeMap, HashMap},
