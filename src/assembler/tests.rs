@@ -1,9 +1,19 @@
 use std::collections::BTreeMap;
 
-use bimap::BiBTreeMap;
-
 use super::*;
 use crate::include_test_file;
+
+#[test]
+fn test_lexer() {
+    let source = include_test_file!("syntax-check.s");
+
+    let mut lexer = Lexer::new(source).peekable();
+    let tokens: Vec<_> = lexer.map(|token_result| token_result.unwrap()).collect();
+
+    for token in tokens {
+        println!("{:?}", token);
+    }
+}
 
 #[ignore]
 #[test]
