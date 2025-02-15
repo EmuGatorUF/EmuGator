@@ -17,6 +17,8 @@ monaco = "0.5"
 
 # wasm stuff
 wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4.43"
+wasm-bindgen-spawn = { path = "../wasm-bindgen-spawn" }
 web-sys = "0.3"
 js-sys = "0.3"
 
