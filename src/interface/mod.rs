@@ -9,6 +9,7 @@ use std::collections::BTreeSet;
 
 use dioxus::prelude::*;
 use dioxus_logger::tracing::info;
+use web_sys::Worker;
 
 use self::{
     datapath_visualization::DatapathVisualization, memory_view::MemoryView,
@@ -25,6 +26,7 @@ use crate::{
 #[allow(non_snake_case)]
 pub fn App() -> Element {
     let workerRunning: bool = false;
+    let mainWorker: Signal<Worker> = use_signal(|| Worker::new("/mainworker.js").unwrap());
     let source = use_signal(|| include_test_file!("prototype-demo.s").to_string());
     let assembled_program: Signal<Option<AssembledProgram>> = use_signal(|| None);
     let emulator_state: Signal<EmulatorState> = use_signal(|| EmulatorState::default());
@@ -70,7 +72,7 @@ pub fn App() -> Element {
 
         div { class: "flex h-screen w-full",
             div { class: "w-1/2 pt-4 flex flex-col h-full bg-[#1E1E1E]",
-                RunButtons { source, assembled_program, emulator_state, breakpoints, workerRunning }
+                RunButtons { source, assembled_program, emulator_state, breakpoints, workerRunning, mainWorker }
                 div { class: "flex-grow",
                     CodeEditor { source, line_highlights, breakpoints }
                 }
