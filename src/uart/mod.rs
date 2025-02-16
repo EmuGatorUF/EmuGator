@@ -1,7 +1,5 @@
 use std::collections::BTreeMap;
 
-use dioxus_logger::tracing::info;
-
 // UART Module for EmuGator
 
 // Fun Fact: John Uart created the UART protocol in ⧫︎♒︎♋︎■︎🙵⬧︎ ♐︎□︎❒︎ ●︎□︎□︎🙵♓︎■︎♑︎✏︎
@@ -40,7 +38,7 @@ impl Uart {
     pub fn default() -> Self {
         // TODO: Switch to these values once larger immediates are supported
         // Uart::new(vec![], 0x3FF0, 0x3FF4, 0, 0, 0x3FF8)
-        Uart::new(vec![], 0xF0, 0xF4, 0, 0, 0xF8)
+        Uart::new(vec![], 0xF0, 0xF4, 0xF8, 0, 0)
     }
 }
 
@@ -55,15 +53,16 @@ pub enum LineStatusRegisterBitMask {
 
 pub fn trigger_uart(uart_module: Uart, data_memory: &mut BTreeMap<u32, u8>) -> Uart {
     let mut next_uart = uart_module.clone();
-    //
-    // Debug print the output buffer
-    info!("UART Output Buffer: {:?}", next_uart.uart_output_buffer);
-    info!("Data Memory: {:?}", data_memory);
 
-    // Check if Tx buffer is empty
-    if data_memory.get(&next_uart.tx_buffer_address).is_none() {
+    // Check if Tx buffer is empty (either not set or set to 0)
+    if data_memory.get(&next_uart.tx_buffer_address).is_none()
+        || data_memory.get(&next_uart.tx_buffer_address).unwrap() == &0
+    {
         // Set TransmitReady bit in LSR and return
-        data_memory.insert(next_uart.lsr_address, LineStatusRegisterBitMask::TransmitReady as u8);
+        data_memory.insert(
+            next_uart.lsr_address,
+            LineStatusRegisterBitMask::TransmitReady as u8,
+        );
         return next_uart;
     }
 
@@ -76,7 +75,10 @@ pub fn trigger_uart(uart_module: Uart, data_memory: &mut BTreeMap<u32, u8>) -> U
         data_memory.insert(next_uart.tx_buffer_address, 0);
 
         // Set TransmitReady bit in LSR
-        data_memory.insert(next_uart.lsr_address, LineStatusRegisterBitMask::TransmitReady as u8);
+        data_memory.insert(
+            next_uart.lsr_address,
+            LineStatusRegisterBitMask::TransmitReady as u8,
+        );
 
         // Set byte in buffer
         next_uart.uart_output_buffer.push(byte);
@@ -88,9 +90,11 @@ pub fn trigger_uart(uart_module: Uart, data_memory: &mut BTreeMap<u32, u8>) -> U
         next_uart.uart_cycle_count -= 1;
 
         // Set LSR to TransmitBusy
-        data_memory.insert(next_uart.lsr_address, LineStatusRegisterBitMask::TransmitBusy as u8);
+        data_memory.insert(
+            next_uart.lsr_address,
+            LineStatusRegisterBitMask::TransmitBusy as u8,
+        );
     }
-
 
     next_uart
 }
