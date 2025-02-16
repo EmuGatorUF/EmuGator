@@ -1,5 +1,6 @@
 use crate::assembler::{self, AssembledProgram, Section};
 use crate::emulator::{self, EmulatorState};
+use crate::uart::{Uart, trigger_uart};
 
 use dioxus::prelude::*;
 use dioxus_logger::tracing::info;
@@ -11,6 +12,7 @@ pub fn RunButtons(
     source: Signal<String>,
     assembled_program: Signal<Option<AssembledProgram>>,
     emulator_state: Signal<EmulatorState>,
+    uart_module: Signal<Uart>,
 ) -> Element {
     rsx! {
         // bottom margin
@@ -48,6 +50,12 @@ pub fn RunButtons(
                                 &mut *program,
                             );
                             *(emulator_state.write()) = new_state;
+
+                            let new_uart = trigger_uart(
+                                uart_module.read().deref().clone(),
+                                &mut program.data_memory,
+                            );
+                            *(uart_module.write()) = new_uart;
                         }
                     },
                     "Next Clock"

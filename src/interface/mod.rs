@@ -18,7 +18,7 @@ use crate::{
     assembler::AssembledProgram,
     code_editor::{CodeEditor, LineHighlight},
     emulator::EmulatorState,
-    include_test_file,
+    include_test_file, uart::Uart,
 };
 
 #[component]
@@ -28,6 +28,7 @@ pub fn App() -> Element {
     let assembled_program: Signal<Option<AssembledProgram>> = use_signal(|| None);
     let emulator_state: Signal<EmulatorState> = use_signal(|| EmulatorState::default());
     let breakpoints: Signal<BTreeSet<usize>> = use_signal(|| BTreeSet::new());
+    let uart_module: Signal<Uart> = use_signal(|| Uart::default());
 
     use_effect(move || {
         info!("source changed");
@@ -69,9 +70,12 @@ pub fn App() -> Element {
 
         div { class: "flex h-screen w-full",
             div { class: "w-1/2 pt-4 flex flex-col h-full bg-[#1E1E1E] overflow-hidden",
-                RunButtons { source, assembled_program, emulator_state }
+                RunButtons { source, assembled_program, emulator_state, uart_module }
                 div { class: "flex-grow",
-                    CodeEditor { source, line_highlights, breakpoints }
+                    CodeEditor { source, line_highlights, breakpoints },
+                    div { class: "flex-grow",
+                        "HI"
+                    }
                 }
             }
             div { class: "w-1/2 flex flex-col",

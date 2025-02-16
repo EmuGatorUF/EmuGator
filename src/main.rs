@@ -5,6 +5,7 @@ mod emulator;
 mod interface;
 mod isa;
 mod utils;
+mod uart;
 
 use dioxus::prelude::*;
 use dioxus_logger::tracing::{info, Level};
