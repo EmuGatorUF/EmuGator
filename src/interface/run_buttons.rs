@@ -1,6 +1,6 @@
 use crate::assembler::{self, AssembledProgram, Section};
 use crate::emulator::{self, EmulatorState};
-use crate::uart::{Uart, trigger_uart};
+use crate::uart::{trigger_uart, Uart};
 
 use dioxus::prelude::*;
 use dioxus_logger::tracing::info;
@@ -26,6 +26,15 @@ pub fn RunButtons(
                             let start_addr = assembled.get_section_start(Section::Text);
                             new_state.pipeline.datapath.instr_addr_o = start_addr;
                             emulator_state.set(new_state);
+
+                            // Setup UART with data memory addresses
+                            // TOD: Probably a better way to do this
+                            let new_uart = Uart::default();
+                            let mut assembled = assembled;
+                            assembled.data_memory.insert(new_uart.rx_buffer_address, 0);
+                            assembled.data_memory.insert(new_uart.tx_buffer_address, 0);
+                            assembled.data_memory.insert(new_uart.lsr_address, 0);
+
                             assembled_program.set(Some(assembled));
                         }
                         Err(errors) => {

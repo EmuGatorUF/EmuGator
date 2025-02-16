@@ -18,7 +18,8 @@ use crate::{
     assembler::AssembledProgram,
     code_editor::{CodeEditor, LineHighlight},
     emulator::EmulatorState,
-    include_test_file, uart::Uart,
+    include_test_file,
+    uart::Uart,
 };
 
 #[component]

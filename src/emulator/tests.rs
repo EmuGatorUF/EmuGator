@@ -79,10 +79,7 @@ fn test_AUIPC() {
     // After AUIPC, x1 should hold the value (PC + 0x12345000)
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(
-        emulator_state.x[1],
-        pc + 0x12345000
-    );
+    assert_eq!(emulator_state.x[1], pc + 0x12345000);
 }
 
 #[test]
@@ -134,8 +131,6 @@ fn test_JAL() {
 
     emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.x[5], 2);
-
-
 }
 
 #[test]
@@ -341,7 +336,7 @@ fn test_BEQ() {
             rs1: 0,
             imm: 2,
             ..Default::default()
-        })
+        }),
     ]);
 
     // Instruction fetch
@@ -404,7 +399,7 @@ fn test_BNE() {
             rs1: 0,
             imm: 2,
             ..Default::default()
-        })
+        }),
     ]);
 
     // Instruction fetch
@@ -466,7 +461,7 @@ fn test_BLT() {
             rs1: 0,
             imm: 2,
             ..Default::default()
-        }) // ADDI ( x5 := x0 + 2)
+        }), // ADDI ( x5 := x0 + 2)
     ]);
 
     // Instruction fetch
@@ -535,7 +530,7 @@ fn test_BGE() {
             rs2: 2,
             imm: -0x8,
             ..Default::default()
-        }) // BGE (branch if x0 >= x2)
+        }), // BGE (branch if x0 >= x2)
     ]);
 
     // Instruction fetch
@@ -611,7 +606,7 @@ fn test_BLTU() {
             rs1: 0,
             imm: 2,
             ..Default::default()
-        }) // ADDI ( x5 := x0 + 2)
+        }), // ADDI ( x5 := x0 + 2)
     ]);
 
     // Instruction fetch
@@ -680,7 +675,7 @@ fn test_BGEU() {
             rs2: 2,
             imm: -0x8,
             ..Default::default()
-        }) // BGEU (branch if x0 >= x2)
+        }), // BGEU (branch if x0 >= x2)
     ]);
 
     // Instruction fetch
@@ -857,35 +852,34 @@ fn test_SB() {
     let mut emulator_state = EmulatorState::default();
 
     let mut program = populate(&[
-            // Set x1 := 10 (Data to write)
-            ISA::LUI.build(Operands {
-                rd: 1,
-                imm: 0xFEFDF000u32.wrapping_sub(0xFFFFF000u32) as i32,
-                ..Default::default()
-            }),
-            ISA::ADDI.build(Operands {
-                rd: 1,
-                rs1: 1,
-                imm: 0xCFB,
-                ..Default::default()
-            }),
-            // Set x2 := 100 (Base Address to write to)
-            ISA::ADDI.build(Operands {
-                rd: 2,
-                rs1: 0,
-                imm: 100,
-                ..Default::default()
-            }),
-            // SB x1, 100(x2) -> Write x1 to address x2 (100) + 5
-            ISA::SB.build(Operands {
-                rd: 0,
-                rs1: 2,
-                rs2: 1,
-                imm: 5,
-                ..Default::default()
-            }),
-        ],
-    );
+        // Set x1 := 10 (Data to write)
+        ISA::LUI.build(Operands {
+            rd: 1,
+            imm: 0xFEFDF000u32.wrapping_sub(0xFFFFF000u32) as i32,
+            ..Default::default()
+        }),
+        ISA::ADDI.build(Operands {
+            rd: 1,
+            rs1: 1,
+            imm: 0xCFB,
+            ..Default::default()
+        }),
+        // Set x2 := 100 (Base Address to write to)
+        ISA::ADDI.build(Operands {
+            rd: 2,
+            rs1: 0,
+            imm: 100,
+            ..Default::default()
+        }),
+        // SB x1, 100(x2) -> Write x1 to address x2 (100) + 5
+        ISA::SB.build(Operands {
+            rd: 0,
+            rs1: 2,
+            rs2: 1,
+            imm: 5,
+            ..Default::default()
+        }),
+    ]);
 
     // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
@@ -910,35 +904,34 @@ fn test_SH() {
     let mut emulator_state = EmulatorState::default();
 
     let mut program = populate(&[
-            // Set x1 := 10 (Data to write)
-            ISA::LUI.build(Operands {
-                rd: 1,
-                imm: 0xFEFDF000u32.wrapping_sub(0xFFFFF000u32) as i32,
-                ..Default::default()
-            }),
-            ISA::ADDI.build(Operands {
-                rd: 1,
-                rs1: 1,
-                imm: 0xCFB,
-                ..Default::default()
-            }),
-            // Set x2 := 100 (Base Address to write to)
-            ISA::ADDI.build(Operands {
-                rd: 2,
-                rs1: 0,
-                imm: 100,
-                ..Default::default()
-            }),
-            // SH x1, 100(x2) -> Write x1 to address x2 (100) + 5
-            ISA::SH.build(Operands {
-                rd: 0,
-                rs1: 2,
-                rs2: 1,
-                imm: 5,
-                ..Default::default()
-            }),
-        ],
-    );
+        // Set x1 := 10 (Data to write)
+        ISA::LUI.build(Operands {
+            rd: 1,
+            imm: 0xFEFDF000u32.wrapping_sub(0xFFFFF000u32) as i32,
+            ..Default::default()
+        }),
+        ISA::ADDI.build(Operands {
+            rd: 1,
+            rs1: 1,
+            imm: 0xCFB,
+            ..Default::default()
+        }),
+        // Set x2 := 100 (Base Address to write to)
+        ISA::ADDI.build(Operands {
+            rd: 2,
+            rs1: 0,
+            imm: 100,
+            ..Default::default()
+        }),
+        // SH x1, 100(x2) -> Write x1 to address x2 (100) + 5
+        ISA::SH.build(Operands {
+            rd: 0,
+            rs1: 2,
+            rs2: 1,
+            imm: 5,
+            ..Default::default()
+        }),
+    ]);
 
     // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
@@ -963,35 +956,34 @@ fn test_SW() {
     let mut emulator_state = EmulatorState::default();
 
     let mut program = populate(&[
-            // Set x1 := 10 (Data to write)
-            ISA::LUI.build(Operands {
-                rd: 1,
-                imm: 0xFEFDF000u32.wrapping_sub(0xFFFFF000u32) as i32,
-                ..Default::default()
-            }),
-            ISA::ADDI.build(Operands {
-                rd: 1,
-                rs1: 1,
-                imm: 0xCFB,
-                ..Default::default()
-            }),
-            // Set x2 := 100 (Base Address to write to)
-            ISA::ADDI.build(Operands {
-                rd: 2,
-                rs1: 0,
-                imm: 100,
-                ..Default::default()
-            }),
-            // SW x1, 100(x2) -> Write x1 to address x2 (100) + 5
-            ISA::SW.build(Operands {
-                rd: 0,
-                rs1: 2,
-                rs2: 1,
-                imm: 5,
-                ..Default::default()
-            }),
-        ],
-    );
+        // Set x1 := 10 (Data to write)
+        ISA::LUI.build(Operands {
+            rd: 1,
+            imm: 0xFEFDF000u32.wrapping_sub(0xFFFFF000u32) as i32,
+            ..Default::default()
+        }),
+        ISA::ADDI.build(Operands {
+            rd: 1,
+            rs1: 1,
+            imm: 0xCFB,
+            ..Default::default()
+        }),
+        // Set x2 := 100 (Base Address to write to)
+        ISA::ADDI.build(Operands {
+            rd: 2,
+            rs1: 0,
+            imm: 100,
+            ..Default::default()
+        }),
+        // SW x1, 100(x2) -> Write x1 to address x2 (100) + 5
+        ISA::SW.build(Operands {
+            rd: 0,
+            rs1: 2,
+            rs2: 1,
+            imm: 5,
+            ..Default::default()
+        }),
+    ]);
 
     // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
@@ -1332,32 +1324,31 @@ fn test_SRLI() {
     let mut emulator_state = EmulatorState::default();
 
     let mut program = populate(&[
-            ISA::ADDI.build(Operands {
-                rd: 1,
-                rs1: 0,
-                imm: 10,
-                ..Default::default()
-            }),
-            ISA::SRLI.build(Operands {
-                rd: 2,
-                rs1: 1,
-                imm: 1,
-                ..Default::default()
-            }),
-            ISA::SRLI.build(Operands {
-                rd: 3,
-                rs1: 1,
-                imm: 0b100010,
-                ..Default::default()
-            }),
-            ISA::SRLI.build(Operands {
-                rd: 0,
-                rs1: 0,
-                imm: 3,
-                ..Default::default()
-            }),
-        ],
-    );
+        ISA::ADDI.build(Operands {
+            rd: 1,
+            rs1: 0,
+            imm: 10,
+            ..Default::default()
+        }),
+        ISA::SRLI.build(Operands {
+            rd: 2,
+            rs1: 1,
+            imm: 1,
+            ..Default::default()
+        }),
+        ISA::SRLI.build(Operands {
+            rd: 3,
+            rs1: 1,
+            imm: 0b100010,
+            ..Default::default()
+        }),
+        ISA::SRLI.build(Operands {
+            rd: 0,
+            rs1: 0,
+            imm: 3,
+            ..Default::default()
+        }),
+    ]);
 
     // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
@@ -1384,32 +1375,31 @@ fn test_SRAI() {
     let mut emulator_state = EmulatorState::default();
 
     let mut program = populate(&[
-            ISA::ADDI.build(Operands {
-                rd: 1,
-                rs1: 0,
-                imm: -10,
-                ..Default::default()
-            }),
-            ISA::SRAI.build(Operands {
-                rd: 2,
-                rs1: 1,
-                imm: -1 & 0x1F | 1 << 10,
-                ..Default::default()
-            }),
-            ISA::SRAI.build(Operands {
-                rd: 3,
-                rs1: 1,
-                imm: 0b100001 & 0x1F | 1 << 10,
-                ..Default::default()
-            }),
-            ISA::SRAI.build(Operands {
-                rd: 0,
-                rs1: 0,
-                imm: 3,
-                ..Default::default()
-            }),
-        ],
-    );
+        ISA::ADDI.build(Operands {
+            rd: 1,
+            rs1: 0,
+            imm: -10,
+            ..Default::default()
+        }),
+        ISA::SRAI.build(Operands {
+            rd: 2,
+            rs1: 1,
+            imm: -1 & 0x1F | 1 << 10,
+            ..Default::default()
+        }),
+        ISA::SRAI.build(Operands {
+            rd: 3,
+            rs1: 1,
+            imm: 0b100001 & 0x1F | 1 << 10,
+            ..Default::default()
+        }),
+        ISA::SRAI.build(Operands {
+            rd: 0,
+            rs1: 0,
+            imm: 3,
+            ..Default::default()
+        }),
+    ]);
 
     // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
@@ -1436,43 +1426,42 @@ fn test_ADD() {
     let mut emulator_state = EmulatorState::default();
 
     let mut program = populate(&[
-            // ADDI x1, x0, 15 -> Set x1 := 15
-            ISA::ADDI.build(Operands {
-                rd: 1,
-                rs1: 0,
-                imm: 15,
-                ..Default::default()
-            }),
-            // ADDI x2, x0, -10 -> Set x2 := -10
-            ISA::ADDI.build(Operands {
-                rd: 2,
-                rs1: 0,
-                imm: -10,
-                ..Default::default()
-            }),
-            // ADD x3, x1, x2 -> Set x3 := x1 + x2 (15 + (-10) = 5)
-            ISA::ADD.build(Operands {
-                rd: 3,
-                rs1: 1,
-                rs2: 2,
-                ..Default::default()
-            }),
-            // ADD x4, x1, x1 -> Set x4 := x1 + x1 (15 + 15 = 30)
-            ISA::ADD.build(Operands {
-                rd: 4,
-                rs1: 1,
-                rs2: 1,
-                ..Default::default()
-            }),
-            // ADD x0, x1, x2 -> Should not modify x0 (x0 always 0)
-            ISA::ADD.build(Operands {
-                rd: 0,
-                rs1: 1,
-                rs2: 2,
-                ..Default::default()
-            }),
-        ],
-    );
+        // ADDI x1, x0, 15 -> Set x1 := 15
+        ISA::ADDI.build(Operands {
+            rd: 1,
+            rs1: 0,
+            imm: 15,
+            ..Default::default()
+        }),
+        // ADDI x2, x0, -10 -> Set x2 := -10
+        ISA::ADDI.build(Operands {
+            rd: 2,
+            rs1: 0,
+            imm: -10,
+            ..Default::default()
+        }),
+        // ADD x3, x1, x2 -> Set x3 := x1 + x2 (15 + (-10) = 5)
+        ISA::ADD.build(Operands {
+            rd: 3,
+            rs1: 1,
+            rs2: 2,
+            ..Default::default()
+        }),
+        // ADD x4, x1, x1 -> Set x4 := x1 + x1 (15 + 15 = 30)
+        ISA::ADD.build(Operands {
+            rd: 4,
+            rs1: 1,
+            rs2: 1,
+            ..Default::default()
+        }),
+        // ADD x0, x1, x2 -> Should not modify x0 (x0 always 0)
+        ISA::ADD.build(Operands {
+            rd: 0,
+            rs1: 1,
+            rs2: 2,
+            ..Default::default()
+        }),
+    ]);
 
     // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
@@ -1503,50 +1492,49 @@ fn test_SUB() {
     let mut emulator_state = EmulatorState::default();
 
     let mut program = populate(&[
-            // ADDI x1, x0, 20 -> Set x1 := 20
-            ISA::ADDI.build(Operands {
-                rd: 1,
-                rs1: 0,
-                imm: 20,
-                ..Default::default()
-            }),
-            // ADDI x2, x0, 5 -> Set x2 := 5
-            ISA::ADDI.build(Operands {
-                rd: 2,
-                rs1: 0,
-                imm: 5,
-                ..Default::default()
-            }),
-            // SUB x3, x1, x2 -> Set x3 := x1 - x2 (20 - 5 = 15)
-            ISA::SUB.build(Operands {
-                rd: 3,
-                rs1: 1,
-                rs2: 2,
-                ..Default::default()
-            }),
-            // SUB x4, x2, x1 -> Set x4 := x2 - x1 (5 - 20 = -15)
-            ISA::SUB.build(Operands {
-                rd: 4,
-                rs1: 2,
-                rs2: 1,
-                ..Default::default()
-            }),
-            // SUB x5, x1, x1 -> Set x5 := x1 - x1 (20 - 20 = 0)
-            ISA::SUB.build(Operands {
-                rd: 5,
-                rs1: 1,
-                rs2: 1,
-                ..Default::default()
-            }),
-            // SUB x0, x1, x2 -> Should not modify x0 (x0 always 0)
-            ISA::SUB.build(Operands {
-                rd: 0,
-                rs1: 1,
-                rs2: 2,
-                ..Default::default()
-            }),
-        ],
-    );
+        // ADDI x1, x0, 20 -> Set x1 := 20
+        ISA::ADDI.build(Operands {
+            rd: 1,
+            rs1: 0,
+            imm: 20,
+            ..Default::default()
+        }),
+        // ADDI x2, x0, 5 -> Set x2 := 5
+        ISA::ADDI.build(Operands {
+            rd: 2,
+            rs1: 0,
+            imm: 5,
+            ..Default::default()
+        }),
+        // SUB x3, x1, x2 -> Set x3 := x1 - x2 (20 - 5 = 15)
+        ISA::SUB.build(Operands {
+            rd: 3,
+            rs1: 1,
+            rs2: 2,
+            ..Default::default()
+        }),
+        // SUB x4, x2, x1 -> Set x4 := x2 - x1 (5 - 20 = -15)
+        ISA::SUB.build(Operands {
+            rd: 4,
+            rs1: 2,
+            rs2: 1,
+            ..Default::default()
+        }),
+        // SUB x5, x1, x1 -> Set x5 := x1 - x1 (20 - 20 = 0)
+        ISA::SUB.build(Operands {
+            rd: 5,
+            rs1: 1,
+            rs2: 1,
+            ..Default::default()
+        }),
+        // SUB x0, x1, x2 -> Should not modify x0 (x0 always 0)
+        ISA::SUB.build(Operands {
+            rd: 0,
+            rs1: 1,
+            rs2: 2,
+            ..Default::default()
+        }),
+    ]);
 
     // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
@@ -1581,57 +1569,56 @@ fn test_SLL() {
     let mut emulator_state = EmulatorState::default();
 
     let mut program = populate(&[
-            // ADDI x1, x0, 1 -> Set x1 := 1
-            ISA::ADDI.build(Operands {
-                rd: 1,
-                rs1: 0,
-                imm: 1,
-                ..Default::default()
-            }),
-            // ADDI x2, x0, 2 -> Set x2 := 2
-            ISA::ADDI.build(Operands {
-                rd: 2,
-                rs1: 0,
-                imm: 2,
-                ..Default::default()
-            }),
-            // SLL x3, x1, x2 -> Set x3 := x1 << x2 (1 << 2 = 4)
-            ISA::SLL.build(Operands {
-                rd: 3,
-                rs1: 1,
-                rs2: 2,
-                ..Default::default()
-            }),
-            // SLL x4, x1, x2 -> Test ignoring upper bits of shift amount
-            // Set x2 := 0b100000 -> (1 << 0 = 1, because shift amount is masked to 5 bits)
-            ISA::ADDI.build(Operands {
-                rd: 2,
-                rs1: 0,
-                imm: 0b100000,
-                ..Default::default()
-            }),
-            ISA::SLL.build(Operands {
-                rd: 4,
-                rs1: 1,
-                rs2: 2,
-                ..Default::default()
-            }),
-            // SLL x5, x2, x2 -> Shift a zero by any value (0 << n = 0)
-            ISA::SLL.build(Operands {
-                rd: 5,
-                rs1: 2,
-                rs2: 2,
-                ..Default::default()
-            }),
-            // SLL x0, x1, x2 -> Ensure x0 remains unchanged
-            ISA::SLL.build(Operands {
-                rd: 0,
-                rs1: 1,
-                rs2: 2,
-                ..Default::default()
-            }),
-        ],
-    );
+        // ADDI x1, x0, 1 -> Set x1 := 1
+        ISA::ADDI.build(Operands {
+            rd: 1,
+            rs1: 0,
+            imm: 1,
+            ..Default::default()
+        }),
+        // ADDI x2, x0, 2 -> Set x2 := 2
+        ISA::ADDI.build(Operands {
+            rd: 2,
+            rs1: 0,
+            imm: 2,
+            ..Default::default()
+        }),
+        // SLL x3, x1, x2 -> Set x3 := x1 << x2 (1 << 2 = 4)
+        ISA::SLL.build(Operands {
+            rd: 3,
+            rs1: 1,
+            rs2: 2,
+            ..Default::default()
+        }),
+        // SLL x4, x1, x2 -> Test ignoring upper bits of shift amount
+        // Set x2 := 0b100000 -> (1 << 0 = 1, because shift amount is masked to 5 bits)
+        ISA::ADDI.build(Operands {
+            rd: 2,
+            rs1: 0,
+            imm: 0b100000,
+            ..Default::default()
+        }),
+        ISA::SLL.build(Operands {
+            rd: 4,
+            rs1: 1,
+            rs2: 2,
+            ..Default::default()
+        }),
+        // SLL x5, x2, x2 -> Shift a zero by any value (0 << n = 0)
+        ISA::SLL.build(Operands {
+            rd: 5,
+            rs1: 2,
+            rs2: 2,
+            ..Default::default()
+        }),
+        // SLL x0, x1, x2 -> Ensure x0 remains unchanged
+        ISA::SLL.build(Operands {
+            rd: 0,
+            rs1: 1,
+            rs2: 2,
+            ..Default::default()
+        }),
+    ]);
 
     // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
@@ -1669,43 +1656,42 @@ fn test_SLT() {
     let mut emulator_state = EmulatorState::default();
 
     let mut program = populate(&[
-            // ADDI x1, x0, 5 -> Set x1 := 5
-            ISA::ADDI.build(Operands {
-                rd: 1,
-                rs1: 0,
-                imm: 5,
-                ..Default::default()
-            }),
-            // ADDI x2, x0, 10 -> Set x2 := 10
-            ISA::ADDI.build(Operands {
-                rd: 2,
-                rs1: 0,
-                imm: 10,
-                ..Default::default()
-            }),
-            // SLT x3, x1, x2 -> x3 := (x1 < x2) ? 1 : 0
-            ISA::SLT.build(Operands {
-                rd: 3,
-                rs1: 1,
-                rs2: 2,
-                ..Default::default()
-            }),
-            // SLT x4, x2, x1 -> x4 := (x2 < x1) ? 1 : 0
-            ISA::SLT.build(Operands {
-                rd: 4,
-                rs1: 2,
-                rs2: 1,
-                ..Default::default()
-            }),
-            // SLT x5, x1, x1 -> x5 := (x1 < x1) ? 1 : 0
-            ISA::SLT.build(Operands {
-                rd: 5,
-                rs1: 1,
-                rs2: 1,
-                ..Default::default()
-            }),
-        ],
-    );
+        // ADDI x1, x0, 5 -> Set x1 := 5
+        ISA::ADDI.build(Operands {
+            rd: 1,
+            rs1: 0,
+            imm: 5,
+            ..Default::default()
+        }),
+        // ADDI x2, x0, 10 -> Set x2 := 10
+        ISA::ADDI.build(Operands {
+            rd: 2,
+            rs1: 0,
+            imm: 10,
+            ..Default::default()
+        }),
+        // SLT x3, x1, x2 -> x3 := (x1 < x2) ? 1 : 0
+        ISA::SLT.build(Operands {
+            rd: 3,
+            rs1: 1,
+            rs2: 2,
+            ..Default::default()
+        }),
+        // SLT x4, x2, x1 -> x4 := (x2 < x1) ? 1 : 0
+        ISA::SLT.build(Operands {
+            rd: 4,
+            rs1: 2,
+            rs2: 1,
+            ..Default::default()
+        }),
+        // SLT x5, x1, x1 -> x5 := (x1 < x1) ? 1 : 0
+        ISA::SLT.build(Operands {
+            rd: 5,
+            rs1: 1,
+            rs2: 1,
+            ..Default::default()
+        }),
+    ]);
 
     // Execute each instruction and validate
     emulator_state = clock(&emulator_state, &mut program);
@@ -1726,36 +1712,35 @@ fn test_SLTU() {
     let mut emulator_state = EmulatorState::default();
 
     let mut program = populate(&[
-            // ADDI x1, x0, -1 -> Set x1 := -1 (interpreted as 0xFFFFFFFF unsigned)
-            ISA::ADDI.build(Operands {
-                rd: 1,
-                rs1: 0,
-                imm: -1,
-                ..Default::default()
-            }),
-            // ADDI x2, x0, 1 -> Set x2 := 1
-            ISA::ADDI.build(Operands {
-                rd: 2,
-                rs1: 0,
-                imm: 1,
-                ..Default::default()
-            }),
-            // SLTU x3, x2, x1 -> x3 := (x2 < x1) ? 1 : 0
-            ISA::SLTU.build(Operands {
-                rd: 3,
-                rs1: 2,
-                rs2: 1,
-                ..Default::default()
-            }),
-            // SLTU x4, x1, x2 -> x4 := (x1 < x2) ? 1 : 0
-            ISA::SLTU.build(Operands {
-                rd: 4,
-                rs1: 1,
-                rs2: 2,
-                ..Default::default()
-            }),
-        ],
-    );
+        // ADDI x1, x0, -1 -> Set x1 := -1 (interpreted as 0xFFFFFFFF unsigned)
+        ISA::ADDI.build(Operands {
+            rd: 1,
+            rs1: 0,
+            imm: -1,
+            ..Default::default()
+        }),
+        // ADDI x2, x0, 1 -> Set x2 := 1
+        ISA::ADDI.build(Operands {
+            rd: 2,
+            rs1: 0,
+            imm: 1,
+            ..Default::default()
+        }),
+        // SLTU x3, x2, x1 -> x3 := (x2 < x1) ? 1 : 0
+        ISA::SLTU.build(Operands {
+            rd: 3,
+            rs1: 2,
+            rs2: 1,
+            ..Default::default()
+        }),
+        // SLTU x4, x1, x2 -> x4 := (x1 < x2) ? 1 : 0
+        ISA::SLTU.build(Operands {
+            rd: 4,
+            rs1: 1,
+            rs2: 2,
+            ..Default::default()
+        }),
+    ]);
 
     emulator_state = clock(&emulator_state, &mut program);
     emulator_state = clock(&emulator_state, &mut program); // Set x1 = -1 (0xFFFFFFFF unsigned)
@@ -1772,29 +1757,28 @@ fn test_XOR() {
     let mut emulator_state = EmulatorState::default();
 
     let mut program = populate(&[
-            // ADDI x1, x0, 0b1100 -> Set x1 := 12
-            ISA::ADDI.build(Operands {
-                rd: 1,
-                rs1: 0,
-                imm: 0b1100,
-                ..Default::default()
-            }),
-            // ADDI x2, x0, 0b1010 -> Set x2 := 10
-            ISA::ADDI.build(Operands {
-                rd: 2,
-                rs1: 0,
-                imm: 0b1010,
-                ..Default::default()
-            }),
-            // XOR x3, x1, x2 -> x3 := x1 ^ x2
-            ISA::XOR.build(Operands {
-                rd: 3,
-                rs1: 1,
-                rs2: 2,
-                ..Default::default()
-            }),
-        ],
-    );
+        // ADDI x1, x0, 0b1100 -> Set x1 := 12
+        ISA::ADDI.build(Operands {
+            rd: 1,
+            rs1: 0,
+            imm: 0b1100,
+            ..Default::default()
+        }),
+        // ADDI x2, x0, 0b1010 -> Set x2 := 10
+        ISA::ADDI.build(Operands {
+            rd: 2,
+            rs1: 0,
+            imm: 0b1010,
+            ..Default::default()
+        }),
+        // XOR x3, x1, x2 -> x3 := x1 ^ x2
+        ISA::XOR.build(Operands {
+            rd: 3,
+            rs1: 1,
+            rs2: 2,
+            ..Default::default()
+        }),
+    ]);
 
     emulator_state = clock(&emulator_state, &mut program);
     emulator_state = clock(&emulator_state, &mut program);
@@ -1809,29 +1793,28 @@ fn test_SRL() {
     let mut emulator_state = EmulatorState::default();
 
     let mut program = populate(&[
-            // ADDI x1, x0, 16 -> Set x1 := 16 (0b10000)
-            ISA::ADDI.build(Operands {
-                rd: 1,
-                rs1: 0,
-                imm: 16,
-                ..Default::default()
-            }),
-            // ADDI x2, x0, 2 -> Set x2 := 2
-            ISA::ADDI.build(Operands {
-                rd: 2,
-                rs1: 0,
-                imm: 2,
-                ..Default::default()
-            }),
-            // SRL x3, x1, x2 -> x3 := x1 >> x2
-            ISA::SRL.build(Operands {
-                rd: 3,
-                rs1: 1,
-                rs2: 2,
-                ..Default::default()
-            }),
-        ],
-    );
+        // ADDI x1, x0, 16 -> Set x1 := 16 (0b10000)
+        ISA::ADDI.build(Operands {
+            rd: 1,
+            rs1: 0,
+            imm: 16,
+            ..Default::default()
+        }),
+        // ADDI x2, x0, 2 -> Set x2 := 2
+        ISA::ADDI.build(Operands {
+            rd: 2,
+            rs1: 0,
+            imm: 2,
+            ..Default::default()
+        }),
+        // SRL x3, x1, x2 -> x3 := x1 >> x2
+        ISA::SRL.build(Operands {
+            rd: 3,
+            rs1: 1,
+            rs2: 2,
+            ..Default::default()
+        }),
+    ]);
 
     emulator_state = clock(&emulator_state, &mut program);
     emulator_state = clock(&emulator_state, &mut program);
@@ -1846,29 +1829,28 @@ fn test_SRA() {
     let mut emulator_state = EmulatorState::default();
 
     let mut program = populate(&[
-            // ADDI x1, x0, -16 -> Set x1 := -16
-            ISA::ADDI.build(Operands {
-                rd: 1,
-                rs1: 0,
-                imm: -16,
-                ..Default::default()
-            }),
-            // ADDI x2, x0, 2 -> Set x2 := 2
-            ISA::ADDI.build(Operands {
-                rd: 2,
-                rs1: 0,
-                imm: 2,
-                ..Default::default()
-            }),
-            // SRA x3, x1, x2 -> x3 := x1 >> x2 (arithmetic)
-            ISA::SRA.build(Operands {
-                rd: 3,
-                rs1: 1,
-                rs2: 2,
-                ..Default::default()
-            }),
-        ],
-    );
+        // ADDI x1, x0, -16 -> Set x1 := -16
+        ISA::ADDI.build(Operands {
+            rd: 1,
+            rs1: 0,
+            imm: -16,
+            ..Default::default()
+        }),
+        // ADDI x2, x0, 2 -> Set x2 := 2
+        ISA::ADDI.build(Operands {
+            rd: 2,
+            rs1: 0,
+            imm: 2,
+            ..Default::default()
+        }),
+        // SRA x3, x1, x2 -> x3 := x1 >> x2 (arithmetic)
+        ISA::SRA.build(Operands {
+            rd: 3,
+            rs1: 1,
+            rs2: 2,
+            ..Default::default()
+        }),
+    ]);
 
     emulator_state = clock(&emulator_state, &mut program);
     emulator_state = clock(&emulator_state, &mut program);
@@ -1883,29 +1865,28 @@ fn test_OR() {
     let mut emulator_state = EmulatorState::default();
 
     let mut program = populate(&[
-            // ADDI x1, x0, 0b1100 -> Set x1 := 12
-            ISA::ADDI.build(Operands {
-                rd: 1,
-                rs1: 0,
-                imm: 0b1100,
-                ..Default::default()
-            }),
-            // ADDI x2, x0, 0b1010 -> Set x2 := 10
-            ISA::ADDI.build(Operands {
-                rd: 2,
-                rs1: 0,
-                imm: 0b1010,
-                ..Default::default()
-            }),
-            // OR x3, x1, x2 -> x3 := x1 | x2
-            ISA::OR.build(Operands {
-                rd: 3,
-                rs1: 1,
-                rs2: 2,
-                ..Default::default()
-            }),
-        ],
-    );
+        // ADDI x1, x0, 0b1100 -> Set x1 := 12
+        ISA::ADDI.build(Operands {
+            rd: 1,
+            rs1: 0,
+            imm: 0b1100,
+            ..Default::default()
+        }),
+        // ADDI x2, x0, 0b1010 -> Set x2 := 10
+        ISA::ADDI.build(Operands {
+            rd: 2,
+            rs1: 0,
+            imm: 0b1010,
+            ..Default::default()
+        }),
+        // OR x3, x1, x2 -> x3 := x1 | x2
+        ISA::OR.build(Operands {
+            rd: 3,
+            rs1: 1,
+            rs2: 2,
+            ..Default::default()
+        }),
+    ]);
 
     emulator_state = clock(&emulator_state, &mut program);
     emulator_state = clock(&emulator_state, &mut program);
@@ -1920,29 +1901,28 @@ fn test_AND() {
     let mut emulator_state = EmulatorState::default();
 
     let mut program = populate(&[
-            // ADDI x1, x0, 0b1100 -> Set x1 := 12
-            ISA::ADDI.build(Operands {
-                rd: 1,
-                rs1: 0,
-                imm: 0b1100,
-                ..Default::default()
-            }),
-            // ADDI x2, x0, 0b1010 -> Set x2 := 10
-            ISA::ADDI.build(Operands {
-                rd: 2,
-                rs1: 0,
-                imm: 0b1010,
-                ..Default::default()
-            }),
-            // AND x3, x1, x2 -> x3 := x1 & x2
-            ISA::AND.build(Operands {
-                rd: 3,
-                rs1: 1,
-                rs2: 2,
-                ..Default::default()
-            }),
-        ],
-    );
+        // ADDI x1, x0, 0b1100 -> Set x1 := 12
+        ISA::ADDI.build(Operands {
+            rd: 1,
+            rs1: 0,
+            imm: 0b1100,
+            ..Default::default()
+        }),
+        // ADDI x2, x0, 0b1010 -> Set x2 := 10
+        ISA::ADDI.build(Operands {
+            rd: 2,
+            rs1: 0,
+            imm: 0b1010,
+            ..Default::default()
+        }),
+        // AND x3, x1, x2 -> x3 := x1 & x2
+        ISA::AND.build(Operands {
+            rd: 3,
+            rs1: 1,
+            rs2: 2,
+            ..Default::default()
+        }),
+    ]);
 
     emulator_state = clock(&emulator_state, &mut program);
     emulator_state = clock(&emulator_state, &mut program);
@@ -1960,36 +1940,35 @@ fn test_CSRRW() {
     let csr2 = 6;
 
     let mut program = populate(&[
-            // set x1 := 42
-            ISA::ADDI.build(Operands {
-                rd: 1,
-                rs1: 0,
-                imm: 42,
-                ..Default::default()
-            }),
-            // set x2 := 100
-            ISA::ADDI.build(Operands {
-                rd: 2,
-                rs1: 0,
-                imm: 100,
-                ..Default::default()
-            }),
-            // CSRRW x1, csr1, x1
-            ISA::CSRRW.build(Operands {
-                rd: 1,
-                rs1: 1,
-                imm: csr1,
-                ..Default::default()
-            }),
-            // cssrw x2, csr2, x2
-            ISA::CSRRW.build(Operands {
-                rd: 2,
-                rs1: 2,
-                imm: csr2,
-                ..Default::default()
-            }),
-        ],
-    );
+        // set x1 := 42
+        ISA::ADDI.build(Operands {
+            rd: 1,
+            rs1: 0,
+            imm: 42,
+            ..Default::default()
+        }),
+        // set x2 := 100
+        ISA::ADDI.build(Operands {
+            rd: 2,
+            rs1: 0,
+            imm: 100,
+            ..Default::default()
+        }),
+        // CSRRW x1, csr1, x1
+        ISA::CSRRW.build(Operands {
+            rd: 1,
+            rs1: 1,
+            imm: csr1,
+            ..Default::default()
+        }),
+        // cssrw x2, csr2, x2
+        ISA::CSRRW.build(Operands {
+            rd: 2,
+            rs1: 2,
+            imm: csr2,
+            ..Default::default()
+        }),
+    ]);
 
     // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
@@ -2019,36 +1998,35 @@ fn test_CSRRS() {
     let csr1 = 5;
 
     let mut program = populate(&[
-            // set x1 := 42
-            ISA::ADDI.build(Operands {
-                rd: 1,
-                rs1: 0,
-                imm: 42,
-                ..Default::default()
-            }),
-            // set x2 := 100
-            ISA::ADDI.build(Operands {
-                rd: 2,
-                rs1: 0,
-                imm: 100,
-                ..Default::default()
-            }),
-            // CSRRS x1, csr1, x1
-            ISA::CSRRS.build(Operands {
-                rd: 1,
-                rs1: 1,
-                imm: csr1,
-                ..Default::default()
-            }),
-            // cssrs x1, csr1, x2
-            ISA::CSRRS.build(Operands {
-                rd: 1,
-                rs1: 2,
-                imm: csr1,
-                ..Default::default()
-            }),
-        ],
-    );
+        // set x1 := 42
+        ISA::ADDI.build(Operands {
+            rd: 1,
+            rs1: 0,
+            imm: 42,
+            ..Default::default()
+        }),
+        // set x2 := 100
+        ISA::ADDI.build(Operands {
+            rd: 2,
+            rs1: 0,
+            imm: 100,
+            ..Default::default()
+        }),
+        // CSRRS x1, csr1, x1
+        ISA::CSRRS.build(Operands {
+            rd: 1,
+            rs1: 1,
+            imm: csr1,
+            ..Default::default()
+        }),
+        // cssrs x1, csr1, x2
+        ISA::CSRRS.build(Operands {
+            rd: 1,
+            rs1: 2,
+            imm: csr1,
+            ..Default::default()
+        }),
+    ]);
 
     // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
@@ -2078,36 +2056,35 @@ fn test_CSRRC() {
     let csr1 = 5;
 
     let mut program = populate(&[
-            // set x1 := 42
-            ISA::ADDI.build(Operands {
-                rd: 1,
-                rs1: 0,
-                imm: 42,
-                ..Default::default()
-            }),
-            // set x2 := 100
-            ISA::ADDI.build(Operands {
-                rd: 2,
-                rs1: 0,
-                imm: 100,
-                ..Default::default()
-            }),
-            // CSRRC x1, csr1, x1
-            ISA::CSRRC.build(Operands {
-                rd: 1,
-                rs1: 1,
-                imm: csr1,
-                ..Default::default()
-            }),
-            // cssrc x1, csr1, x2
-            ISA::CSRRC.build(Operands {
-                rd: 1,
-                rs1: 2,
-                imm: csr1,
-                ..Default::default()
-            }),
-        ],
-    );
+        // set x1 := 42
+        ISA::ADDI.build(Operands {
+            rd: 1,
+            rs1: 0,
+            imm: 42,
+            ..Default::default()
+        }),
+        // set x2 := 100
+        ISA::ADDI.build(Operands {
+            rd: 2,
+            rs1: 0,
+            imm: 100,
+            ..Default::default()
+        }),
+        // CSRRC x1, csr1, x1
+        ISA::CSRRC.build(Operands {
+            rd: 1,
+            rs1: 1,
+            imm: csr1,
+            ..Default::default()
+        }),
+        // cssrc x1, csr1, x2
+        ISA::CSRRC.build(Operands {
+            rd: 1,
+            rs1: 2,
+            imm: csr1,
+            ..Default::default()
+        }),
+    ]);
 
     // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
@@ -2138,22 +2115,21 @@ fn test_CSRRWI() {
     let csr1 = 5;
 
     let mut program = populate(&[
-            // CSRRC x1, csr1, x1
-            ISA::CSRRWI.build(Operands {
-                rd: 1,
-                rs1: 25,
-                imm: csr1,
-                ..Default::default()
-            }),
-            // cssrc x1, csr1, x2
-            ISA::CSRRWI.build(Operands {
-                rd: 1,
-                rs1: 2,
-                imm: csr1,
-                ..Default::default()
-            }),
-        ],
-    );
+        // CSRRC x1, csr1, x1
+        ISA::CSRRWI.build(Operands {
+            rd: 1,
+            rs1: 25,
+            imm: csr1,
+            ..Default::default()
+        }),
+        // cssrc x1, csr1, x2
+        ISA::CSRRWI.build(Operands {
+            rd: 1,
+            rs1: 2,
+            imm: csr1,
+            ..Default::default()
+        }),
+    ]);
 
     // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
@@ -2176,22 +2152,21 @@ fn test_CSRRSI() {
     let csr1 = 5;
 
     let mut program = populate(&[
-            // CSRRSI x1, csr1, x1
-            ISA::CSRRSI.build(Operands {
-                rd: 1,
-                rs1: 25,
-                imm: csr1,
-                ..Default::default()
-            }),
-            // CSRRSI x1, csr1, x2
-            ISA::CSRRSI.build(Operands {
-                rd: 1,
-                rs1: 2,
-                imm: csr1,
-                ..Default::default()
-            }),
-        ],
-    );
+        // CSRRSI x1, csr1, x1
+        ISA::CSRRSI.build(Operands {
+            rd: 1,
+            rs1: 25,
+            imm: csr1,
+            ..Default::default()
+        }),
+        // CSRRSI x1, csr1, x2
+        ISA::CSRRSI.build(Operands {
+            rd: 1,
+            rs1: 2,
+            imm: csr1,
+            ..Default::default()
+        }),
+    ]);
 
     // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
@@ -2213,22 +2188,21 @@ fn test_CSRRCI() {
     let csr1 = 5;
 
     let mut program = populate(&[
-            // CSRRCI x1, csr1, x1
-            ISA::CSRRCI.build(Operands {
-                rd: 1,
-                rs1: 25,
-                imm: csr1,
-                ..Default::default()
-            }),
-            // CSRRCI x1, csr1, x2
-            ISA::CSRRCI.build(Operands {
-                rd: 1,
-                rs1: 2,
-                imm: csr1,
-                ..Default::default()
-            }),
-        ],
-    );
+        // CSRRCI x1, csr1, x1
+        ISA::CSRRCI.build(Operands {
+            rd: 1,
+            rs1: 25,
+            imm: csr1,
+            ..Default::default()
+        }),
+        // CSRRCI x1, csr1, x2
+        ISA::CSRRCI.build(Operands {
+            rd: 1,
+            rs1: 2,
+            imm: csr1,
+            ..Default::default()
+        }),
+    ]);
 
     // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);

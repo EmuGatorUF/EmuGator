@@ -47,7 +47,13 @@ pub struct EmulatorState {
     pub pipeline: CVE2Pipeline,
 }
 
-fn rw_memory(memory: &mut BTreeMap<u32, u8>, address: u32, byte_enable: [bool; 4], wenable: bool, wdata: u32) -> Result<u32, ()> {
+fn rw_memory(
+    memory: &mut BTreeMap<u32, u8>,
+    address: u32,
+    byte_enable: [bool; 4],
+    wenable: bool,
+    wdata: u32,
+) -> Result<u32, ()> {
     let mut rdata_bytes: [u8; 4] = [0; 4];
     let wdata_bytes = wdata.to_le_bytes();
     let success = (0usize..4usize).all(|i| {
@@ -58,7 +64,7 @@ fn rw_memory(memory: &mut BTreeMap<u32, u8>, address: u32, byte_enable: [bool; 4
             } else {
                 memory.get(&addr).copied().unwrap_or_default()
             };
-            true 
+            true
         } else {
             true
         }
@@ -78,12 +84,12 @@ pub fn clock(org_state: &EmulatorState, program: &mut AssembledProgram) -> Emula
     if next_state.pipeline.datapath.instr_req_o {
         // Read the next instruction into the instruction fetch register
         match rw_memory(
-                &mut program.instruction_memory,
-                next_state.pipeline.datapath.instr_addr_o,
-                [true; 4],
-                false,
-                0,
-            ) {
+            &mut program.instruction_memory,
+            next_state.pipeline.datapath.instr_addr_o,
+            [true; 4],
+            false,
+            0,
+        ) {
             Ok(instr) => {
                 next_state.pipeline.datapath.instr_rdata_i = instr;
                 next_state.pipeline.datapath.instr_gnt_i = true;

@@ -72,7 +72,7 @@ fn LUI(instr: &Instruction, state: &mut EmulatorState) {
 
 fn AUIPC(instr: &Instruction, state: &mut EmulatorState) {
     let rd = instr.rd() as usize;
-    
+
     // immediate should already be shifted by the appropriate amount by encoder
     let immediate = instr.immediate().unwrap() as i32;
     let result = state.pipeline.ID_pc as i32 + immediate;
@@ -271,8 +271,8 @@ fn BGEU(instr: &Instruction, state: &mut EmulatorState) {
 
 fn LB(instr: &Instruction, state: &mut EmulatorState) {
     if state.pipeline.datapath.id_multicycle == 0 {
-        let address: u32 = (state.x[instr.rs1() as usize] as i32
-            + instr.immediate().unwrap()) as u32;
+        let address: u32 =
+            (state.x[instr.rs1() as usize] as i32 + instr.immediate().unwrap()) as u32;
 
         // set data on pipline
         let byte_enable = [true, false, false, false];
@@ -285,7 +285,7 @@ fn LB(instr: &Instruction, state: &mut EmulatorState) {
     } else {
         let read_value = state.pipeline.datapath.data_rdata_i;
         state.x[instr.rd() as usize] = bitmask!(31;8) * bits!(read_value, 7) | read_value;
-        
+
         state.pipeline.datapath.data_req_o = false;
         state.pipeline.datapath.data_addr_o = 0;
         state.pipeline.datapath.data_we_o = false;
@@ -297,8 +297,8 @@ fn LB(instr: &Instruction, state: &mut EmulatorState) {
 
 fn LH(instr: &Instruction, state: &mut EmulatorState) {
     if state.pipeline.datapath.id_multicycle == 0 {
-        let address: u32 = (state.x[instr.rs1() as usize] as i32
-            + instr.immediate().unwrap()) as u32;
+        let address: u32 =
+            (state.x[instr.rs1() as usize] as i32 + instr.immediate().unwrap()) as u32;
 
         // set data on pipline
         let byte_enable = [true, true, false, false];
@@ -311,7 +311,7 @@ fn LH(instr: &Instruction, state: &mut EmulatorState) {
     } else {
         let read_value = state.pipeline.datapath.data_rdata_i;
         state.x[instr.rd() as usize] = bitmask!(31;16) * bits!(read_value, 15) | read_value;
-        
+
         state.pipeline.datapath.data_req_o = false;
         state.pipeline.datapath.data_addr_o = 0;
         state.pipeline.datapath.data_we_o = false;
@@ -323,8 +323,8 @@ fn LH(instr: &Instruction, state: &mut EmulatorState) {
 
 fn LW(instr: &Instruction, state: &mut EmulatorState) {
     if state.pipeline.datapath.id_multicycle == 0 {
-        let address: u32 = (state.x[instr.rs1() as usize] as i32
-            + instr.immediate().unwrap()) as u32;
+        let address: u32 =
+            (state.x[instr.rs1() as usize] as i32 + instr.immediate().unwrap()) as u32;
 
         // set data on pipline
         let byte_enable = [true, true, true, true];
@@ -336,7 +336,7 @@ fn LW(instr: &Instruction, state: &mut EmulatorState) {
         state.pipeline.datapath.fetch_enable_i = false;
     } else {
         let read_value = state.pipeline.datapath.data_rdata_i;
-        
+
         state.pipeline.datapath.data_req_o = false;
         state.pipeline.datapath.data_addr_o = 0;
         state.pipeline.datapath.data_we_o = false;
@@ -349,8 +349,8 @@ fn LW(instr: &Instruction, state: &mut EmulatorState) {
 
 fn LBU(instr: &Instruction, state: &mut EmulatorState) {
     if state.pipeline.datapath.id_multicycle == 0 {
-        let address: u32 = (state.x[instr.rs1() as usize] as i32
-            + instr.immediate().unwrap()) as u32;
+        let address: u32 =
+            (state.x[instr.rs1() as usize] as i32 + instr.immediate().unwrap()) as u32;
 
         // set data on pipline
         let byte_enable = [true, false, false, false];
@@ -362,7 +362,7 @@ fn LBU(instr: &Instruction, state: &mut EmulatorState) {
         state.pipeline.datapath.fetch_enable_i = false;
     } else {
         let read_value = state.pipeline.datapath.data_rdata_i;
-        
+
         state.pipeline.datapath.data_req_o = false;
         state.pipeline.datapath.data_addr_o = 0;
         state.pipeline.datapath.data_we_o = false;
@@ -375,8 +375,8 @@ fn LBU(instr: &Instruction, state: &mut EmulatorState) {
 
 fn LHU(instr: &Instruction, state: &mut EmulatorState) {
     if state.pipeline.datapath.id_multicycle == 0 {
-        let address: u32 = (state.x[instr.rs1() as usize] as i32
-            + instr.immediate().unwrap()) as u32;
+        let address: u32 =
+            (state.x[instr.rs1() as usize] as i32 + instr.immediate().unwrap()) as u32;
 
         // set data on pipline
         let byte_enable = [true, true, false, false];
@@ -388,7 +388,7 @@ fn LHU(instr: &Instruction, state: &mut EmulatorState) {
         state.pipeline.datapath.fetch_enable_i = false;
     } else {
         let read_value = state.pipeline.datapath.data_rdata_i;
-        
+
         state.pipeline.datapath.data_req_o = false;
         state.pipeline.datapath.data_addr_o = 0;
         state.pipeline.datapath.data_we_o = false;
@@ -434,7 +434,7 @@ fn SH(instr: &Instruction, state: &mut EmulatorState) {
         state.pipeline.datapath.data_req_o = true;
         state.pipeline.datapath.data_addr_o = address;
         state.pipeline.datapath.data_we_o = true;
-        state.pipeline.datapath.data_be_o = [true, true, false, false]; 
+        state.pipeline.datapath.data_be_o = [true, true, false, false];
         state.pipeline.datapath.data_wdata_o = data;
         state.pipeline.datapath.id_multicycle = 1;
         state.pipeline.datapath.fetch_enable_i = false;
@@ -459,7 +459,7 @@ fn SW(instr: &Instruction, state: &mut EmulatorState) {
         state.pipeline.datapath.data_req_o = true;
         state.pipeline.datapath.data_addr_o = address;
         state.pipeline.datapath.data_we_o = true;
-        state.pipeline.datapath.data_be_o = [true, true, true, true]; 
+        state.pipeline.datapath.data_be_o = [true, true, true, true];
         state.pipeline.datapath.data_wdata_o = data;
         state.pipeline.datapath.id_multicycle = 1;
         state.pipeline.datapath.fetch_enable_i = false;

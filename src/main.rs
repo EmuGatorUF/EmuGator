@@ -4,8 +4,8 @@ mod code_editor;
 mod emulator;
 mod interface;
 mod isa;
-mod utils;
 mod uart;
+mod utils;
 
 use dioxus::prelude::*;
 use dioxus_logger::tracing::{info, Level};
