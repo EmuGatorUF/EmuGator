@@ -2,9 +2,11 @@
 mod tests;
 
 mod assembled_program;
+mod assembler;
 mod lexer;
 
 pub use assembled_program::{AssembledProgram, Section};
+pub use assembler::assemble as new_assemble;
 pub use lexer::*;
 
 use std::{
@@ -20,7 +22,7 @@ struct DataItem {
     values: Vec<u8>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AssemblerError {
     pub error_message: String,
     pub line_number: usize,
@@ -35,6 +37,15 @@ impl AssemblerError {
             line_number,
             column,
             width,
+        }
+    }
+
+    pub fn from_token(error_message: String, token: &Token) -> Self {
+        Self {
+            error_message,
+            line_number: token.line,
+            column: token.column,
+            width: token.width,
         }
     }
 }

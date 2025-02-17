@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
 
+use bimap::BiBTreeMap;
+
 use super::*;
 use crate::include_test_file;
 
@@ -12,6 +14,67 @@ fn test_lexer() {
 
     for token in tokens {
         println!("{:?}", token);
+    }
+}
+
+#[test]
+fn test_assembler() {
+    let source = include_test_file!("syntax-check.s");
+    let assembled_program_new = assembler::assemble(source);
+    let assembled_program = assemble(source);
+
+    if let (Ok(assembled_program), Ok(assembled_program_new)) =
+        (&assembled_program, &assembled_program_new)
+    {
+        for (label, addr) in &assembled_program.labels {
+            assert_eq!(
+                Some(addr),
+                assembled_program_new.labels.get(label),
+                "Mismatch in label \"{}\"",
+                label
+            );
+            println!(
+                "{}: 0x{:08X}, 0x{:08X}",
+                label,
+                addr,
+                assembled_program_new.labels.get(label).unwrap()
+            );
+        }
+
+        for (label, addr) in &assembled_program.data_labels {
+            assert_eq!(
+                Some(addr),
+                assembled_program_new.data_labels.get(label),
+                "Mismatch in label \"{}\"",
+                label
+            );
+            println!(
+                "{}: 0x{:08X}, 0x{:08X}",
+                label,
+                addr,
+                assembled_program_new.data_labels.get(label).unwrap()
+            );
+        }
+
+        for (addr, line) in &assembled_program.source_map {
+            assert_eq!(
+                Some(line),
+                assembled_program_new.source_map.get_by_left(addr),
+                "Mismatch in source map at address 0x{:08X}",
+                addr
+            );
+            println!(
+                "0x{:08X}: Line {}, {}",
+                addr,
+                line,
+                assembled_program_new.source_map.get_by_left(addr).unwrap()
+            );
+        }
+    } else if let (Err(_), Err(_)) = (&assembled_program, &assembled_program_new) {
+        // Both should fail
+    } else {
+        eprint!("{:?}\n{:?}", assembled_program, assembled_program_new);
+        panic!("Mismatch in assembly results");
     }
 }
 

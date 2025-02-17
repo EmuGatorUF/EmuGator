@@ -26,8 +26,6 @@ bimap = "0.6"
 ibig = "0.3.6"
 peeking_take_while = "1.0.0"
 
-[profile]
-
 [profile.wasm-dev]
 inherits = "dev"
 opt-level = 1
