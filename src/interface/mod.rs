@@ -32,6 +32,8 @@ pub fn App() -> Element {
     let breakpoints: Signal<BTreeSet<usize>> = use_signal(|| BTreeSet::new());
     let uart_module: Signal<Uart> = use_signal(|| Uart::default());
 
+    let minimize_console: Signal<bool> = use_signal(|| false);
+
     use_effect(move || {
         info!("source changed");
         // TODO: Get diagnostics
@@ -68,17 +70,17 @@ pub fn App() -> Element {
     });
 
     rsx! {
-        document::Stylesheet { href: asset!("/assets/tailwind.css") }
+        document::Stylesheet { href: asset!("./assets/tailwind.css") }
 
         div { class: "flex h-screen w-full",
             div { class: "w-1/2 pt-4 flex flex-col h-full bg-[#1E1E1E] overflow-hidden",
                 RunButtons { source, assembled_program, emulator_state, uart_module }
                 if  assembled_program.read().is_some() {
-                    div { class: "flex-col h-6/10",
+                    div { class: "flex-1 relative overflow-hidden",
                         CodeEditor { source, line_highlights, breakpoints },
                     }
-                    div { class: "flex-col flex-grow",
-                        UartView { uart_module }
+                    div {class: "transition-all duration-300 ease-in-out ".to_owned() + {if *minimize_console.read() { "h-min" } else { "h-4/10" }},
+                        UartView { uart_module, minimize_console }
                     }
                 } else {
                     div { class: "flex-col h-screen",
