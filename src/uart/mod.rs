@@ -43,7 +43,8 @@ impl Uart {
 
     pub fn to_string(&self) -> String {
         // Convert the output buffer to a string
-        String::from_utf8(self.uart_output_buffer.clone()).unwrap_or_else(|_| "Invalid UTF-8".to_string())
+        String::from_utf8(self.uart_output_buffer.clone())
+            .unwrap_or_else(|_| "Invalid UTF-8".to_string())
     }
 }
 

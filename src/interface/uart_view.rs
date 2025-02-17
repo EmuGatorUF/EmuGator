@@ -1,5 +1,5 @@
-use dioxus::{prelude::component, signals::Signal};
 use dioxus::prelude::*;
+use dioxus::{prelude::component, signals::Signal};
 
 use crate::uart::Uart;
 
