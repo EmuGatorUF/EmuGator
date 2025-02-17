@@ -4,6 +4,7 @@ mod instruction_views;
 mod memory_view;
 mod register_view;
 mod run_buttons;
+mod uart_view;
 
 use std::collections::BTreeSet;
 
@@ -12,7 +13,7 @@ use dioxus_logger::tracing::info;
 
 use self::{
     datapath_visualization::DatapathVisualization, memory_view::MemoryView,
-    register_view::RegisterView, run_buttons::RunButtons,
+    register_view::RegisterView, run_buttons::RunButtons, uart_view::UartView,
 };
 use crate::{
     assembler::AssembledProgram,
@@ -72,11 +73,18 @@ pub fn App() -> Element {
         div { class: "flex h-screen w-full",
             div { class: "w-1/2 pt-4 flex flex-col h-full bg-[#1E1E1E] overflow-hidden",
                 RunButtons { source, assembled_program, emulator_state, uart_module }
-                div { class: "flex-grow",
-                    CodeEditor { source, line_highlights, breakpoints },
-                    div { class: "flex-grow",
-                        "HI"
+                if  assembled_program.read().is_some() {
+                    div { class: "flex-col h-6/10",
+                        CodeEditor { source, line_highlights, breakpoints },
                     }
+                    div { class: "flex-col flex-grow",
+                        UartView { uart_module }
+                    }
+                } else {
+                    div { class: "flex-col h-screen",
+                        CodeEditor { source, line_highlights, breakpoints },
+                    }
+
                 }
             }
             div { class: "w-1/2 flex flex-col",
