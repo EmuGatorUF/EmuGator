@@ -12,9 +12,8 @@ pub fn UartView(uart_module: Signal<Uart>, minimize_console: Signal<bool>) -> El
             div {
                 div { class: "flex flex-grow p-2 items-center align-center justify-between",
                     "UART Console",
-                    button { class: "flex items-center justify-center text-sm bg-gray-500 py-1 px-2 border border-gray-400 rounded shadow",
+                    button { class: "flex text-sm items-center justify-center text-center text-sm bg-inherit px-2 hover:border border-gray-400 rounded shadow ".to_owned() + {if *minimize_console.read() { "" } else { "rotate-180" }},
                         onclick: move |_| {
-                            info!("Button Pressed! {:?}", *minimize_console.read());
                             // For some reason, this can't be a single line :|
                             let is_minimized = *minimize_console.read();
                             minimize_console.set(!is_minimized);
