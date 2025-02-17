@@ -287,6 +287,124 @@ fn parse_expression<'a>(lexer: &mut Peekable<Lexer<'a>>) -> Result<Vec<RPN<'a>>,
     )
 }
 
+fn parse_data_directive_length<'a>(
+    token: Token<'a>,
+    lexer: &mut Peekable<Lexer<'a>>,
+) -> Result<u32, AssemblerError> {
+    if let TokenKind::Symbol(directive_str) = token.kind {
+        match directive_str {
+            "data" | "text" => Ok(0),
+            "byte" => {
+                parse_expression(lexer)?;
+                let mut length = 1;
+
+                // lexer.peek() is either None, Newline, or Comma
+                while is_kind(lexer.peek(), TokenKind::Comma) {
+                    lexer.next(); // Skip comma
+                    parse_expression(lexer)?;
+                    length += 1;
+                }
+
+                // Return number of bytes
+                Ok(length)
+            }
+            "word" => {
+                parse_expression(lexer)?;
+                let mut length = 4;
+
+                // lexer.peek() is either None, Newline, or Comma
+                while is_kind(lexer.peek(), TokenKind::Comma) {
+                    lexer.next(); // Skip comma
+                    parse_expression(lexer)?;
+                    length += 4;
+                }
+
+                // Return number of bytes
+                Ok(length)
+            }
+            "dword" => todo!(),
+            "string" => {
+                let string = lexer.next().ok_or(AssemblerError::from_token(
+                    "Unexpected EOF after '.string'".into(),
+                    &token,
+                ))??;
+
+                if let TokenKind::StrLiteral(_, c) = string.kind {
+                    // Return string length
+                    Ok(c.as_bytes().len() as u32 + 1) // Include null terminator
+                } else {
+                    // Error: Invalid string
+                    return Err(AssemblerError::from_token(
+                        "Expected string literal after .string directive.".into(),
+                        &string,
+                    ));
+                }
+            }
+            "ascii" => {
+                let string = lexer.next().ok_or(AssemblerError::from_token(
+                    "Unexpected EOF after '.ascii'".into(),
+                    &token,
+                ))??;
+
+                if let TokenKind::StrLiteral(_, c) = string.kind {
+                    // Return string length
+                    Ok(c.as_bytes().len() as u32)
+                } else {
+                    // Error: Invalid string
+                    return Err(AssemblerError::from_token(
+                        "Expected string literal after .ascii directive.".into(),
+                        &string,
+                    ));
+                }
+            }
+            _ => Err(AssemblerError::from_token(
+                format!("Unknown directive '{}'", directive_str),
+                &token,
+            )),
+        }
+    } else {
+        Err(AssemblerError::from_token(
+            "Invalid token, expected directive after '.'".into(),
+            &token,
+        ))
+    }
+}
+
+fn run_pass<
+    'a,
+    T: FnMut(&mut Token<'a>, &mut Peekable<Lexer<'a>>) -> Result<(), AssemblerError>,
+>(
+    lexer: &mut Peekable<Lexer<'a>>,
+    mut pass: T,
+) -> Vec<AssemblerError> {
+    let mut errors = Vec::new();
+    while let Some(mut token) = lexer.next() {
+        match token {
+            Ok(mut token) => {
+                let err = pass(&mut token, lexer);
+
+                if let Err(err) = err {
+                    errors.push(err);
+                }
+
+                // Consume rest of the line
+                if token.kind != TokenKind::Newline {
+                    match consume_line(lexer) {
+                        Ok(_) => {}
+                        Err(err) => errors.push(err),
+                    };
+                }
+            }
+            Err(err) => {
+                errors.push(err);
+                continue;
+            }
+        }
+    }
+
+    errors
+}
+
 fn is_kind(token: Option<&Result<Token, AssemblerError>>, token_kind: TokenKind) -> bool {
     if let Some(Ok(Token { kind, .. })) = token {
         *kind == token_kind
@@ -326,185 +444,79 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
     let mut current_org: String = "!org0".into();
     let mut offset: u32 = 0;
 
-    while let Some(mut token) = lexer.next() {
-        match token {
-            Ok(mut token) => {
-                let err: Result<_, _> = (|token: &mut Token<'a>| {
-                    // Check for a label
-                    let label = parse_label(token, &mut lexer)?;
+    errors.append(&mut run_pass(&mut lexer, |token, lexer| {
+        // Check for a label
+        let label = parse_label(token, lexer)?;
 
-                    // Check for section directive
-                    let directive = parse_section(token, &mut lexer)?;
+        // Check for section directive
+        let directive = parse_section(token, lexer)?;
 
-                    // Handle label
-                    if let Some((section, label, expression)) = match (directive, label) {
-                        (Some((section, expression, _)), Some((label, token))) => {
-                            offset = 0;
-                            Some((section, label.into(), (expression, token)))
-                        }
-                        (None, Some((label, token))) => Some((
-                            current_section,
-                            label.into(),
-                            (
-                                vec![
-                                    RPN {
-                                        kind: RPNKind::Variable(current_org.clone()),
-                                        token: token.clone(),
-                                    },
-                                    RPN {
-                                        kind: RPNKind::Integer(offset.into()),
-                                        token: token.clone(),
-                                    },
-                                    RPN {
-                                        kind: RPNKind::Add,
-                                        token: token.clone(),
-                                    },
-                                ],
-                                token,
-                            ),
-                        )),
-                        (Some((section, expression, directive_token)), None) => {
-                            offset = 0;
-                            Some((
-                                section,
-                                format!("!org{}", directive_token.line),
-                                (expression, directive_token),
-                            ))
-                        }
-                        (None, None) => None,
-                    } {
-                        symbol_table.insert(label, expression);
-                    }
-
-                    // Check for other directives
-                    if token.kind == TokenKind::Dot {
-                        let directive = lexer.next().ok_or(AssemblerError::from_token(
-                            "Unexpected EOF after '.'".into(),
-                            token,
-                        ))??;
-
-                        let data_length = if let TokenKind::Symbol(directive_str) = directive.kind {
-                            match directive_str {
-                                "data" | "text" => Ok(0),
-                                "byte" => {
-                                    parse_expression(&mut lexer)?;
-                                    let mut length = 1;
-
-                                    // lexer.peek() is either None, Newline, or Comma
-                                    while is_kind(lexer.peek(), TokenKind::Comma) {
-                                        lexer.next(); // Skip comma
-                                        parse_expression(&mut lexer)?;
-                                        length += 1;
-                                    }
-
-                                    // Return number of bytes
-                                    Ok(length)
-                                }
-                                "word" => {
-                                    parse_expression(&mut lexer)?;
-                                    let mut length = 4;
-
-                                    // lexer.peek() is either None, Newline, or Comma
-                                    while is_kind(lexer.peek(), TokenKind::Comma) {
-                                        lexer.next(); // Skip comma
-                                        parse_expression(&mut lexer)?;
-                                        length += 4;
-                                    }
-
-                                    // Return number of bytes
-                                    Ok(length)
-                                }
-                                "dword" => todo!(),
-                                "string" => {
-                                    let string =
-                                        lexer.next().ok_or(AssemblerError::from_token(
-                                            "Unexpected EOF after '.string'".into(),
-                                            &directive,
-                                        ))??;
-
-                                    if let TokenKind::StrLiteral(_, c) = string.kind {
-                                        // Return string length
-                                        Ok(c.as_bytes().len() as u32 + 1) // Include null terminator
-                                    } else {
-                                        // Error: Invalid string
-                                        return Err(AssemblerError::from_token(
-                                            "Expected string literal after .string directive."
-                                                .into(),
-                                            &string,
-                                        ));
-                                    }
-                                }
-                                "ascii" => {
-                                    let string =
-                                        lexer.next().ok_or(AssemblerError::from_token(
-                                            "Unexpected EOF after '.ascii'".into(),
-                                            &directive,
-                                        ))??;
-
-                                    if let TokenKind::StrLiteral(_, c) = string.kind {
-                                        // Return string length
-                                        Ok(c.as_bytes().len() as u32)
-                                    } else {
-                                        // Error: Invalid string
-                                        return Err(AssemblerError::from_token(
-                                            "Expected string literal after .ascii directive."
-                                                .into(),
-                                            &string,
-                                        ));
-                                    }
-                                }
-                                _ => Err(AssemblerError::from_token(
-                                    format!("Unknown directive '{}'", directive_str),
-                                    &directive,
-                                )),
-                            }
-                        } else {
-                            Err(AssemblerError::from_token(
-                                "Invalid token, expected directive after '.'".into(),
-                                &directive,
-                            ))
-                        }?;
-
-                        offset += data_length;
-                    }
-
-                    // Check for instruction
-                    if let TokenKind::Symbol(instr) = token.kind {
-                        let instruction = token;
-
-                        // Parse instruction
-                        ISA::from_str(instr).map_err(|e| {
-                            AssemblerError::from_token(
-                                format!("Invalid instruction {}", instr),
-                                instruction,
-                            )
-                        })?;
-
-                        // Instructions are 4 bytes
-                        offset += 4;
-                    }
-
-                    Ok(())
-                })(&mut token);
-
-                if let Err(err) = err {
-                    errors.push(err);
-                }
-
-                // Consume rest of the line
-                if token.kind != TokenKind::Newline {
-                    match consume_line(&mut lexer) {
-                        Ok(_) => {}
-                        Err(err) => errors.push(err),
-                    };
-                }
+        // Handle label
+        if let Some((section, label, expression)) = match (directive, label) {
+            (Some((section, expression, _)), Some((label, token))) => {
+                offset = 0;
+                Some((section, label.into(), (expression, token)))
             }
-            Err(err) => {
-                errors.push(err);
-                continue;
+            (None, Some((label, token))) => Some((
+                current_section,
+                label.into(),
+                (
+                    vec![
+                        RPN {
+                            kind: RPNKind::Variable(current_org.clone()),
+                            token: token.clone(),
+                        },
+                        RPN {
+                            kind: RPNKind::Integer(offset.into()),
+                            token: token.clone(),
+                        },
+                        RPN {
+                            kind: RPNKind::Add,
+                            token: token.clone(),
+                        },
+                    ],
+                    token,
+                ),
+            )),
+            (Some((section, expression, directive_token)), None) => {
+                offset = 0;
+                Some((
+                    section,
+                    format!("!org{}", directive_token.line),
+                    (expression, directive_token),
+                ))
             }
+            (None, None) => None,
+        } {
+            symbol_table.insert(label, expression);
         }
-    }
+
+        // Check for other directives
+        if token.kind == TokenKind::Dot {
+            let directive = lexer.next().ok_or(AssemblerError::from_token(
+                "Unexpected EOF after '.'".into(),
+                token,
+            ))??;
+
+            let data_length = parse_data_directive_length(directive, lexer)?;
+            offset += data_length;
+        }
+
+        // Check for instruction
+        if let TokenKind::Symbol(instr) = token.kind {
+            let instruction = token;
+
+            // Parse instruction
+            ISA::from_str(instr).map_err(|e| {
+                AssemblerError::from_token(format!("Invalid instruction {}", instr), instruction)
+            })?;
+
+            // Instructions are 4 bytes
+            offset += 4;
+        }
+
+        Ok(())
+    }));
 
     // Resolve text labels
     let mut resolved_symbols = HashMap::new();
@@ -516,7 +528,7 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
                 Ok(e) => e,
                 Err((msg, label)) => AssemblerError::from_token(
                     msg,
-                    &symbol_table.get(&label).expect("Label not found").1,
+                    &symbol_table.get(&label).expect("Symbol not found").1,
                 ),
             })
         {
@@ -531,114 +543,90 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
     let mut current_section = Section::Text;
     let mut address: u32 = 0;
 
-    while let Some(mut token) = lexer.next() {
-        // Resolve lexer errors
-        match token {
-            Ok(mut token) => {
-                let err: Result<(), AssemblerError> = (|token: &mut Token<'a>| {
-                    // Check for a label
-                    let label = parse_label(token, &mut lexer)?;
+    errors.append(&mut run_pass(&mut lexer, |token, lexer| {
+        // Check for a label
+        let label = parse_label(token, lexer)?;
 
-                    // Check for directive
-                    let directive = parse_section(token, &mut lexer)?;
+        // Check for directive
+        let directive = parse_section(token, lexer)?;
 
-                    // Handle label
-                    if let Some((section, label)) = match (directive, label) {
-                        (Some((section, _, _)), Some((label))) => {
-                            Some((section, (label.0.into(), label.1)))
-                        }
-                        (Some((section, _, directive_token)), None) => Some((
-                            section,
-                            (format!("!org{}", directive_token.line), directive_token),
-                        )),
-                        (None, _) => None,
-                    } {
-                        current_section = section;
-                        address = symbol_table
-                            .get(&label.0)
-                            .ok_or(AssemblerError::from_token(
-                                "Label not resolved".into(),
-                                &label.1,
-                            ))?
-                            .try_into()
-                            .map_err(|e: OutOfBoundsError| {
-                                AssemblerError::from_token(
-                                    format!("Label \"{}\" is too large (>32-bits)", label.0),
-                                    &label.1,
-                                )
-                            })?;
-                    }
-
-                    // Check for other directives
-                    if token.kind == TokenKind::Dot {
-                        let directive = lexer.next().ok_or(AssemblerError::from_token(
-                            "Unexpected EOF after '.'".into(),
-                            token,
-                        ))??;
-
-                        // let data: &[u8] = if let TokenKind::Symbol(directive_str) = directive.kind {
-                        //     match directive_str {
-                        //         "data" | "text" => Ok(&[]),
-                        //         "byte" => {
-                        //             todo!();
-                        //         }
-                        //         "word" => {
-                        //             todo!();
-                        //         }
-                        //         "dword" => {
-                        //             todo!();
-                        //         }
-                        //         "string" => {
-                        //             todo!()
-                        //         }
-                        //         "ascii" => {
-                        //             todo!()
-                        //         }
-                        //         _ => Err(AssemblerError::from_token(
-                        //             format!("Unknown directive '{}'", directive_str),
-                        //             &directive,
-                        //         )),
-                        //     }
-                        // } else {
-                        //     Err(AssemblerError::from_token(
-                        //         "Invalid token, expected directive after '.'".into(),
-                        //         &directive,
-                        //     ))
-                        // }?;
-                    }
-
-                    // Check for instruction
-                    if let TokenKind::Symbol(instr) = token.kind {
-                        let instruction = token;
-
-                        // Parse instruction
-                        ISA::from_str(instr).map_err(|e| {
-                            AssemblerError::from_token(
-                                format!("Invalid instruction {}", instr),
-                                &instruction,
-                            )
-                        })?;
-
-                        // Instructions are 4 bytes
-                        offset += 4;
-                    }
-                    Ok(())
-                })(&mut token);
-
-                // Consume rest of the line
-                if token.kind != TokenKind::Newline {
-                    match consume_line(&mut lexer) {
-                        Ok(_) => {}
-                        Err(err) => errors.push(err),
-                    };
-                }
-            }
-            Err(err) => {
-                errors.push(err);
-                continue;
-            }
+        // Handle label
+        if let Some((section, label)) = match (directive, label) {
+            (Some((section, _, _)), Some((label))) => Some((section, (label.0.into(), label.1))),
+            (Some((section, _, directive_token)), None) => Some((
+                section,
+                (format!("!org{}", directive_token.line), directive_token),
+            )),
+            (None, _) => None,
+        } {
+            current_section = section;
+            address = symbol_table
+                .get(&label.0)
+                .ok_or(AssemblerError::from_token(
+                    "Label not resolved".into(),
+                    &label.1,
+                ))?
+                .try_into()
+                .map_err(|e: OutOfBoundsError| {
+                    AssemblerError::from_token(
+                        format!("Label \"{}\" is too large (>32-bits)", label.0),
+                        &label.1,
+                    )
+                })?;
         }
-    }
+
+        // Check for other directives
+        if token.kind == TokenKind::Dot {
+            let directive = lexer.next().ok_or(AssemblerError::from_token(
+                "Unexpected EOF after '.'".into(),
+                token,
+            ))??;
+
+            // let data: &[u8] = if let TokenKind::Symbol(directive_str) = directive.kind {
+            //     match directive_str {
+            //         "data" | "text" => Ok(&[]),
+            //         "byte" => {
+            //             todo!();
+            //         }
+            //         "word" => {
+            //             todo!();
+            //         }
+            //         "dword" => {
+            //             todo!();
+            //         }
+            //         "string" => {
+            //             todo!()
+            //         }
+            //         "ascii" => {
+            //             todo!()
+            //         }
+            //         _ => Err(AssemblerError::from_token(
+            //             format!("Unknown directive '{}'", directive_str),
+            //             &directive,
+            //         )),
+            //     }
+            // } else {
+            //     Err(AssemblerError::from_token(
+            //         "Invalid token, expected directive after '.'".into(),
+            //         &directive,
+            //     ))
+            // }?;
+        }
+
+        // Check for instruction
+        if let TokenKind::Symbol(instr) = token.kind {
+            let instruction = token;
+
+            // Parse instruction
+            ISA::from_str(instr).map_err(|e| {
+                AssemblerError::from_token(format!("Invalid instruction {}", instr), &instruction)
+            })?;
+
+            // Instructions are 4 bytes
+            offset += 4;
+        }
+        Ok(())
+    }));
 
     if errors.len() > 0 {
         Err(errors)
