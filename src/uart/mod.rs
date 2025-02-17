@@ -40,6 +40,11 @@ impl Uart {
         // Uart::new(vec![], 0x3FF0, 0x3FF4, 0, 0, 0x3FF8)
         Uart::new(vec![], 0xF0, 0xF4, 0xF8, 0, 0)
     }
+
+    pub fn to_string(&self) -> String {
+        // Convert the output buffer to a string
+        String::from_utf8(self.uart_output_buffer.clone()).unwrap_or_else(|_| "Invalid UTF-8".to_string())
+    }
 }
 
 #[allow(dead_code)]
