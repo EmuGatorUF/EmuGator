@@ -75,19 +75,19 @@ pub fn App() -> Element {
 
         div { class: "flex h-screen w-full",
             div { class: "w-1/2 pt-4 flex flex-col h-full bg-[#1E1E1E] overflow-hidden",
-                RunButtons { source, assembled_program, emulator_state, uart_module }
-                if  assembled_program.read().is_some() {
-                    div { class: "flex-1 relative overflow-hidden",
-                        CodeEditor { source, line_highlights, breakpoints },
+                RunButtons {
+                    source,
+                    assembled_program,
+                    assembler_errors,
+                    emulator_state,
+                }
+                div { class: "flex-grow",
+                    CodeEditor {
+                        source,
+                        line_highlights,
+                        breakpoints,
+                        assembler_errors,
                     }
-                    div {class: "transition-all duration-300 ease-in-out ".to_owned() + {if *minimize_console.read() { "h-min" } else { "h-4/10" }},
-                        UartView { uart_module, minimize_console }
-                    }
-                } else {
-                    div { class: "flex-col h-screen",
-                        CodeEditor { source, line_highlights, breakpoints },
-                    }
-
                 }
             }
             div { class: "w-1/2 flex flex-col",
