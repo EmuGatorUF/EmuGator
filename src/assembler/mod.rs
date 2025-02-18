@@ -45,8 +45,8 @@ pub fn assemble(program: &str) -> Result<AssembledProgram, Vec<AssemblerError>> 
     let mut data_address = 0;
 
     // First pass: collect labels and process data
-    for (line_num, line) in program.lines().enumerate() {
-        let line = clean_line(line);
+    for (line_num, original_line) in program.lines().enumerate() {
+        let (line, indent) = clean_line(original_line);
         if line.is_empty() {
             continue;
         }
@@ -68,14 +68,14 @@ pub fn assemble(program: &str) -> Result<AssembledProgram, Vec<AssemblerError>> 
             match current_section {
                 Section::Text => {
                     if let Err(e) = assembled.add_label(label.clone(), text_address, false) {
-                        let column = line.find(&label).unwrap_or(0);
-                        errors.push(AssemblerError::new(e, line_num + 1, column, label.len()));
+                        let label_pos = original_line[indent..].find(&label).unwrap_or(0) + indent;
+                        errors.push(AssemblerError::new(e, line_num + 1, label_pos, label.len()));
                     }
                 }
                 Section::Data => {
                     if let Err(e) = assembled.add_label(label.clone(), data_address, true) {
-                        let column = line.find(&label).unwrap_or(0);
-                        errors.push(AssemblerError::new(e, line_num + 1, column, label.len()));
+                        let label_pos = original_line[indent..].find(&label).unwrap_or(0) + indent;
+                        errors.push(AssemblerError::new(e, line_num + 1, label_pos, label.len()));
                     }
                 }
             }
@@ -90,20 +90,23 @@ pub fn assemble(program: &str) -> Result<AssembledProgram, Vec<AssemblerError>> 
                         data_address += data.size as u32;
                     }
                     Err(e) => {
+                        let content_pos =
+                            original_line[indent..].find(&content).unwrap_or(0) + indent;
                         errors.push(AssemblerError::new(
                             e,
                             line_num + 1,
-                            content.find('.').unwrap_or(0),
+                            content_pos,
                             content.len(),
                         ));
                     }
                     _ => {}
                 }
             } else {
+                let content_pos = original_line[indent..].find(&content).unwrap_or(0) + indent;
                 errors.push(AssemblerError::new(
                     format!("Data directive '{}' outside of .data section", content),
                     line_num + 1,
-                    0,
+                    content_pos,
                     content.len(),
                 ));
             }
@@ -124,8 +127,8 @@ pub fn assemble(program: &str) -> Result<AssembledProgram, Vec<AssemblerError>> 
     current_section = Section::Text;
     text_address = assembled.get_section_start(Section::Text);
 
-    for (line_num, line) in program.lines().enumerate() {
-        let line = clean_line(line);
+    for (line_num, original_line) in program.lines().enumerate() {
+        let (line, indent) = clean_line(original_line);
         if line.is_empty() {
             continue;
         }
@@ -148,6 +151,8 @@ pub fn assemble(program: &str) -> Result<AssembledProgram, Vec<AssemblerError>> 
         if current_section == Section::Text && !content.starts_with('.') {
             match parse_instruction(
                 &content,
+                original_line,
+                indent,
                 &assembled.labels,
                 &assembled.data_labels,
                 text_address,
@@ -158,32 +163,35 @@ pub fn assemble(program: &str) -> Result<AssembledProgram, Vec<AssemblerError>> 
                     text_address += 4;
                 }
                 Err(e) => {
-                    // For instruction errors, try to be more specific about the error location
                     let parts: Vec<&str> = content
                         .split(|c: char| c.is_whitespace() || c == ',')
                         .filter(|s| !s.is_empty())
                         .collect();
 
                     let (column, width) = if parts.is_empty() {
-                        (0, content.len())
+                        let content_pos =
+                            original_line[indent..].find(&content).unwrap_or(0) + indent;
+                        (content_pos, content.len())
                     } else {
-                        // Try to identify which part of the instruction caused the error
                         let error_part = if e.contains("register") {
                             parts.iter().find(|&&p| p.starts_with('x'))
                         } else if e.contains("immediate") || e.contains("offset") {
                             parts.last()
                         } else {
-                            Some(&parts[0]) // Instruction name
+                            Some(&parts[0])
                         };
 
                         if let Some(part) = error_part {
-                            (content.find(part).unwrap_or(0), part.len())
+                            let part_pos = original_line[indent..].find(part).unwrap_or(0) + indent;
+                            (part_pos, part.len())
                         } else {
-                            (0, content.len())
+                            let content_pos =
+                                original_line[indent..].find(&content).unwrap_or(0) + indent;
+                            (content_pos, content.len())
                         }
                     };
 
-                    errors.push(AssemblerError::new(e, line_num + 1, column, width));
+                    errors.push(AssemblerError::new(e, line_num + 1, column + 1, width));
                 }
             }
         }
@@ -222,10 +230,12 @@ fn parse_section_directive(line: &str) -> Option<(Section, u32)> {
     Some((section, address))
 }
 
-fn clean_line(line: &str) -> String {
+fn clean_line(line: &str) -> (String, usize) {
+    let indent = line.chars().take_while(|c| c.is_whitespace()).count();
+
     match line.split('#').next() {
-        Some(l) => l.trim().to_string(),
-        None => String::new(),
+        Some(l) => (l.trim_end().to_string(), indent),
+        None => (String::new(), 0),
     }
 }
 
@@ -321,6 +331,8 @@ fn parse_number(value: &str) -> Result<u32, String> {
 
 fn parse_instruction(
     line: &str,
+    original_line: &str,
+    indent: usize,
     text_labels: &HashMap<String, u32>,
     data_labels: &HashMap<String, u32>,
     current_address: u32,
