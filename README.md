@@ -31,9 +31,7 @@ The assembler is long yet simple and integrates with the frontend to take in ass
 - The main function, `assemble`, handles the assembly string and coordinates the parsing passes.
 
 ## Known Bugs
-- Users cannot continously run programs, they must step through the program by clock cycles.
-- Decreasing page size vertically causes the editor to overflow vertically.
-- .word allocations over 255 do not currently work
+- Users cannot continuously run programs, they must step through the program by clock cycles.
 
 ## Development
 
