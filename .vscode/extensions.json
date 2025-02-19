@@ -5,6 +5,7 @@
         "rust-lang.rust-analyzer",
         "bradlc.vscode-tailwindcss",
         "dtsvet.vscode-wasm",
-        "ms-vscode.wasm-dwarf-debugging"
+        "ms-vscode.wasm-dwarf-debugging",
+        "llvm-vs-code-extensions.lldb-dap"
     ]
 }
