@@ -157,4 +157,8 @@ impl Instruction {
     pub fn funct7(&self) -> u8 {
         bits!(self.instr, 25, 7) as u8
     }
+
+    pub fn is_valid(&self) -> bool {
+        InstructionDefinition::from_instr(*self).is_some()
+    }
 }

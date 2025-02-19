@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 
+use super::pipeline::{ALUOp, CVE2Control, DataDestSel, OpASel, OpBSel};
 use super::{EmulatorState, InstructionHandler};
 use crate::isa::Instruction;
 use crate::{bitmask, bits};
@@ -474,15 +475,14 @@ fn SW(instr: &Instruction, state: &mut EmulatorState) {
     }
 }
 
-fn ADDI(instr: &Instruction, state: &mut EmulatorState) {
-    let rd = instr.rd() as usize;
-    let rs = instr.rs1() as usize;
-    let immediate = instr.immediate().unwrap() as i32;
-
-    // must match sign
-    let rs = state.x[rs] as i32;
-
-    state.x[rd] = (rs + immediate) as u32;
+fn ADDI(_instr: &Instruction, state: &mut EmulatorState) {
+    state.pipeline.control = CVE2Control {
+        op_a_sel: Some(OpASel::RF),
+        op_b_sel: Some(OpBSel::IMM),
+        alu_op: Some(ALUOp::ADD),
+        data_dest_sel: Some(DataDestSel::ALU),
+        reg_write: true,
+    };
 }
 
 fn SLTI(instr: &Instruction, state: &mut EmulatorState) {
@@ -546,12 +546,14 @@ fn SRxI(instr: &Instruction, state: &mut EmulatorState) {
         | (bitmask!(31;32-shamt) * bits!(state.x[rs], 31) * bits!(instr.raw(), 30));
 }
 
-fn ADD(instr: &Instruction, state: &mut EmulatorState) {
-    let rd = instr.rd() as usize;
-    let rs1 = instr.rs1() as usize;
-    let rs2 = instr.rs2() as usize;
-
-    state.x[rd] = (state.x[rs1] as i32 + state.x[rs2] as i32) as u32;
+fn ADD(_instr: &Instruction, state: &mut EmulatorState) {
+    state.pipeline.control = CVE2Control {
+        op_a_sel: Some(OpASel::RF),
+        op_b_sel: Some(OpBSel::RF),
+        alu_op: Some(ALUOp::ADD),
+        data_dest_sel: Some(DataDestSel::ALU),
+        reg_write: true,
+    };
 }
 
 fn SUB(instr: &Instruction, state: &mut EmulatorState) {
