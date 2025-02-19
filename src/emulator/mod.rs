@@ -220,7 +220,16 @@ impl CVE2Datapath {
         let Some(b) = self.op_b else { return };
 
         self.alu_out = Some(match op {
-            ALUOp::ADD => (a as i32 + b as i32) as u32,
+            ALUOp::ADD => ((a as i32) + (b as i32)) as u32,
+            ALUOp::SUB => ((a as i32) - (b as i32)) as u32,
+            ALUOp::XOR => a ^ b,
+            ALUOp::OR => a | b,
+            ALUOp::AND => a & b,
+            ALUOp::SLL => a << (b & 0x1F),
+            ALUOp::SRL => a >> (b & 0x1F),
+            ALUOp::SRA => ((a as i32) >> (b & 0x1F)) as u32,
+            ALUOp::SLT => ((a as i32) < (b as i32)) as u32,
+            ALUOp::SLTU => (a < b) as u32,
         });
     }
 

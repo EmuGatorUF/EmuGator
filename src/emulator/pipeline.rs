@@ -105,10 +105,41 @@ pub struct CVE2Control {
     pub reg_write: bool,          // Register write control.
 }
 
+impl CVE2Control {
+    pub fn register(op: ALUOp) -> Self {
+        Self {
+            op_a_sel: Some(OpASel::RF),
+            op_b_sel: Some(OpBSel::RF),
+            alu_op: Some(op),
+            data_dest_sel: Some(DataDestSel::ALU),
+            reg_write: true,
+        }
+    }
+
+    pub fn immediate(op: ALUOp) -> Self {
+        Self {
+            op_a_sel: Some(OpASel::RF),
+            op_b_sel: Some(OpBSel::IMM),
+            alu_op: Some(op),
+            data_dest_sel: Some(DataDestSel::ALU),
+            reg_write: true,
+        }
+    }
+}
+
 #[repr(u32)]
 #[derive(Copy, Clone, Debug)]
 pub enum ALUOp {
     ADD,
+    SUB,
+    XOR,
+    OR,
+    AND,
+    SLL,
+    SRL,
+    SRA,
+    SLT,
+    SLTU,
 }
 
 #[allow(dead_code)]

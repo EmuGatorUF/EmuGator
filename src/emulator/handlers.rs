@@ -476,160 +476,80 @@ fn SW(instr: &Instruction, state: &mut EmulatorState) {
 }
 
 fn ADDI(_instr: &Instruction, state: &mut EmulatorState) {
-    state.pipeline.control = CVE2Control {
-        op_a_sel: Some(OpASel::RF),
-        op_b_sel: Some(OpBSel::IMM),
-        alu_op: Some(ALUOp::ADD),
-        data_dest_sel: Some(DataDestSel::ALU),
-        reg_write: true,
-    };
+    state.pipeline.control = CVE2Control::immediate(ALUOp::ADD);
 }
 
-fn SLTI(instr: &Instruction, state: &mut EmulatorState) {
-    let rd = instr.rd() as usize;
-    let rs1 = instr.rs1() as usize;
-    let immediate = instr.immediate().unwrap() as i32;
-
-    // must treat as signed
-    let rs1 = state.x[rs1] as i32;
-
-    state.x[rd] = (rs1 < immediate) as u32;
+fn SLTI(_instr: &Instruction, state: &mut EmulatorState) {
+    state.pipeline.control = CVE2Control::immediate(ALUOp::SLT);
 }
 
-fn SLTIU(instr: &Instruction, state: &mut EmulatorState) {
-    let rd = instr.rd() as usize;
-    let rs1 = instr.rs1() as usize;
-    let immediate = instr.immediate().unwrap() as u32;
-
-    state.x[rd] = (state.x[rs1] < immediate) as u32;
+fn SLTIU(_instr: &Instruction, state: &mut EmulatorState) {
+    state.pipeline.control = CVE2Control::immediate(ALUOp::SLTU);
 }
 
-fn XORI(instr: &Instruction, state: &mut EmulatorState) {
-    let rd = instr.rd() as usize;
-    let rs = instr.rs1() as usize;
-    let immediate = instr.immediate().unwrap() as u32;
-
-    state.x[rd] = state.x[rs] ^ immediate;
+fn XORI(_instr: &Instruction, state: &mut EmulatorState) {
+    state.pipeline.control = CVE2Control::immediate(ALUOp::XOR);
 }
 
-fn ORI(instr: &Instruction, state: &mut EmulatorState) {
-    let rd = instr.rd() as usize;
-    let rs = instr.rs1() as usize;
-    let immediate = instr.immediate().unwrap() as u32;
-
-    state.x[rd] = state.x[rs] | immediate;
+fn ORI(_instr: &Instruction, state: &mut EmulatorState) {
+    state.pipeline.control = CVE2Control::immediate(ALUOp::OR);
 }
 
-fn ANDI(instr: &Instruction, state: &mut EmulatorState) {
-    let rd = instr.rd() as usize;
-    let rs = instr.rs1() as usize;
-    let immediate = instr.immediate().unwrap() as u32;
-
-    state.x[rd] = state.x[rs] & immediate;
+fn ANDI(_instr: &Instruction, state: &mut EmulatorState) {
+    state.pipeline.control = CVE2Control::immediate(ALUOp::AND);
 }
 
-fn SLLI(instr: &Instruction, state: &mut EmulatorState) {
-    let rd = instr.rd() as usize;
-    let rs = instr.rs1() as usize;
-    let immediate = instr.immediate().unwrap() as u32;
-
-    state.x[rd] = state.x[rs] << (immediate & 0x1F);
+fn SLLI(_instr: &Instruction, state: &mut EmulatorState) {
+    state.pipeline.control = CVE2Control::immediate(ALUOp::SLL);
 }
 
 fn SRxI(instr: &Instruction, state: &mut EmulatorState) {
-    let rd = instr.rd() as usize;
-    let rs = instr.rs1() as usize;
-    let immediate = instr.immediate().unwrap() as u32;
-
-    let shamt = immediate & 0x1F;
-    state.x[rd] = state.x[rs] >> (immediate & 0x1F)
-        | (bitmask!(31;32-shamt) * bits!(state.x[rs], 31) * bits!(instr.raw(), 30));
+    let op = if bits!(instr.raw(), 30) == 0 {
+        ALUOp::SRL
+    } else {
+        ALUOp::SRA
+    };
+    state.pipeline.control = CVE2Control::immediate(op);
 }
 
 fn ADD(_instr: &Instruction, state: &mut EmulatorState) {
-    state.pipeline.control = CVE2Control {
-        op_a_sel: Some(OpASel::RF),
-        op_b_sel: Some(OpBSel::RF),
-        alu_op: Some(ALUOp::ADD),
-        data_dest_sel: Some(DataDestSel::ALU),
-        reg_write: true,
-    };
+    state.pipeline.control = CVE2Control::register(ALUOp::ADD);
 }
 
-fn SUB(instr: &Instruction, state: &mut EmulatorState) {
-    let rd = instr.rd() as usize;
-    let rs1 = instr.rs1() as usize;
-    let rs2 = instr.rs2() as usize;
-
-    state.x[rd] = (state.x[rs1] as i32 - state.x[rs2] as i32) as u32;
+fn SUB(_instr: &Instruction, state: &mut EmulatorState) {
+    state.pipeline.control = CVE2Control::register(ALUOp::SUB);
 }
 
-fn SLL(instr: &Instruction, state: &mut EmulatorState) {
-    let rd = instr.rd() as usize;
-    let rs1 = instr.rs1() as usize;
-    let rs2 = instr.rs2() as usize;
-
-    state.x[rd] = state.x[rs1] << (state.x[rs2] & 0x1F);
+fn SLL(_instr: &Instruction, state: &mut EmulatorState) {
+    state.pipeline.control = CVE2Control::register(ALUOp::SLL);
 }
 
-fn SLT(instr: &Instruction, state: &mut EmulatorState) {
-    let rd = instr.rd() as usize;
-    let rs1 = instr.rs1() as usize;
-    let rs2 = instr.rs2() as usize;
-
-    // must treat both as signed
-    let rs1 = state.x[rs1] as i32;
-    let rs2 = state.x[rs2] as i32;
-
-    state.x[rd] = (rs1 < rs2) as u32;
+fn SLT(_instr: &Instruction, state: &mut EmulatorState) {
+    state.pipeline.control = CVE2Control::register(ALUOp::SLT);
 }
 
-fn SLTU(instr: &Instruction, state: &mut EmulatorState) {
-    let rd = instr.rd() as usize;
-    let rs1 = instr.rs1() as usize;
-    let rs2 = instr.rs2() as usize;
-
-    state.x[rd] = (state.x[rs1] < state.x[rs2]) as u32;
+fn SLTU(_instr: &Instruction, state: &mut EmulatorState) {
+    state.pipeline.control = CVE2Control::register(ALUOp::SLTU);
 }
 
-fn XOR(instr: &Instruction, state: &mut EmulatorState) {
-    let rd = instr.rd() as usize;
-    let rs1 = instr.rs1() as usize;
-    let rs2 = instr.rs2() as usize;
-
-    state.x[rd] = state.x[rs1] ^ state.x[rs2];
+fn XOR(_instr: &Instruction, state: &mut EmulatorState) {
+    state.pipeline.control = CVE2Control::register(ALUOp::XOR);
 }
 
-fn SRL(instr: &Instruction, state: &mut EmulatorState) {
-    let rd = instr.rd() as usize;
-    let rs1 = instr.rs1() as usize;
-    let rs2 = instr.rs2() as usize;
-
-    state.x[rd] = state.x[rs1] >> (state.x[rs2] & 0x1F);
+fn SRL(_instr: &Instruction, state: &mut EmulatorState) {
+    state.pipeline.control = CVE2Control::register(ALUOp::SRL);
 }
 
-fn SRA(instr: &Instruction, state: &mut EmulatorState) {
-    let rd = instr.rd() as usize;
-    let rs1 = instr.rs1() as usize;
-    let rs2 = instr.rs2() as usize;
-
-    state.x[rd] = (state.x[rs1] as i32 >> (state.x[rs2] & 0x1F)) as u32;
+fn SRA(_instr: &Instruction, state: &mut EmulatorState) {
+    state.pipeline.control = CVE2Control::register(ALUOp::SRA);
 }
 
-fn OR(instr: &Instruction, state: &mut EmulatorState) {
-    let rd = instr.rd() as usize;
-    let rs1 = instr.rs1() as usize;
-    let rs2 = instr.rs2() as usize;
-
-    state.x[rd] = state.x[rs1] | state.x[rs2];
+fn OR(_instr: &Instruction, state: &mut EmulatorState) {
+    state.pipeline.control = CVE2Control::register(ALUOp::OR);
 }
 
-fn AND(instr: &Instruction, state: &mut EmulatorState) {
-    let rd = instr.rd() as usize;
-    let rs1 = instr.rs1() as usize;
-    let rs2 = instr.rs2() as usize;
-
-    state.x[rd] = state.x[rs1] & state.x[rs2];
+fn AND(_instr: &Instruction, state: &mut EmulatorState) {
+    state.pipeline.control = CVE2Control::register(ALUOp::AND);
 }
 
 #[allow(unused_variables)]
