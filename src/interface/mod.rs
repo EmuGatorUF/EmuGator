@@ -26,7 +26,7 @@ use crate::{
 #[allow(non_snake_case)]
 pub fn App() -> Element {
     let workerRunning: bool = false;
-    let mainWorker: Signal<Worker> = use_signal(|| Worker::new("/mainworker.js").unwrap());
+    let mainWorker: Signal<Worker> = use_signal(|| Worker::new("/assets/mainworker.js").unwrap());
     let source = use_signal(|| include_test_file!("prototype-demo.s").to_string());
     let assembled_program: Signal<Option<AssembledProgram>> = use_signal(|| None);
     let emulator_state: Signal<EmulatorState> = use_signal(|| EmulatorState::default());
