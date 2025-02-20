@@ -14,6 +14,8 @@ use std::{
     str::FromStr,
 };
 
+use crate::assembler::assembler::Expression;
+
 use crate::isa::{Instruction, InstructionDefinition, InstructionFormat, Operands, ISA};
 
 #[derive(Debug)]
@@ -46,6 +48,17 @@ impl AssemblerError {
             line_number: token.line,
             column: token.column,
             width: token.width,
+        }
+    }
+
+    pub fn from_expression(error_message: String, expression: &Expression) -> Self {
+        let first = &expression.first().expect("Expression is not empty.").token;
+        let last = &expression.last().expect("Expression is not empty.").token;
+        Self {
+            error_message,
+            line_number: first.line,
+            column: first.column,
+            width: last.column + last.width - first.column,
         }
     }
 }

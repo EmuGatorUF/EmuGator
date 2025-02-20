@@ -2,7 +2,10 @@ use std::collections::BTreeMap;
 
 use bimap::BiBTreeMap;
 
-use super::*;
+use crate::assembler;
+use crate::assembler::lexer::Lexer;
+
+use super::assemble;
 use crate::include_test_file;
 
 #[test]
@@ -20,7 +23,7 @@ fn test_lexer() {
 #[test]
 fn test_assembler() {
     let source = include_test_file!("syntax-check.s");
-    let assembled_program_new = assembler::assemble(source);
+    let assembled_program_new = assembler::assembler::assemble(source);
     let assembled_program = assemble(source);
 
     if let (Ok(assembled_program), Ok(assembled_program_new)) =
