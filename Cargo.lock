@@ -1857,6 +1857,7 @@ dependencies = [
 [[package]]
 name = "wasm-bindgen-spawn"
 version = "0.0.1"
+source = "git+https://github.com/Pistonite/wasm-bindgen-spawn.git#ec539057c965d8eb83438f2480aec9062e326958"
 dependencies = [
  "js-sys",
  "oneshot",
