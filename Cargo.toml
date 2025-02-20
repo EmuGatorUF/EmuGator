@@ -2,7 +2,7 @@
 name = "emu-gator"
 version = "0.1.0"
 authors = ["Liam Rosenfeld <me@liamrosenfeld.com>"]
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -21,7 +21,7 @@ web-sys = "0.3"
 js-sys = "0.3"
 
 # util
-strum = { version = "0.26.3", features = ["derive"] }
+strum = { version = "0.27", features = ["derive"] }
 bimap = "0.6"
 
 [profile]
