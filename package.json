@@ -4,6 +4,8 @@
     "tailwind": "tailwindcss -i ./input.css -o ./assets/tailwind.css --watch"
   },
   "devDependencies": {
+    "@swc/cli": "^0.6.0",
+    "@swc/core": "^1.10.18",
     "tailwindcss": "^3.4.13"
   }
 }

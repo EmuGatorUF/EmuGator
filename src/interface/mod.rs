@@ -9,7 +9,7 @@ use std::collections::BTreeSet;
 
 use dioxus::prelude::*;
 use dioxus_logger::tracing::info;
-use web_sys::Worker;
+use web_sys::{DedicatedWorkerGlobalScope, MessageEvent, Worker, WorkerGlobalScope, WorkerOptions, WorkerType,};
 
 use self::{
     datapath_visualization::DatapathVisualization, memory_view::MemoryView,
@@ -25,8 +25,10 @@ use crate::{
 #[component]
 #[allow(non_snake_case)]
 pub fn App() -> Element {
+    const PATH_TO_MAINWORKER_JS: Asset = asset!("/assets/mainworker.js", JsAssetOptions::new().with_minify(true));
+
     let workerRunning: bool = false;
-    let mainWorker: Signal<Worker> = use_signal(|| Worker::new("/assets/mainworker.js").unwrap());
+    let mainWorker: Signal<Worker> = use_signal(|| Worker::new_with_options("/assets/mainworker.js", WorkerOptions::new().type_(WorkerType::Module)).unwrap());
     let source = use_signal(|| include_test_file!("prototype-demo.s").to_string());
     let assembled_program: Signal<Option<AssembledProgram>> = use_signal(|| None);
     let emulator_state: Signal<EmulatorState> = use_signal(|| EmulatorState::default());
