@@ -82,7 +82,7 @@ fn test_assembler() {
                 addr
             );
             println!(
-                "0x{:08X}: 0x{:08X}, 0x{:08X}",
+                "0x{:08X}: 0x{:02X}, 0x{:02X}",
                 addr,
                 instr,
                 assembled_program_new.instruction_memory.get(addr).unwrap()
