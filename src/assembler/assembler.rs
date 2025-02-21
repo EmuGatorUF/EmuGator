@@ -421,7 +421,7 @@ fn parse_directive<'a>(
                                     &expression,
                                 ));
                             } else {
-                                let pad = if (*bytes.last().expect("Bytes is not empty.") as i8) < 0 { 0xFF } else { 0x00 };
+                                let pad = if value >= 0.into() { 0x00 } else { 0xFF };
                                 bytes.resize(width, pad);
                                 data.extend(bytes);
                             }
