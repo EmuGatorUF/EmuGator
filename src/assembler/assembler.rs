@@ -168,18 +168,16 @@ impl TryFrom<&Token<'_>> for RPNKind {
     type Error = AssemblerError;
 
     fn try_from(token: &Token<'_>) -> Result<Self, Self::Error> {
-        match token.kind {
+        match &token.kind {
             TokenKind::Plus => Ok(Self::Add),
             TokenKind::Minus => Ok(Self::Subtract),
             TokenKind::Asterisk => Ok(Self::Multiply),
             TokenKind::Slash => Ok(Self::Divide),
             TokenKind::LParenthesis => Ok(Self::LParenthesis),
             TokenKind::RParenthesis => Ok(Self::RParenthesis),
-            TokenKind::IntLiteral(_, _, val) => Ok(Self::Integer(val.try_into().map_err(|e| {
-                AssemblerError::from_token(format!("Invalid integer value: {}", e), token)
-            })?)),
-            TokenKind::ChrLiteral(_, c) => Ok(Self::Integer((c as u32).into())),
-            TokenKind::Symbol(name) => Ok(Self::Variable(name.into())),
+            TokenKind::IntLiteral(_, _, val) => Ok(Self::Integer(val.clone())),
+            TokenKind::ChrLiteral(_, c) => Ok(Self::Integer((*c as u32).into())),
+            TokenKind::Symbol(name) => Ok(Self::Variable((*name).into())),
             _ => Err(AssemblerError::from_token(
                 "Invalid token encountered".into(),
                 token,
@@ -508,7 +506,7 @@ fn parse_instruction<'a>(
         let parts = consume_line(token, lexer)?;
 
         // Parse instruction
-        let def = ISA::from_str(&instr)
+        let def = ISA::from_str(&instr.to_uppercase())
             .map_err(|e| {
                 AssemblerError::from_token(format!("Invalid instruction {}", instr), &token)
             })?
@@ -889,7 +887,7 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
             vec![RPN {
                 kind: RPNKind::Integer(0.into()),
                 token: Token {
-                    kind: TokenKind::IntLiteral("0", 10, 0),
+                    kind: TokenKind::IntLiteral("0", 10, 0.into()),
                     line: 1,
                     column: 1,
                     width: 0,
@@ -979,7 +977,7 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
             // Check for instruction
             if let TokenKind::Symbol(instr) = token.kind {
                 // Parse instruction
-                ISA::from_str(instr).map_err(|e| {
+                ISA::from_str(&instr.to_uppercase()).map_err(|e| {
                     AssemblerError::from_token(format!("Invalid instruction {}", instr), token)
                 })?;
 

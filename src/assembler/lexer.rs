@@ -1,3 +1,5 @@
+use ibig::IBig;
+
 use super::AssemblerError;
 use std::iter::Enumerate;
 
@@ -17,7 +19,7 @@ pub enum TokenKind<'a> {
     RParenthesis,
 
     // Literals
-    IntLiteral(&'a str, u32, i32),
+    IntLiteral(&'a str, u32, IBig),
     ChrLiteral(&'a str, char),
     StrLiteral(&'a str, String),
 
@@ -43,6 +45,7 @@ pub struct Lexer<'a> {
     char_iter: std::iter::Peekable<Enumerate<std::str::Chars<'a>>>,
     line: usize,
     column: usize,
+    terminated: bool,
 }
 
 impl<'a> Lexer<'a> {
@@ -52,6 +55,7 @@ impl<'a> Lexer<'a> {
             char_iter: source.chars().enumerate().peekable(),
             line: 1,
             column: 0,
+            terminated: false,
         }
     }
 
@@ -278,8 +282,12 @@ impl<'a> Iterator for Lexer<'a> {
                                 self.next_char();
                             }
 
+                            if self.char_iter.peek().is_none() {
+                                end += 1;
+                            }
+
                             let literal = &self.source[i..end];
-                            let value = i32::from_str_radix(
+                            let value = IBig::from_str_radix(
                                 &*self.source[start..end].replace("_", ""),
                                 base,
                             )
@@ -370,10 +378,14 @@ impl<'a> Iterator for Lexer<'a> {
 
                             while let Some((j, c)) = self.char_iter.peek() {
                                 end = *j;
-                                if !c.is_ascii_alphanumeric() && *c != '_' && *c != '.' {
+                                if !c.is_ascii_alphanumeric() && *c != '_' {
                                     break;
                                 }
                                 self.next_char();
+                            }
+
+                            if self.char_iter.peek().is_none() {
+                                end += 1;
                             }
 
                             Token {
@@ -394,12 +406,20 @@ impl<'a> Iterator for Lexer<'a> {
                     self.line += 1;
                     self.column = 0;
                     break;
-                } else if c == ';' {
-                    break;
                 }
             }
         };
 
-        output
+        if output.is_none() && !self.terminated {
+            self.terminated = true;
+            Some(Ok(Token {
+                kind: TokenKind::Newline,
+                line: self.line,
+                column: self.column,
+                width: 0,
+            }))
+        } else {
+            output
+        }
     }
 }
