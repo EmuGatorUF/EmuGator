@@ -114,8 +114,7 @@ impl<'a> Lexer<'a> {
         let parsed_str = Self::parse_string(literal);
 
         let mut iter = parsed_str.chars();
-        let c = iter.next().expect("String was empty!");
-        assert!(iter.next().is_none(), "String was too long!");
+        let c = iter.next().expect("String is non-empty.");
 
         c
     }
@@ -418,6 +417,15 @@ impl<'a> Iterator for Lexer<'a> {
                             }
 
                             let literal = &self.source[i..end + 1];
+
+                            if literal.len() < 3 {
+                                return Err(AssemblerError::new(
+                                    "Invalid character literal".to_string(),
+                                    self.line,
+                                    token_col,
+                                    end - i,
+                                ));
+                            }
 
                             Token {
                                 kind: TokenKind::ChrLiteral(

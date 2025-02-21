@@ -31,6 +31,7 @@ fn consume_line<'a>(
                 .as_ref()
                 .is_ok_and(|token| token.kind != TokenKind::Newline)
         })
+        // Safe to unwrap because we know the tokens are Ok
         .map(|token_result| token_result.unwrap())
         .collect();
 
@@ -81,6 +82,7 @@ fn parse_expression<'a>(lexer: &mut Peekable<Lexer<'a>>) -> Result<Expression<'a
                     token.kind != TokenKind::Newline && token.kind != TokenKind::Comma
                 })
             })
+            // Safe to unwrap because we know the tokens are Ok
             .map(|token_result| token_result.unwrap()),
     )
 }
@@ -206,6 +208,7 @@ fn parse_directive<'a>(
                         ))??;
 
                         if let TokenKind::StrLiteral(_, c) = string.kind {
+                            // Safe to unwrap because Vec::write() is infallible
                             data.write(c.as_bytes()).unwrap();
                             if matches!(directive_str, "asciz" | "string") {
                                 data.push(0u8);
@@ -842,7 +845,7 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
                             address = (address + alignment - 1) & !(alignment - 1);
 
                             for (i, data) in data.iter().enumerate() {
-                                memory.insert(address + u32::try_from(i).expect("Data too large to fit in memory."), *data);
+                                memory.insert(address + u32::try_from(i).map_err(|_| AssemblerError::from_token("Data too large to fit in memory.".into(), token))?, *data);
                             }
 
                             address += data.len() as u32;
@@ -861,8 +864,8 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
                 
                 let data = instruction.raw().to_le_bytes();
                 
-                println!("{}: {:08x}", token.line, instruction.raw());
                 for (i, data) in data.iter().enumerate() {
+                    // Safe to unwrap because we know i < 4 
                     memory.insert(address + u32::try_from(i).unwrap(), *data);
                 }
                 source_map.insert(address, instruction_token.line);

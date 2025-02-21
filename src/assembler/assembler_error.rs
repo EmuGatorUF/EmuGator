@@ -1,5 +1,4 @@
-use super::{lexer::Token, Expression};
-
+use super::{Expression, lexer::Token, rpn::RPN};
 
 #[derive(Debug, Clone)]
 pub struct AssemblerError {
@@ -29,13 +28,22 @@ impl AssemblerError {
     }
 
     pub fn from_expression(error_message: String, expression: &Expression) -> Self {
-        let first = &expression.first().expect("Expression is not empty.").token;
-        let last = &expression.last().expect("Expression is not empty.").token;
-        Self {
-            error_message,
-            line_number: first.line,
-            column: first.column,
-            width: last.column + last.width - first.column,
+        if let Some(RPN { token: first, .. }) = expression.first() {
+            // Safe to unwrap because we know the expression is not empty
+            let last = &expression.last().unwrap().token;
+            Self {
+                error_message,
+                line_number: first.line,
+                column: first.column,
+                width: last.column + last.width - first.column,
+            }
+        } else {
+            Self {
+                error_message: error_message + " (empty expression somewhere)",
+                line_number: 0,
+                column: 0,
+                width: 0,
+            }
         }
     }
 }
