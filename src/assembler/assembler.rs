@@ -14,7 +14,7 @@ use dioxus::html::{g::direction, geometry::ElementSpace, symbol};
 use ibig::{IBig, error::OutOfBoundsError};
 use peeking_take_while::PeekableExt;
 
-use crate::assembler::lexer::{Lexer, Token, TokenKind};
+use crate::{assembler::lexer::{Lexer, Token, TokenKind}, isa::InstructionDefinition};
 use crate::isa::{ISA, Instruction, InstructionFormat, Operands};
 
 use super::{AssembledProgram, AssemblerError, Section};
@@ -531,6 +531,46 @@ fn parse_instruction<'a>(
                     kind: TokenKind::Comma,
                     ..
                 },
+                rs2_token @ Token {
+                    kind: TokenKind::Symbol(rs2),
+                    ..
+                },
+            ] => {
+                let rest = &parts[4..];
+
+                let rd =
+                    parse_register(rd).map_err(|e| AssemblerError::from_token(e, &rd_token))?;
+                let rs1 =
+                    parse_register(rs1).map_err(|e| AssemblerError::from_token(e, &rs1_token))?;
+                let rs2 = 
+                    parse_register(rs2).map_err(|e| AssemblerError::from_token(e, &rs2_token))?;
+
+                let operands = Operands {
+                    rd,
+                    rs1,
+                    rs2,
+                    ..Default::default()
+                };
+
+                Ok(Some((Instruction::from_def_operands(def, operands), instruction_token)))
+            }
+            &[
+                rd_token @ Token {
+                    kind: TokenKind::Symbol(rd),
+                    ..
+                },
+                Token {
+                    kind: TokenKind::Comma,
+                    ..
+                },
+                rs1_token @ Token {
+                    kind: TokenKind::Symbol(rs1),
+                    ..
+                },
+                Token {
+                    kind: TokenKind::Comma,
+                    ..
+                },
                 imm @ ..,
             ] => {
                 let rest = &parts[4..];
@@ -539,30 +579,29 @@ fn parse_instruction<'a>(
                     parse_register(rd).map_err(|e| AssemblerError::from_token(e, &rd_token))?;
                 let rs1 =
                     parse_register(rs1).map_err(|e| AssemblerError::from_token(e, &rs1_token))?;
-                let imm = shunting_yard(&mut imm.iter().cloned())?;
+                let imm = parse_immediate(imm, &def, symbol_table)?;
 
                 let operands = Operands {
                     rd,
                     rs1,
-                    imm: imm
-                        .evaluate(|name| {
-                            symbol_table.get(name).ok_or(AssemblerError::from_token(
-                                format!("Symbol {} not defined.", name),
-                                &imm[0].token,
-                            ))
-                        })?
-                        .try_into()
-                        .map_err(|e| {
-                            AssemblerError::from_expression(
-                                format!("Invalid immediate value."),
-                                &imm,
-                            )
-                        })?,
-                    rs2: 0u32,
+                    imm,
+                    ..Default::default()
                 };
 
                 Ok(Some((Instruction::from_def_operands(def, operands), instruction_token)))
             }
+            &[rd_token @ Token { kind: TokenKind::Symbol(rd), .. }, Token { kind: TokenKind::Comma, ..}, imm @ ..] => {
+                let rd = parse_register(rd).map_err(|e| AssemblerError::from_token(e, &rd_token))?;
+                let imm = parse_immediate(imm, &def, symbol_table)?;
+
+                let operands = Operands {
+                    rd,
+                    imm,
+                    ..Default::default()
+                };
+
+                Ok(Some((Instruction::from_def_operands(def, operands), instruction_token)))
+            },
             _ => todo!(),
         }
     } else {
@@ -579,6 +618,75 @@ fn parse_register(reg: &str) -> Result<u32, String> {
     match reg[1..].parse::<u32>() {
         Ok(num) if num < 32 => Ok(num),
         _ => Err(format!("Invalid register number (must be 0-31): {}", reg)),
+    }
+}
+
+fn parse_immediate(imm: &[Token], def: &InstructionDefinition, symbol_table: &HashMap<String, IBig>) -> Result<i32, AssemblerError> {
+    let expression = shunting_yard(&mut imm.iter().cloned())?;
+    let imm = expression
+    .evaluate(|name| {
+        symbol_table.get(name).ok_or(AssemblerError::from_expression(
+            format!("Symbol {} not defined.", name),
+            &expression
+        ))
+    })?
+    .try_into()
+    .map_err(|e| {
+        AssemblerError::from_expression(
+            format!("Invalid immediate value."),
+            &expression,
+        )
+    })?;
+
+    match def.format {
+        InstructionFormat::I | InstructionFormat::S | InstructionFormat::S => {
+            if imm > 2047 || imm < -2048 {
+                Err(AssemblerError::from_expression(format!(
+                    "Immediate value {} is out of range (-2048 to 2047)",
+                    imm
+                ), &expression))
+            } else {
+                // Shift instructions use the lower 5 bits of the immediate as the shift amount
+                if def.opcode == 0b0010011 && matches!(def.funct3, Some(0x1) | Some(0x5)) {
+                    if let Some(funct7) = def.funct7 {
+                        let shamt = imm & 0b11111;
+                        Ok(((funct7 as i32) << 5) | shamt)
+                    } else {
+                        Ok(imm)
+                    }
+                } else {
+                    Ok(imm)
+                }
+            }
+        },
+        InstructionFormat::U => {
+            // TODO: Bounds checking
+            let imm = imm as u32;
+            if imm > 0xFFFFF {
+                Err(AssemblerError::from_expression(
+                    format!("Immediate value {} is out of range (0 to 0xFFFFF)", imm),
+                    &expression,
+                ))
+            } else {
+                Ok((imm << 12) as i32)
+            }
+        }
+        InstructionFormat::J => {
+            if bits!(imm, 0) != 0 {
+                Err(AssemblerError::from_expression(
+                    format!("Jump offset {} must be 2-byte aligned.", imm),
+                    &expression,
+                ))
+            } else if imm > 1048575 || imm < -1048576 {
+                Err(AssemblerError::from_expression(format!(
+                    "Jump target is too far ({} bytes), must be within -1048576 to +1048575 bytes", imm),
+                    &expression
+                ))
+        } else {
+                Ok((((imm as u32) & 0x7FF_FFFF) << 1) as i32)
+            }
+        }
+        InstructionFormat::R | InstructionFormat::B => unreachable!(),  // R-type instructions should not have immediates
     }
 }
 
