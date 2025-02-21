@@ -25,8 +25,8 @@ pub fn UartView(uart_module: Signal<Uart>, minimize_console: Signal<bool>) -> El
                     hr {}
                 }
             }
-            div { class: if *minimize_console.read() { "h-0" } else { "p-3" },
-                dangerous_inner_html: "{uart_module.read().to_string()}"
+            div { class: if *minimize_console.read() { "h-0" } else { "p-3 whitespace-pre" },
+                "{uart_module.read().to_string()}"
             }
         }
     }
