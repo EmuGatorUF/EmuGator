@@ -17,7 +17,7 @@ pub enum TokenKind<'a> {
     RParenthesis,
 
     // Literals
-    IntLiteral(&'a str, u32, usize),
+    IntLiteral(&'a str, u32, i32),
     ChrLiteral(&'a str, char),
     StrLiteral(&'a str, String),
 
@@ -25,7 +25,7 @@ pub enum TokenKind<'a> {
     Dot,
     Comma,
     Colon,
-    Comment(&'a str),
+    // Comment(&'a str),
     Symbol(&'a str),
 }
 
@@ -116,26 +116,34 @@ impl<'a> Iterator for Lexer<'a> {
             self.next_char().and_then(|(i, c)| {
                 Some((|| {
                     Ok(match c {
-                        '\r' | '\n' | ';' => {
+                        '\r' | '\n' | ';' | '#' => {
+                            // Comment/Newline tokens
+                            let mut end = i;
                             let line = self.line;
-                            let column = self.column;
+                            let token_col = self.column;
 
-                            // Handle CRLF line endings
-                            if c == '\r' && matches!(self.char_iter.peek(), Some((_, '\n'))) {
-                                self.next_char();
-                            }
+                            let mut c = c;
+                            loop {
+                                if c == '\n' {
+                                    break;
+                                }
 
-                            // Don't increment line number for semicolons
-                            if c != ';' {
-                                self.line += 1;
-                                self.column = 0;
+                                if let Some((j, next_c)) = self.char_iter.peek() {
+                                    end = *j;
+                                    c = *next_c;
+                                    self.next_char();
+                                } else {
+                                    break;
+                                }
                             }
+                            self.line += 1;
+                            self.column = 0;
 
                             Token {
                                 kind: TokenKind::Newline,
-                                line,
-                                column,
-                                width: 1,
+                                line: line,
+                                column: token_col,
+                                width: end - i,
                             }
                         }
                         '+' => Token {
@@ -210,26 +218,6 @@ impl<'a> Iterator for Lexer<'a> {
                             column: self.column,
                             width: 1,
                         },
-                        '#' => {
-                            // Comment token
-                            let mut end = i;
-                            let token_col = self.column;
-
-                            while let Some((j, c)) = self.char_iter.peek() {
-                                end = *j;
-                                if *c == '\n' {
-                                    break;
-                                }
-                                self.next_char();
-                            }
-
-                            Token {
-                                kind: TokenKind::Comment(&self.source[i..end]),
-                                line: self.line,
-                                column: token_col,
-                                width: end - i,
-                            }
-                        }
                         '0'..='9' => {
                             // Int token
                             let mut end = i;
@@ -291,7 +279,7 @@ impl<'a> Iterator for Lexer<'a> {
                             }
 
                             let literal = &self.source[i..end];
-                            let value = usize::from_str_radix(
+                            let value = i32::from_str_radix(
                                 &*self.source[start..end].replace("_", ""),
                                 base,
                             )

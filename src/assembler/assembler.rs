@@ -11,14 +11,14 @@ use std::{
 
 use bimap::BiBTreeMap;
 use dioxus::html::{g::direction, geometry::ElementSpace, symbol};
-use ibig::{error::OutOfBoundsError, IBig};
+use ibig::{IBig, error::OutOfBoundsError};
 use peeking_take_while::PeekableExt;
 
-use crate::isa::{Instruction, InstructionFormat, Operands, ISA};
-use crate::assembler::{lexer::{Lexer, Token, TokenKind}};
+use crate::assembler::lexer::{Lexer, Token, TokenKind};
+use crate::isa::{ISA, Instruction, InstructionFormat, Operands};
 
-use crate::bits;
 use super::{AssembledProgram, AssemblerError, Section};
+use crate::bits;
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum RPNKind {
@@ -64,7 +64,10 @@ impl<'a> Deref for Expression<'a> {
 }
 
 impl<'a> Expression<'a> {
-    fn evaluate<F: FnMut(&String) -> Result<&'a IBig, AssemblerError>>(&self, mut resolve: F) -> Result<IBig, AssemblerError> {
+    fn evaluate<F: FnMut(&String) -> Result<&'a IBig, AssemblerError>>(
+        &self,
+        mut resolve: F,
+    ) -> Result<IBig, AssemblerError> {
         let mut stack = Vec::new();
         for rpn in self.iter() {
             match &rpn.kind {
@@ -172,7 +175,9 @@ impl TryFrom<&Token<'_>> for RPNKind {
             TokenKind::Slash => Ok(Self::Divide),
             TokenKind::LParenthesis => Ok(Self::LParenthesis),
             TokenKind::RParenthesis => Ok(Self::RParenthesis),
-            TokenKind::IntLiteral(_, _, val) => Ok(Self::Integer(val.try_into().unwrap())),
+            TokenKind::IntLiteral(_, _, val) => Ok(Self::Integer(val.try_into().map_err(|e| {
+                AssemblerError::from_token(format!("Invalid integer value: {}", e), token)
+            })?)),
             TokenKind::ChrLiteral(_, c) => Ok(Self::Integer((c as u32).into())),
             TokenKind::Symbol(name) => Ok(Self::Variable(name.into())),
             _ => Err(AssemblerError::from_token(
@@ -183,7 +188,10 @@ impl TryFrom<&Token<'_>> for RPNKind {
     }
 }
 
-fn consume_line<'a>(lexer: &mut Peekable<Lexer<'a>>) -> Result<Vec<Token<'a>>, AssemblerError> {
+fn consume_line<'a>(
+    token: &mut Token<'a>,
+    lexer: &mut Peekable<Lexer<'a>>,
+) -> Result<Vec<Token<'a>>, AssemblerError> {
     let parts = lexer
         .peeking_take_while(|token_result| {
             token_result
@@ -194,14 +202,10 @@ fn consume_line<'a>(lexer: &mut Peekable<Lexer<'a>>) -> Result<Vec<Token<'a>>, A
         .collect();
 
     // lexer.next() is either None, Newline, or Err(_) at this point
-    match lexer.next() {
-        None
-        | Some(Ok(Token {
-            kind: TokenKind::Newline,
-            ..
-        })) => {}
-        Some(Err(e)) => return Err(e),
-        _ => unreachable!(),
+    if let Some(Err(e)) = lexer.next_if(|token_result| token_result.is_err()) {
+        return Err(e);
+    } else if let Some(Ok(next_token)) = lexer.next_if(|token_result| token_result.is_ok()) {
+        *token = next_token;
     }
 
     Ok(parts)
@@ -310,62 +314,6 @@ fn parse_label<'a>(
     })
 }
 
-fn parse_section<'a>(
-    token: &mut Token<'a>,
-    lexer: &mut Peekable<Lexer<'a>>,
-) -> Result<Option<(Section, Expression<'a>, Token<'a>)>, AssemblerError> {
-    if token.kind == TokenKind::Dot {
-        // Parse directive
-        let directive = lexer
-            .peek()
-            .ok_or(AssemblerError::from_token(
-                "Unexpected EOF after '.'".into(),
-                token,
-            ))?
-            .as_ref()
-            .map_err(|e| e.clone())?;
-
-        if let TokenKind::Symbol(directive_str) = directive.kind {
-            Ok(if directive_str == "text" || directive_str == "data" {
-                let directive_token = lexer.next().unwrap()?; // Skip directive
-                let expression = parse_expression(lexer)?;
-
-                *token = lexer.next().ok_or(AssemblerError::from_token(
-                    "Unexpected EOF after section directive, expected one or more instructions or data.".into(),
-                    &directive_token,
-                ))??;
-
-                let expression = if expression.len() > 0 {
-                    expression
-                } else {
-                    vec![RPN {
-                        kind: RPNKind::Integer(0.into()),
-                        token: directive_token.clone(),
-                    }]
-                    .into()
-                };
-
-                let section = if directive_str == "text" {
-                    Section::Text
-                } else {
-                    Section::Data
-                };
-                Some((section, expression, directive_token))
-            } else {
-                None
-            })
-        } else {
-            // Error: Invalid token after '.'
-            Err(AssemblerError::from_token(
-                "Invalid token, expected directive after '.'".into(),
-                directive,
-            ))
-        }
-    } else {
-        Ok(None)
-    }
-}
-
 fn parse_expression<'a>(lexer: &mut Peekable<Lexer<'a>>) -> Result<Expression<'a>, AssemblerError> {
     shunting_yard(
         &mut lexer
@@ -447,30 +395,35 @@ fn parse_directive<'a>(
                     }
 
                     let data = if let Some(symbol_table) = symbol_table {
-                        let ibig: Vec<_> = data.into_iter().map(|expression| {
-                            (expression.evaluate(|name| {
-                                symbol_table
-                                    .get(name)
-                                    .ok_or(AssemblerError::from_token(
-                                        format!("Symbol {} not defined.", name),
-                                        &expression[0].token,
-                                    ))
-                            }), expression)
-                        }).collect();
+                        let ibig: Vec<_> = data
+                            .into_iter()
+                            .map(|expression| {
+                                (
+                                    expression.evaluate(|name| {
+                                        symbol_table.get(name).ok_or(AssemblerError::from_token(
+                                            format!("Symbol {} not defined.", name),
+                                            &expression[0].token,
+                                        ))
+                                    }),
+                                    expression,
+                                )
+                            })
+                            .collect();
 
                         let mut data = vec![];
                         for (value, expression) in ibig.into_iter() {
                             let value = value?;
 
-                            let mut bytes: Vec<_> = IBigLittleEndianIterator::from(&value).collect();
-                            
+                            let mut bytes: Vec<_> =
+                                IBigLittleEndianIterator::from(&value).collect();
+
                             if bytes.len() > width {
                                 return Err(AssemblerError::from_expression(
                                     format!("Value {} is too large for {} bytes.", value, width),
-                                    &expression
+                                    &expression,
                                 ));
                             } else {
-                                let pad = 0xFF * bits!(bytes.last().unwrap(), 7);
+                                let pad = if (*bytes.last().expect("Bytes is not empty.") as i8) < 0 { 0xFF } else { 0x00 };
                                 bytes.resize(width, pad);
                                 data.extend(bytes);
                             }
@@ -544,6 +497,91 @@ fn parse_directive<'a>(
     }
 }
 
+fn parse_instruction<'a>(
+    token: &mut Token<'a>,
+    lexer: &mut Peekable<Lexer<'a>>,
+    symbol_table: &HashMap<String, IBig>,
+) -> Result<Option<(Instruction, Token<'a>)>, AssemblerError> {
+    if let TokenKind::Symbol(instr) = token.kind {
+        let instruction_token = token.clone();
+        let parts = consume_line(token, lexer)?;
+
+        // Parse instruction
+        let def = ISA::from_str(&instr.to_uppercase())
+            .map_err(|e| {
+                AssemblerError::from_token(format!("Invalid instruction {}", instr), &token)
+            })?
+            .definition();
+
+        match &parts.as_slice() {
+            &[
+                rd_token @ Token {
+                    kind: TokenKind::Symbol(rd),
+                    ..
+                },
+                Token {
+                    kind: TokenKind::Comma,
+                    ..
+                },
+                rs1_token @ Token {
+                    kind: TokenKind::Symbol(rs1),
+                    ..
+                },
+                Token {
+                    kind: TokenKind::Comma,
+                    ..
+                },
+                imm @ ..,
+            ] => {
+                let rest = &parts[4..];
+
+                let rd =
+                    parse_register(rd).map_err(|e| AssemblerError::from_token(e, &rd_token))?;
+                let rs1 =
+                    parse_register(rs1).map_err(|e| AssemblerError::from_token(e, &rs1_token))?;
+                let imm = shunting_yard(&mut imm.iter().cloned())?;
+
+                let operands = Operands {
+                    rd,
+                    rs1,
+                    imm: imm
+                        .evaluate(|name| {
+                            symbol_table.get(name).ok_or(AssemblerError::from_token(
+                                format!("Symbol {} not defined.", name),
+                                &imm[0].token,
+                            ))
+                        })?
+                        .try_into()
+                        .map_err(|e| {
+                            AssemblerError::from_expression(
+                                format!("Invalid immediate value."),
+                                &imm,
+                            )
+                        })?,
+                    rs2: 0u32,
+                };
+
+                Ok(Some((Instruction::from_def_operands(def, operands), instruction_token)))
+            }
+            _ => todo!(),
+        }
+    } else {
+        Ok(None)
+    }
+}
+
+fn parse_register(reg: &str) -> Result<u32, String> {
+    let reg = reg.to_lowercase();
+    if !reg.starts_with('x') {
+        return Err(format!("Invalid register (must start with 'x'): {}", reg));
+    }
+
+    match reg[1..].parse::<u32>() {
+        Ok(num) if num < 32 => Ok(num),
+        _ => Err(format!("Invalid register number (must be 0-31): {}", reg)),
+    }
+}
+
 fn run_pass<
     'a,
     T: FnMut(&mut Token<'a>, &mut Peekable<Lexer<'a>>) -> Result<(), AssemblerError>,
@@ -559,19 +597,24 @@ fn run_pass<
 
                 if let Err(err) = err {
                     errors.push(err);
+
+                    // Consume the rest of the line
+                    while let Err(err) = consume_line(&mut token, lexer) {
+                        errors.push(err);
+                    }
                 }
 
-                // Consume rest of the line
+                // Line should be consumed
                 if token.kind != TokenKind::Newline {
-                    match consume_line(lexer) {
-                        Ok(_) => {}
-                        Err(err) => errors.push(err),
-                    };
-                }
+                    let err = AssemblerError::from_token(
+                        "Expected newline at end of line".into(),
+                        &token,
+                    );
+                    errors.push(err);
+                };
             }
             Err(err) => {
                 errors.push(err);
-                continue;
             }
         }
     }
@@ -628,13 +671,16 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
             let directive = parse_directive(token, lexer, None)?;
 
             // Handle section directive and label (must be handled together)
-            if let Some(Directive::Section(section, entry)) = directive {
+            if let Some(Directive::Section(section, (expression, token))) = directive {
                 offset = 0;
                 current_section = section;
                 let (org, entry) = if let Some((label, token)) = label {
-                    (label.into(), (entry.0, token))
+                    (label.into(), (expression, token))
                 } else {
-                    (format!("!org({},{})", token.line, token.column), entry)
+                    (
+                        format!("!org({},{})", token.line, token.column),
+                        (expression, token),
+                    )
                 };
                 current_org = org;
                 symbol_table.insert(current_org.clone(), entry);
@@ -683,15 +729,12 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
 
             // Check for instruction
             if let TokenKind::Symbol(instr) = token.kind {
-                let instruction = token;
-
                 // Parse instruction
                 ISA::from_str(instr).map_err(|e| {
-                    AssemblerError::from_token(
-                        format!("Invalid instruction {}", instr),
-                        instruction,
-                    )
+                    AssemblerError::from_token(format!("Invalid instruction {}", instr), token)
                 })?;
+
+                consume_line(token, lexer)?;
 
                 // Instructions are 4 bytes
                 offset += 4;
@@ -725,6 +768,14 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
 
     let symbol_table = resolved_symbols;
 
+    for (symbol, value) in symbol_table.iter() {
+        println!("{}: {}", symbol, value);
+    }
+
+    let mut instruction_memory = BTreeMap::new();
+    let mut data_memory = BTreeMap::new();
+    let mut source_map = BiBTreeMap::new();
+
     // Second Pass
     let _ = {
         let mut lexer = Lexer::new(source).peekable();
@@ -732,62 +783,84 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
         let mut address: u32 = 0;
 
         errors.append(&mut run_pass(&mut lexer, |token, lexer| {
+            let mut memory = match current_section {
+                Section::Text => &mut instruction_memory,
+                Section::Data => &mut data_memory,
+            };
+
             // Check for a label
             let label = parse_label(token, lexer)?;
-
-            if let Some((label, label_token)) = &label {
-                if IBig::from(address) != symbol_table[*label] {
-                    return Err(AssemblerError::from_token(
-                        format!("Invalid address. Expected {}, got {}. This is probably due to a misaligned .data directive.", symbol_table[*label], address),
-                        &label_token,
-                    ));
-                } 
-            }
 
             // Check for section directive
             let directive = parse_directive(token, lexer, Some(&symbol_table))?;
 
-            // Handle directives
-            if let Some(directive) = directive {
-                match directive {
-                    Directive::Alignment(alignment) => {
-                        address = (address + alignment - 1) & !(alignment - 1);
-                    }
-                    Directive::Data(data, alignment) => {
-                        address = (address + alignment - 1) & !(alignment - 1);
-                        address += data.len() as u32;
-                    }
-                    Directive::Symbol(_, _) => {}
-                    Directive::Section(section, entry) => {
-                        let (org, entry) = if let Some((label, token)) = label {
-                            (label.into(), (entry.0, token))
-                        } else {
-                            (format!("!org({},{})", token.line, token.column), entry)
-                        };
+            // Handle section directive and label (must be handled together)
+            if let Some(Directive::Section(section, (_, token))) = directive {
+                let org = if let Some((label, _)) = label {
+                    label.into()
+                } else {
+                    format!("!org({},{})", token.line, token.column)
+                };
 
-                        current_section = section;
-                        address = symbol_table[&org].clone().try_into().map_err(|e| {
-                            AssemblerError::from_token(format!("Invalid address."), &entry.1)
+                current_section = section;
+                memory = match current_section {
+                    Section::Text => &mut instruction_memory,
+                    Section::Data => &mut data_memory,
+                };
+
+                address = symbol_table.get(&org).ok_or(AssemblerError::from_token(
+                    format!("Symbol {} not defined.", org),
+                    &token,
+                ))?.clone().try_into().map_err(|e| {
+                            AssemblerError::from_token(format!("Invalid address."), &token)
                         })?;
+            } else {
+                if let Some((label, label_token)) = label {
+                    if IBig::from(address) != symbol_table[label] {
+                        return Err(AssemblerError::from_token(
+                            format!("Invalid address. Expected {}, got {}. This is probably due to a misaligned .data directive.", symbol_table[label], address),
+                            &label_token,
+                        ));
+                    }
+                }
+
+                // Handle the rest of the directives
+                if let Some(directive) = directive {
+                    match directive {
+                        Directive::Alignment(alignment) => {
+                            address = (address + alignment - 1) & !(alignment - 1);
+                        }
+                        Directive::Data(data, alignment) => {
+                            address = (address + alignment - 1) & !(alignment - 1);
+
+                            for (i, data) in data.iter().enumerate() {
+                                memory.insert(address + u32::try_from(i).expect("Data too large to fit in memory."), *data);
+                            }
+
+                            address += data.len() as u32;
+                        }
+                        Directive::Symbol(symbol, entry) => {
+                        }
+                        Directive::Section(section, _) => unreachable!(),
                     }
                 }
             }
 
             // Check for instruction
-            if let TokenKind::Symbol(instr) = token.kind {
-                let instruction = token;
+            let instruction = parse_instruction(token, lexer, &symbol_table)?;
 
-                // Parse instruction
-                ISA::from_str(instr).map_err(|e| {
-                    AssemblerError::from_token(
-                        format!("Invalid instruction {}", instr),
-                        &instruction,
-                    )
-                })?;
-
+            if let Some((instruction, instruction_token)) = instruction {
+                
+                let data = instruction.raw().to_le_bytes();
+                for (i, data) in data.iter().enumerate() {
+                    memory.insert(address + u32::try_from(i).unwrap(), *data);
+                }
+                source_map.insert(address, instruction_token.line);
+                
                 // Instructions are 4 bytes
                 address += 4;
             }
+
             Ok(())
         }));
     };
@@ -796,13 +869,13 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
         Err(errors)
     } else {
         Ok(AssembledProgram {
-            instruction_memory: BTreeMap::new(),
-            data_memory: BTreeMap::new(),
+            instruction_memory,
+            data_memory,
             labels: symbol_table
                 .iter()
                 .map(|(k, v)| (k.clone(), v.try_into().expect("")))
                 .collect(),
-            source_map: BiBTreeMap::new(),
+            source_map,
             data_labels: symbol_table
                 .iter()
                 .map(|(k, v)| (k.clone(), v.try_into().expect("")))
@@ -855,8 +928,10 @@ fn resolve_label(
             }
         }
 
-        
-       let value = stack.pop().ok_or(Ok(AssemblerError::from_expression("Invalid expression.".into(), expression)))?;
+        let value = stack.pop().ok_or(Ok(AssemblerError::from_expression(
+            "Invalid expression.".into(),
+            expression,
+        )))?;
         resolved_labels.insert(label.clone(), value.clone());
         value
     })
