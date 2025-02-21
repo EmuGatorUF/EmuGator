@@ -1,8 +1,10 @@
+use serde::{Deserialize, Serialize};
+
 /// Struct representing the datapath for the `cve2_top` module.
 /// Taken from https://github.com/openhwgroup/cve2/blob/main/rtl/cve2_top.sv
 
 #[allow(dead_code)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct CVE2Datapath {
     // Clock and Reset
     pub clk_i: bool,  // Input clock signal.
@@ -77,7 +79,7 @@ impl Default for CVE2Datapath {
 }
 
 #[allow(non_snake_case)]
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Default, Debug, Serialize, Deserialize)]
 pub struct CVE2Pipeline {
     pub IF: u32,    // Instruction Fetch Buffer
     pub IF_pc: u32, // Program Counter for the IF stage

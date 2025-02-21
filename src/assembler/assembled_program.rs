@@ -1,10 +1,11 @@
 use bimap::BiBTreeMap;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
     str::FromStr,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AssembledProgram {
     /// Map of instruction memory addresses to instruction bytes
     pub instruction_memory: BTreeMap<u32, u8>,
@@ -12,7 +13,7 @@ pub struct AssembledProgram {
     /// Map of data memory addresses to data bytes
     pub data_memory: BTreeMap<u32, u8>,
 
-    /// Map of line numbers (left) to instruction addresses (right)
+    /// Map of addresses (left) to line numbers (right)
     pub source_map: BiBTreeMap<u32, usize>,
 
     /// Map of instruction labels to addresses

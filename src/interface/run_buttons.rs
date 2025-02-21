@@ -1,8 +1,9 @@
 use crate::assembler::{self, AssembledProgram, AssemblerError, Section};
-use crate::emulator::{self, EmulatorState};
-use crate::uart::{trigger_uart, Uart};
+use crate::emulator::{self, EmulatorState, EmulatorWorker};
+use crate::uart::{Uart, trigger_uart};
 
 use dioxus::prelude::*;
+use gloo_worker::Spawnable;
 use std::ops::Deref;
 
 #[component]
@@ -14,6 +15,8 @@ pub fn RunButtons(
     emulator_state: Signal<EmulatorState>,
     uart_module: Signal<Uart>,
 ) -> Element {
+    let emulator_worker = use_signal(|| EmulatorWorker::spawner().spawn("wasm/emu-gator.js"));
+
     rsx! {
         // bottom margin
         div { class: "flex content-center gap-2 justify-center mb-2",
@@ -68,23 +71,7 @@ pub fn RunButtons(
                 }
                 button {
                     class: "bg-purple-500 hover:bg-purple-600 text-s text-white font-bold py-1 px-2 rounded",
-                    onclick: move |_| {
-                        if let Some(mut program) = assembled_program.as_mut() {
-                            let new_state = emulator::clock(
-                                emulator_state.read().deref(),
-                                &mut *program,
-                            );
-                            *(emulator_state.write()) = new_state;
-                            while !emulator_state.read().deref().pipeline.datapath.debug_req_i && !emulator_state.read().deref().pipeline.datapath.instr_err_i {
-                                let new_state = emulator::clock(
-                                    emulator_state.read().deref(),
-                                    &mut *program,
-                                );
-                                *(emulator_state.write()) = new_state;
-                                println!("Clock");
-                            }
-                        }
-                    },
+                    onclick: move |_| {},
                     "Run to Break"
                 }
             }

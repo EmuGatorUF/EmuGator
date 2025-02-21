@@ -4,19 +4,24 @@ mod handlers;
 #[cfg(test)]
 mod tests;
 
-use crate::assembler::AssembledProgram;
-use crate::isa::Instruction;
+use dioxus_logger::tracing::info;
+use futures::{StreamExt, sink::SinkExt};
+use gloo_worker::reactor::{ReactorScope, reactor};
+use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     ops::{Index, IndexMut},
 };
+
+use crate::assembler::AssembledProgram;
+use crate::isa::Instruction;
 
 use datapath::CVE2Pipeline;
 use handlers::get_handler;
 
 pub type InstructionHandler = fn(&Instruction, &mut EmulatorState);
 
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Default, Debug, Serialize, Deserialize)]
 pub struct RegisterFile {
     pub x: [u32; 32],
 }
@@ -40,7 +45,7 @@ impl IndexMut<usize> for RegisterFile {
     }
 }
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct EmulatorState {
     pub x: RegisterFile,
     pub csr: BTreeMap<u32, u32>,
@@ -75,6 +80,50 @@ fn rw_memory(
     } else {
         return Err(());
     }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct EmulatorInput {
+    state: EmulatorState,
+    program: AssembledProgram, // FIXME: make mutable reference
+    breakpoints: BTreeSet<usize>,
+}
+
+#[reactor]
+pub async fn EmulatorWorker(mut scope: ReactorScope<EmulatorInput, EmulatorState>) {
+    info!("EmulatorWorker started");
+    while let Some(mut input) = scope.next().await {
+        // let result = clock_until_break(&input.state, &mut input.program, &input.breakpoints);
+        let result = clock(&input.state, &mut input.program);
+        if scope.send(result).await.is_err() {
+            break;
+        }
+    }
+}
+
+pub fn clock_until_break(
+    org_state: &EmulatorState,
+    program: &mut AssembledProgram,
+    breakpoints: &BTreeSet<usize>,
+) -> EmulatorState {
+    let mut state = org_state.clone();
+    loop {
+        state = clock(&state, program);
+
+        let hit_breakpoint =
+            if let Some(line_num) = program.source_map.get_by_left(&state.pipeline.IF_pc) {
+                breakpoints.contains(line_num)
+            } else {
+                false
+            };
+        let hit_ebreak = state.pipeline.datapath.debug_req_i;
+
+        if hit_ebreak || hit_breakpoint {
+            state.pipeline.datapath.debug_req_i = false;
+            break;
+        }
+    }
+    state
 }
 
 pub fn clock(org_state: &EmulatorState, program: &mut AssembledProgram) -> EmulatorState {
