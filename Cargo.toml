@@ -23,8 +23,8 @@ js-sys = "0.3"
 # util
 strum = { version = "0.27", features = ["derive"] }
 bimap = "0.6"
-
-[profile]
+ibig = "0.3.6"
+peeking_take_while = "1.0.0"
 
 [profile.wasm-dev]
 inherits = "dev"
@@ -35,3 +35,6 @@ inherits = "dev"
 
 [profile.android-dev]
 inherits = "dev"
+
+[dev-dependencies]
+serde = "1.0.217"

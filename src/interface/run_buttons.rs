@@ -3,6 +3,7 @@ use crate::emulator::{self, EmulatorState};
 use crate::uart::{trigger_uart, Uart};
 
 use dioxus::prelude::*;
+use dioxus_logger::tracing::info;
 use std::ops::Deref;
 
 #[component]
@@ -20,24 +21,24 @@ pub fn RunButtons(
             button {
                 class: "bg-green-500 hover:bg-green-600 text-s text-white font-bold py-1 px-2 rounded",
                 onclick: move |_| {
+                    info!("Assembler clicked");
                     match assembler::assemble(&source.read()) {
                         Ok(assembled) => {
+                            info!("Assembly succeeded.");
                             let mut new_state = EmulatorState::default();
                             let start_addr = assembled.get_section_start(Section::Text);
                             new_state.pipeline.datapath.instr_addr_o = start_addr;
                             emulator_state.set(new_state);
-
-                            // Setup UART with data memory addresses
                             *uart_module.write() = Uart::default();
                             let mut assembled = assembled;
                             assembled.data_memory.insert(uart_module.read().rx_buffer_address, 0);
                             assembled.data_memory.insert(uart_module.read().tx_buffer_address, 0);
                             assembled.data_memory.insert(uart_module.read().lsr_address, 0);
-
                             assembled_program.set(Some(assembled));
                             assembler_errors.set(Vec::new());
                         }
                         Err(errors) => {
+                            info!("Assembly failed.");
                             assembled_program.set(None);
                             assembler_errors.set(errors);
                         }
@@ -55,7 +56,6 @@ pub fn RunButtons(
                                 &mut *program,
                             );
                             *(emulator_state.write()) = new_state;
-
                             let new_uart = trigger_uart(
                                 uart_module.read().deref().clone(),
                                 &mut program.data_memory,
