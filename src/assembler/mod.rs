@@ -1,246 +1,25 @@
+use std::{collections::{BTreeMap, HashMap, HashSet}, io::Write, iter::Peekable, mem::replace, str::FromStr};
+
+use bimap::BiBTreeMap;
+use ibig::IBig;
+use lexer::{Lexer, Token, TokenKind};
+use peeking_take_while::PeekableExt;
+use rpn::{Expression, RPNKind, RPN};
+
+use crate::{bits, isa::{Instruction, InstructionDefinition, InstructionFormat, Operands, ISA}, utils::IBigLittleEndianIterator};
+
+pub use assembled_program::{AssembledProgram, Section};
+pub use assembler_error::AssemblerError;
+
 #[cfg(test)]
 mod tests;
 
 mod assembled_program;
+mod assembler_error;
 mod lexer;
+mod rpn;
 
-pub use assembled_program::{AssembledProgram, Section};
-pub use lexer::*;
 
-use std::{
-    collections::{BTreeMap, HashMap},
-    str::FromStr,
-};
-
-use crate::isa::{ISA, Instruction, InstructionDefinition, InstructionFormat, Operands};
-
-#[derive(Debug)]
-struct DataItem {
-    size: usize, // in bytes
-    values: Vec<u8>,
-}
-
-#[derive(Debug, Clone)]
-pub struct AssemblerError {
-    pub error_message: String,
-    pub line_number: usize,
-    pub column: usize,
-    pub width: usize,
-}
-
-impl AssemblerError {
-    pub fn new(error_message: String, line_number: usize, column: usize, width: usize) -> Self {
-        Self {
-            error_message,
-            line_number,
-            column,
-            width,
-        }
-    }
-
-    pub fn from_token(error_message: String, token: &Token) -> Self {
-        Self {
-            error_message,
-            line_number: token.line,
-            column: token.column,
-            width: token.width,
-        }
-    }
-
-    pub fn from_expression(error_message: String, expression: &Expression) -> Self {
-        let first = &expression.first().expect("Expression is not empty.").token;
-        let last = &expression.last().expect("Expression is not empty.").token;
-        Self {
-            error_message,
-            line_number: first.line,
-            column: first.column,
-            width: last.column + last.width - first.column,
-        }
-    }
-}
-
-use std::{
-    collections::{HashSet, VecDeque},
-    io::Write,
-    iter::Peekable,
-    mem::replace,
-    ops::Deref,
-    
-};
-
-use bimap::BiBTreeMap;
-use dioxus::html::{g::direction, geometry::ElementSpace, symbol};
-use ibig::{IBig, error::OutOfBoundsError};
-use peeking_take_while::PeekableExt;
-
-use crate::{assembler::lexer::{Lexer, Token, TokenKind}};
-use crate::bits;
-
-#[derive(PartialEq, Eq, Debug)]
-pub enum RPNKind {
-    LParenthesis,
-    RParenthesis,
-    UnaryPlus,
-    UnaryMinus,
-    Add,
-    Subtract,
-    Multiply,
-    Divide,
-    Modulo,
-    ShiftLeft,
-    ShiftRight,
-    BitwiseAnd,
-    BitwiseOr,
-    BitwiseXor,
-    BitwiseNot,
-    Integer(IBig),
-    Variable(String),
-}
-
-#[derive(PartialEq, Eq, Debug)]
-enum Associativity {
-    Left,
-    Right,
-}
-
-pub struct Expression<'a>(Vec<RPN<'a>>);
-
-impl<'a, T: Into<Vec<RPN<'a>>>> From<T> for Expression<'a> {
-    fn from(value: T) -> Self {
-        Expression(value.into())
-    }
-}
-
-impl<'a> Deref for Expression<'a> {
-    type Target = Vec<RPN<'a>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<'a> Expression<'a> {
-    fn evaluate<F: FnMut(&String) -> Result<&'a IBig, AssemblerError>>(
-        &self,
-        mut resolve: F,
-    ) -> Result<IBig, AssemblerError> {
-        let mut stack = Vec::new();
-        for rpn in self.iter() {
-            match &rpn.kind {
-                RPNKind::Integer(val) => stack.push(val.clone()),
-                RPNKind::Variable(name) => stack.push(resolve(&name)?.clone()),
-                RPNKind::Add => {
-                    let a = stack.pop().expect("Empty stack");
-                    let b = stack.pop().expect("Empty stack");
-                    stack.push(a + b);
-                }
-                RPNKind::Subtract => {
-                    let a = stack.pop().expect("Empty stack");
-                    let b = stack.pop().expect("Empty stack");
-                    stack.push(b - a);
-                }
-                RPNKind::Multiply => {
-                    let a = stack.pop().expect("Empty stack");
-                    let b = stack.pop().expect("Empty stack");
-                    stack.push(a * b);
-                }
-                RPNKind::Divide => {
-                    let a = stack.pop().expect("Empty stack");
-                    let b = stack.pop().expect("Empty stack");
-                    stack.push(b / a);
-                }
-                _ => todo!(),
-            }
-        }
-
-        Ok(stack.pop().expect("Empty stack"))
-    }
-}
-
-pub struct RPN<'a> {
-    pub kind: RPNKind,
-    pub token: Token<'a>,
-}
-
-struct IBigLittleEndianIterator<'a> {
-    value: &'a IBig,
-    index: usize,
-}
-
-impl<'a> From<&'a IBig> for IBigLittleEndianIterator<'a> {
-    fn from(value: &'a IBig) -> Self {
-        Self { value, index: 0 }
-    }
-}
-
-impl Iterator for IBigLittleEndianIterator<'_> {
-    type Item = u8;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        // Check for negative numbers
-        let shifted = self.value >> (self.index * 8);
-
-        if (shifted == 0.into() || shifted == (-1).into()) && self.index != 0 {
-            return None;
-        }
-
-        let byte: u8 = (shifted & 0xFFu8);
-
-        self.index += 1;
-        Some(byte)
-    }
-}
-
-impl<'a> TryFrom<Token<'a>> for RPN<'a> {
-    type Error = AssemblerError;
-
-    fn try_from(token: Token<'a>) -> Result<Self, Self::Error> {
-        Ok(Self {
-            kind: (&token).try_into()?,
-            token,
-        })
-    }
-}
-
-impl RPNKind {
-    fn properties(&self) -> (u32, Associativity) {
-        match *self {
-            Self::Multiply | Self::Divide => (3, Associativity::Left),
-            Self::Add | Self::Subtract => (2, Associativity::Left),
-            _ => (0, Associativity::Left),
-        }
-    }
-
-    fn precedence(&self) -> u32 {
-        self.properties().0
-    }
-
-    fn associativity(&self) -> Associativity {
-        self.properties().1
-    }
-}
-
-impl TryFrom<&Token<'_>> for RPNKind {
-    type Error = AssemblerError;
-
-    fn try_from(token: &Token<'_>) -> Result<Self, Self::Error> {
-        match &token.kind {
-            TokenKind::Plus => Ok(Self::Add),
-            TokenKind::Minus => Ok(Self::Subtract),
-            TokenKind::Asterisk => Ok(Self::Multiply),
-            TokenKind::Slash => Ok(Self::Divide),
-            TokenKind::LParenthesis => Ok(Self::LParenthesis),
-            TokenKind::RParenthesis => Ok(Self::RParenthesis),
-            TokenKind::IntLiteral(_, _, val) => Ok(Self::Integer(val.clone())),
-            TokenKind::ChrLiteral(_, c) => Ok(Self::Integer((*c as u32).into())),
-            TokenKind::Symbol(name) => Ok(Self::Variable((*name).into())),
-            _ => Err(AssemblerError::from_token(
-                "Invalid token encountered".into(),
-                token,
-            )),
-        }
-    }
-}
 
 fn consume_line<'a>(
     token: &mut Token<'a>,
@@ -252,6 +31,7 @@ fn consume_line<'a>(
                 .as_ref()
                 .is_ok_and(|token| token.kind != TokenKind::Newline)
         })
+        // Safe to unwrap because we know the tokens are Ok
         .map(|token_result| token_result.unwrap())
         .collect();
 
@@ -263,80 +43,6 @@ fn consume_line<'a>(
     }
 
     Ok(parts)
-}
-
-fn shunting_yard<'a>(
-    tokens: &mut dyn Iterator<Item = Token<'a>>,
-) -> Result<Expression<'a>, AssemblerError> {
-    let mut output = VecDeque::new();
-    let mut op_stack: VecDeque<RPN<'a>> = VecDeque::new();
-
-    for token in tokens {
-        match &token.kind {
-            TokenKind::Symbol(_) | TokenKind::IntLiteral(_, _, _) | TokenKind::ChrLiteral(_, _) => {
-                output.push_back(token.try_into()?);
-            }
-            TokenKind::Plus
-            | TokenKind::Minus
-            | TokenKind::Asterisk
-            | TokenKind::Slash
-            | TokenKind::Ampersand
-            | TokenKind::Pipe
-            | TokenKind::Caret => {
-                let o1: RPN<'a> = token.try_into()?;
-                loop {
-                    let o2 = op_stack.back();
-                    if let Some(o2) = o2 {
-                        if o2.kind != RPNKind::LParenthesis
-                            && (o2.kind.precedence() > o1.kind.precedence()
-                                || (o2.kind.precedence() == o1.kind.precedence()
-                                    && o1.kind.associativity() == Associativity::Left))
-                        {
-                            output.push_back(op_stack.pop_back().expect("Stack is not empty"));
-                        } else {
-                            break;
-                        }
-                    } else {
-                        break;
-                    }
-                }
-                op_stack.push_back(o1);
-            }
-            TokenKind::LParenthesis => {
-                op_stack.push_back(token.try_into()?);
-            }
-            TokenKind::RParenthesis => {
-                while op_stack
-                    .back()
-                    .ok_or(AssemblerError::from_token(
-                        "Mismatched parenthesis".into(),
-                        &token,
-                    ))?
-                    .kind
-                    != RPNKind::LParenthesis
-                {
-                    output.push_back(op_stack.pop_back().expect("Mismatched parenthesis"));
-                }
-                op_stack.pop_back();
-            }
-            _ => {
-                // Non-Expression Token encountered
-                break;
-            }
-        }
-    }
-
-    while let Some(back) = op_stack.pop_back() {
-        if back.kind == RPNKind::LParenthesis || back.kind == RPNKind::RParenthesis {
-            return Err(AssemblerError::from_token(
-                "Mismatched parenthesis".into(),
-                &back.token,
-            ));
-        }
-        output.push_back(back);
-    }
-
-    Ok(output.into())
 }
 
 fn parse_label<'a>(
@@ -369,13 +75,14 @@ fn parse_label<'a>(
 }
 
 fn parse_expression<'a>(lexer: &mut Peekable<Lexer<'a>>) -> Result<Expression<'a>, AssemblerError> {
-    shunting_yard(
+    Expression::shunting_yard(
         &mut lexer
             .peeking_take_while(|token_result| {
                 token_result.as_ref().is_ok_and(|token| {
                     token.kind != TokenKind::Newline && token.kind != TokenKind::Comma
                 })
             })
+            // Safe to unwrap because we know the tokens are Ok
             .map(|token_result| token_result.unwrap()),
     )
 }
@@ -501,6 +208,7 @@ fn parse_directive<'a>(
                         ))??;
 
                         if let TokenKind::StrLiteral(_, c) = string.kind {
+                            // Safe to unwrap because Vec::write() is infallible
                             data.write(c.as_bytes()).unwrap();
                             if matches!(directive_str, "asciz" | "string") {
                                 data.push(0u8);
@@ -798,7 +506,7 @@ fn parse_register(reg: &str) -> Result<u32, String> {
 }
 
 fn parse_immediate(imm: &[Token], def: &InstructionDefinition, symbol_table: &HashMap<String, IBig>, current_address: u32) -> Result<i32, AssemblerError> {
-    let expression = shunting_yard(&mut imm.iter().cloned())?;
+    let expression = Expression::shunting_yard(&mut imm.iter().cloned())?;
     let imm = expression
     .evaluate(|name| {
         symbol_table.get(name).ok_or(AssemblerError::from_expression(
@@ -1137,7 +845,7 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
                             address = (address + alignment - 1) & !(alignment - 1);
 
                             for (i, data) in data.iter().enumerate() {
-                                memory.insert(address + u32::try_from(i).expect("Data too large to fit in memory."), *data);
+                                memory.insert(address + u32::try_from(i).map_err(|_| AssemblerError::from_token("Data too large to fit in memory.".into(), token))?, *data);
                             }
 
                             address += data.len() as u32;
@@ -1156,8 +864,8 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
                 
                 let data = instruction.raw().to_le_bytes();
                 
-                println!("{}: {:08x}", token.line, instruction.raw());
                 for (i, data) in data.iter().enumerate() {
+                    // Safe to unwrap because we know i < 4 
                     memory.insert(address + u32::try_from(i).unwrap(), *data);
                 }
                 source_map.insert(address, instruction_token.line);

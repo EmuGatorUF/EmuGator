@@ -1,16 +1,18 @@
 use std::collections::BTreeMap;
 
 use bimap::BiBTreeMap;
+use ibig::IBig;
 
 use crate::assembler;
-use crate::assembler::lexer::Lexer;
+use crate::assembler::lexer::{Lexer, TokenKind};
 
-use super::assemble;
+use super::rpn::Expression;
+use super::{assemble, parse_expression};
 use crate::include_test_file;
 
 #[ignore]
 #[test]
-fn test_lexer() {
+fn print_lexer() {
     let source = include_test_file!("syntax-check.s");
 
     let mut lexer = Lexer::new(source).peekable();
@@ -365,6 +367,31 @@ fn test_ADDI() {
     let (inst_mem, _, _) = assembled_program.emulator_maps();
 
     let expected_bytes = [0x93, 0x00, 0xA1, 0x00];
+
+    for i in 0..4 {
+        assert_eq!(
+            inst_mem.get(&(i as u32)),
+            Some(&expected_bytes[i]),
+            "Mismatch at byte {} of ADDI instruction",
+            i
+        );
+    }
+}
+
+#[test]
+fn test_ADDI_neg() {
+    let assembled_program = assemble(".text\nADDI x1, x2, -5").unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
+    let (inst_mem, _, _) = assembled_program.emulator_maps();
+
+    let expected_bytes = [0x93, 0x00, 0xB1, 0xFF];
 
     for i in 0..4 {
         assert_eq!(
@@ -1656,4 +1683,98 @@ fn assembler_all_instructions() {
             }
         }
     }
+}
+
+#[test]
+fn long_expression() {
+    let mut lexer = Lexer::new("8 * (1 + 7) / 2 - 5 * 3").peekable();
+    let expression = parse_expression(&mut lexer).expect("Tokens should be valid.");
+    let result = expression
+        .evaluate(|_| unreachable!())
+        .expect("Expression should be valid.");
+
+    let expected_result: IBig = 17.into();
+    assert_eq!(result, expected_result)
+}
+
+#[test]
+fn long_neg_expression() {
+    let mut lexer = Lexer::new("-1/4*(7-8)-12").peekable();
+    let expression = parse_expression(&mut lexer).expect("Tokens should be valid.");
+    let result = expression
+        .evaluate(|_| unreachable!())
+        .expect("Expression should be valid.");
+
+    let expected_result: IBig = (-12).into();
+    assert_eq!(result, expected_result)
+}
+
+#[test]
+fn bitwise_operations() {
+    let mut lexer = Lexer::new("5 & 3 | 2 ^ 8").peekable();
+    let expression = parse_expression(&mut lexer).expect("Tokens should be valid.");
+    let result = expression
+        .evaluate(|_| unreachable!())
+        .expect("Expression should be valid.");
+
+    let expected_result: IBig = 11.into();
+    assert_eq!(result, expected_result)
+}
+
+#[ignore]
+#[test]
+fn shift_operations() {
+    let mut lexer = Lexer::new("4 << 2 + 1 >> 1").peekable();
+    let expression = parse_expression(&mut lexer).expect("Tokens should be valid.");
+    let result = expression
+        .evaluate(|_| unreachable!())
+        .expect("Expression should be valid.");
+
+    let expected_result: IBig = 8.into(); // (4 << 3) >> 1 = (32) >> 1 = 16
+    assert_eq!(result, expected_result)
+}
+
+#[test]
+fn modulo_operation() {
+    let mut lexer = Lexer::new("10 % 3 * 4").peekable();
+    let expression = parse_expression(&mut lexer).expect("Tokens should be valid.");
+    let result = expression
+        .evaluate(|_| unreachable!())
+        .expect("Expression should be valid.");
+
+    let expected_result: IBig = 4.into(); // (10 % 3) * 4 = 1 * 4 = 4
+    assert_eq!(result, expected_result)
+}
+
+#[test]
+fn unary_bitwise_not() {
+    let mut lexer = Lexer::new("~5").peekable();
+    let expression = parse_expression(&mut lexer).expect("Tokens should be valid.");
+    let result = expression
+        .evaluate(|_| unreachable!())
+        .expect("Expression should be valid.");
+
+    let expected_result: IBig = (!5).into();
+    assert_eq!(result, expected_result)
+}
+
+#[test]
+fn nested_parentheses() {
+    let mut lexer = Lexer::new("(((3 + 5) * 2) / 4)").peekable();
+    let expression = parse_expression(&mut lexer).expect("Tokens should be valid.");
+    let result = expression
+        .evaluate(|_| unreachable!())
+        .expect("Expression should be valid.");
+
+    let expected_result: IBig = 4.into(); // (((8 * 2) / 4) << 1) = (16 / 4) << 1 = 4 << 1 = 8
+    assert_eq!(result, expected_result)
+}
+
+#[test]
+fn divide_by_zero() {
+    let mut lexer = Lexer::new("10 / 0").peekable();
+    let expression = parse_expression(&mut lexer).expect("Tokens should be valid.");
+    let result = expression.evaluate(|_| unreachable!());
+
+    assert!(result.is_err(), "Division by zero should return an error.");
 }

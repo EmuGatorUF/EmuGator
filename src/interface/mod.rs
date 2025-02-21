@@ -80,18 +80,20 @@ pub fn App() -> Element {
                     assembled_program,
                     assembler_errors,
                     emulator_state,
-                    uart_module
+                    uart_module,
                 }
-                if  assembled_program.read().is_some() {
+                if assembled_program.read().is_some() {
                     div { class: "flex-1 relative overflow-hidden",
                         CodeEditor {
                             source,
                             line_highlights,
                             breakpoints,
-                            assembler_errors
-                    },
+                            assembler_errors,
+                        }
                     }
-                    div {class: "transition-all duration-300 ease-in-out ".to_owned() + {if *minimize_console.read() { "h-min" } else { "h-4/10" }},
+                    div {
+                        class: "transition-all duration-300 ease-in-out ".to_owned()
+                            + { if *minimize_console.read() { "h-min" } else { "h-4/10" } },
                         UartView { uart_module, minimize_console }
                     }
                 } else {
@@ -100,8 +102,8 @@ pub fn App() -> Element {
                             source,
                             line_highlights,
                             breakpoints,
-                            assembler_errors
-                        },
+                            assembler_errors,
+                        }
                     }
                 }
             }
