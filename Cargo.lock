@@ -835,7 +835,7 @@ dependencies = [
  "futures-channel",
  "futures-core",
  "futures-sink",
- "gloo-utils",
+ "gloo-utils 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "http",
  "js-sys",
  "pin-project",
@@ -861,14 +861,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "gloo-utils"
+version = "0.2.0"
+source = "git+https://github.com/JonasAlaif/gloo/?branch=spawn-options#d263d2260f1d9c4b56892ce5aa45078f4cacedf9"
+dependencies = [
+ "js-sys",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
 name = "gloo-worker"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "085f262d7604911c8150162529cefab3782e91adb20202e8658f7275d2aefe5d"
+source = "git+https://github.com/JonasAlaif/gloo/?branch=spawn-options#d263d2260f1d9c4b56892ce5aa45078f4cacedf9"
 dependencies = [
  "bincode",
  "futures",
- "gloo-utils",
+ "gloo-utils 0.2.0 (git+https://github.com/JonasAlaif/gloo/?branch=spawn-options)",
  "gloo-worker-macros",
  "js-sys",
  "pinned",
@@ -882,8 +893,7 @@ dependencies = [
 [[package]]
 name = "gloo-worker-macros"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "956caa58d4857bc9941749d55e4bd3000032d8212762586fa5705632967140e7"
+source = "git+https://github.com/JonasAlaif/gloo/?branch=spawn-options#d263d2260f1d9c4b56892ce5aa45078f4cacedf9"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -1152,9 +1162,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.25"
+version = "0.4.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04cbf5b083de1c7e0222a7a51dbfdba1cbe1c6ab0b15e29fff3f6c077fd9cd9f"
+checksum = "30bde2b3dc3671ae49d8e2e9f044c7c005836e7a023ee57cffa25ab82764bb9e"
 
 [[package]]
 name = "longest-increasing-subsequence"
@@ -1390,9 +1400,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.5.8"
+version = "0.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03a862b389f93e68874fbf580b9de08dd02facb9a788ebadaf4a3fd33cf58834"
+checksum = "82b568323e98e49e2a0899dcee453dd679fae22d69adf9b11dd508d1549b7e2f"
 dependencies = [
  "bitflags",
 ]

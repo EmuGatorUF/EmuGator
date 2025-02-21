@@ -15,7 +15,11 @@ pub fn RunButtons(
     emulator_state: Signal<EmulatorState>,
     uart_module: Signal<Uart>,
 ) -> Element {
-    let emulator_worker = use_signal(|| EmulatorWorker::spawner().spawn("wasm/emu-gator.js"));
+    let emulator_worker = use_signal(|| {
+        EmulatorWorker::spawner()
+            .as_module(true)
+            .spawn("wasm/emu-gator.js")
+    });
 
     rsx! {
         // bottom margin
