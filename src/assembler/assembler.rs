@@ -6,7 +6,7 @@ use std::{
     iter::Peekable,
     mem::replace,
     ops::Deref,
-    str::FromStr,
+    str::FromStr, thread::current,
 };
 
 use bimap::BiBTreeMap;
@@ -501,6 +501,7 @@ fn parse_instruction<'a>(
     token: &mut Token<'a>,
     lexer: &mut Peekable<Lexer<'a>>,
     symbol_table: &HashMap<String, IBig>,
+    current_address: u32,
 ) -> Result<Option<(Instruction, Token<'a>)>, AssemblerError> {
     if let TokenKind::Symbol(instr) = token.kind {
         let instruction_token = token.clone();
@@ -579,7 +580,7 @@ fn parse_instruction<'a>(
                     parse_register(rd).map_err(|e| AssemblerError::from_token(e, &rd_token))?;
                 let rs1 =
                     parse_register(rs1).map_err(|e| AssemblerError::from_token(e, &rs1_token))?;
-                let imm = parse_immediate(imm, &def, symbol_table)?;
+                let imm = parse_immediate(imm, &def, symbol_table, current_address)?;
 
                 let operands = Operands {
                     rd,
@@ -592,7 +593,7 @@ fn parse_instruction<'a>(
             }
             &[rd_token @ Token { kind: TokenKind::Symbol(rd), .. }, Token { kind: TokenKind::Comma, ..}, imm @ ..] => {
                 let rd = parse_register(rd).map_err(|e| AssemblerError::from_token(e, &rd_token))?;
-                let imm = parse_immediate(imm, &def, symbol_table)?;
+                let imm = parse_immediate(imm, &def, symbol_table, current_address)?;
 
                 let operands = Operands {
                     rd,
@@ -621,7 +622,7 @@ fn parse_register(reg: &str) -> Result<u32, String> {
     }
 }
 
-fn parse_immediate(imm: &[Token], def: &InstructionDefinition, symbol_table: &HashMap<String, IBig>) -> Result<i32, AssemblerError> {
+fn parse_immediate(imm: &[Token], def: &InstructionDefinition, symbol_table: &HashMap<String, IBig>, current_address: u32) -> Result<i32, AssemblerError> {
     let expression = shunting_yard(&mut imm.iter().cloned())?;
     let imm = expression
     .evaluate(|name| {
@@ -672,18 +673,20 @@ fn parse_immediate(imm: &[Token], def: &InstructionDefinition, symbol_table: &Ha
             }
         }
         InstructionFormat::J => {
-            if bits!(imm, 0) != 0 {
+            let offset = imm - current_address as i32;
+
+            if bits!(offset, 0) != 0 {
                 Err(AssemblerError::from_expression(
-                    format!("Jump offset {} must be 2-byte aligned.", imm),
+                    format!("Jump offset {} must be 2-byte aligned.", offset),
                     &expression,
                 ))
-            } else if imm > 1048575 || imm < -1048576 {
+            } else if offset > 0xFFFFF || offset < -0x100000 {
                 Err(AssemblerError::from_expression(format!(
-                    "Jump target is too far ({} bytes), must be within -1048576 to +1048575 bytes", imm),
+                    "Jump target is too far ({} bytes), must be within -1048576 to +1048575 bytes", offset),
                     &expression
                 ))
-        } else {
-                Ok((((imm as u32) & 0x7FF_FFFF) << 1) as i32)
+            } else {
+                Ok(offset)
             }
         }
         InstructionFormat::R | InstructionFormat::B => unreachable!(),  // R-type instructions should not have immediates
@@ -955,7 +958,7 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
             }
 
             // Check for instruction
-            let instruction = parse_instruction(token, lexer, &symbol_table)?;
+            let instruction = parse_instruction(token, lexer, &symbol_table, address)?;
 
             if let Some((instruction, instruction_token)) = instruction {
                 

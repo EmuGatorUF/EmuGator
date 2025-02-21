@@ -73,6 +73,21 @@ fn test_assembler() {
                 assembled_program_new.source_map.get_by_left(addr).unwrap()
             );
         }
+
+        for (addr, instr) in &assembled_program.instruction_memory {
+            assert_eq!(
+                Some(instr),
+                assembled_program_new.instruction_memory.get(addr),
+                "Mismatch in instruction memory at address 0x{:08X}",
+                addr
+            );
+            println!(
+                "0x{:08X}: 0x{:08X}, 0x{:08X}",
+                addr,
+                instr,
+                assembled_program_new.instruction_memory.get(addr).unwrap()
+            );
+        }
     } else if let (Err(_), Err(_)) = (&assembled_program, &assembled_program_new) {
         // Both should fail
     } else {
