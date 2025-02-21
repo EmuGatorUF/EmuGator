@@ -28,12 +28,11 @@ pub fn RunButtons(
                             emulator_state.set(new_state);
 
                             // Setup UART with data memory addresses
-                            // TOD: Probably a better way to do this
-                            let new_uart = Uart::default();
+                            *uart_module.write() = Uart::default();
                             let mut assembled = assembled;
-                            assembled.data_memory.insert(new_uart.rx_buffer_address, 0);
-                            assembled.data_memory.insert(new_uart.tx_buffer_address, 0);
-                            assembled.data_memory.insert(new_uart.lsr_address, 0);
+                            assembled.data_memory.insert(uart_module.read().rx_buffer_address, 0);
+                            assembled.data_memory.insert(uart_module.read().tx_buffer_address, 0);
+                            assembled.data_memory.insert(uart_module.read().lsr_address, 0);
 
                             assembled_program.set(Some(assembled));
                             assembler_errors.set(Vec::new());
