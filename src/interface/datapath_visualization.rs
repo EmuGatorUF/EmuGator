@@ -1,5 +1,7 @@
 use crate::emulator::EmulatorState;
 use dioxus::prelude::*;
+use dioxus_elements::geometry::WheelDelta;
+use dioxus_elements::input_data::MouseButton;
 
 fn format_pc(pc: u32) -> String {
     format!("0x{:08X}", pc)
@@ -9,15 +11,92 @@ fn format_pc(pc: u32) -> String {
 #[allow(non_snake_case)]
 pub fn DatapathVisualization(emulator_state: Signal<EmulatorState>) -> Element {
     let mut hovered_element = use_signal(|| Option::<String>::None);
+    let initial_view = (0.0, 0.0, 1261.0, 660.0);
+    let mut view_box = use_signal(|| initial_view);
+    let mut is_panning = use_signal(|| false);
+    let mut start_pan = use_signal(|| (0.0, 0.0, 0.0, 0.0));
+    let mut scale = use_signal(|| 1.0);
 
     rsx! {
         div { class: "w-full h-full bg-white overflow-hidden relative",
-            // SVG needs to be inline in RSX to be rendered properly
+            button {
+                class: "absolute top-2 left-2 bg-gray-200 hover:bg-gray-300 p-1 rounded z-10",
+                onclick: move |_| {
+                    view_box.set(initial_view);
+                    scale.set(1.0);
+                },
+                svg {
+                    width: "16",
+                    height: "16",
+                    view_box: "0 0 24 24",
+                    stroke: "currentColor",
+                    fill: "none",
+                    "stroke-width": "2",
+                    "stroke-linecap": "round",
+                    "stroke-linejoin": "round",
+                    path { d: "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" }
+                    path { d: "M3 3v5h5" }
+                }
+            }
             svg {
                 width: "100%",
                 height: "100%",
-                view_box: "0 0 1261 660",
+                view_box: format!(
+                    "{} {} {} {}",
+                    view_box.read().0,
+                    view_box.read().1,
+                    view_box.read().2,
+                    view_box.read().3,
+                ),
                 xmlns: "http://www.w3.org/2000/svg",
+                style: format!(
+                    "cursor: {}; user-select: none;",
+                    if *is_panning.read() { "grabbing" } else { "default" },
+                ),
+                onwheel: move |e| {
+                    let delta = e.delta();
+                    let scale_change = match delta {
+                        WheelDelta::Pixels(y) => if y.y < 0.0 { 1.25 } else { 0.8 }
+                        WheelDelta::Lines(y) => if y.y < 0.0 { 1.25 } else { 0.8 }
+                        _ => 1.0,
+                    };
+                    let new_scale = *scale.read() * scale_change;
+                    if new_scale >= 0.5 {
+                        let (old_x, old_y, old_width, old_height) = *view_box.read();
+                        let center_x = old_x + old_width / 2.0;
+                        let center_y = old_y + old_height / 2.0;
+                        let new_width = 1261.0 / new_scale;
+                        let new_height = 660.0 / new_scale;
+                        let new_x = center_x - new_width / 2.0;
+                        let new_y = center_y - new_height / 2.0;
+                        view_box.set((new_x, new_y, new_width, new_height));
+                        scale.set(new_scale);
+                    }
+                },
+                onmousedown: move |e| {
+                    if e.held_buttons().contains(MouseButton::Primary) {
+                        is_panning.set(true);
+                        let (view_x, view_y, _, _) = *view_box.read();
+                        start_pan
+                            .set((
+                                e.client_coordinates().x as f64,
+                                e.client_coordinates().y as f64,
+                                view_x,
+                                view_y,
+                            ));
+                    }
+                },
+                onmousemove: move |e| {
+                    if *is_panning.read() {
+                        let (start_x, start_y, initial_x, initial_y) = *start_pan.read();
+                        let (_, _, width, height) = *view_box.read();
+                        let dx = (e.client_coordinates().x as f64 - start_x) * width / 200.0;
+                        let dy = (e.client_coordinates().y as f64 - start_y) * height / 100.0;
+                        view_box.set((initial_x - dx, initial_y - dy, width, height));
+                    }
+                },
+                onmouseup: move |_| is_panning.set(false),
+                onmouseleave: move |_| is_panning.set(false),
                 // Background
                 rect {
                     id: "background",
