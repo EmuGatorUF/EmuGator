@@ -236,6 +236,32 @@ impl<'a> Expression<'a> {
                     ))?;
                     stack.push(!a);
                 }
+                RPNKind::ShiftLeft => {
+                    let a = stack.pop().ok_or(AssemblerError::from_token(
+                        "Not enough operands for <<.".into(),
+                        &rpn.token,
+                    ))?;
+                    let b = stack.pop().ok_or(AssemblerError::from_token(
+                        "Not enough operands for <<.".into(),
+                        &rpn.token,
+                    ))?;
+                    // represented as b << a
+                    // Will panic if a is too large
+                    stack.push(b << usize::try_from(&a).unwrap());
+                }
+                RPNKind::ShiftRight => {
+                    let a = stack.pop().ok_or(AssemblerError::from_token(
+                        "Not enough operands for <<.".into(),
+                        &rpn.token,
+                    ))?;
+                    let b = stack.pop().ok_or(AssemblerError::from_token(
+                        "Not enough operands for <<.".into(),
+                        &rpn.token,
+                    ))?;
+                    // represented as b >> a
+                    // Will panic if a is too large
+                    stack.push(b >> usize::try_from(&a).unwrap());
+                }
                 _ => todo!(),
             }
         }
