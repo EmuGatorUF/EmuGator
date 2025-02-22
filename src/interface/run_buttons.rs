@@ -1,6 +1,6 @@
 use crate::assembler::{self, AssembledProgram, AssemblerError, Section};
 use crate::emulator::{self, EmulatorState};
-use crate::uart::{trigger_uart, Uart};
+use crate::uart::{LineStatusRegisterBitMask, Uart, trigger_uart};
 
 use dioxus::prelude::*;
 use dioxus_logger::tracing::info;
@@ -33,7 +33,7 @@ pub fn RunButtons(
                             let mut assembled = assembled;
                             assembled.data_memory.insert(uart_module.read().rx_buffer_address, 0);
                             assembled.data_memory.insert(uart_module.read().tx_buffer_address, 0);
-                            assembled.data_memory.insert(uart_module.read().lsr_address, 0);
+                            assembled.data_memory.insert(uart_module.read().lsr_address, LineStatusRegisterBitMask::TransmitReady as u8 | LineStatusRegisterBitMask::ReceiveReady as u8);
                             assembled_program.set(Some(assembled));
                             assembler_errors.set(Vec::new());
                         }

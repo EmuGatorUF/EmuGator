@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
 
+use dioxus_logger::tracing::info;
+
 // UART Module for EmuGator
 
 // Fun Fact: John Uart created the UART protocol in ⧫︎♒︎♋︎■︎🙵⬧︎ ♐︎□︎❒︎ ●︎□︎□︎🙵♓︎■︎♑︎✏︎
@@ -36,9 +38,7 @@ impl Uart {
     }
 
     pub fn default() -> Self {
-        // TODO: Switch to these values once larger immediates are supported
-        // Uart::new(vec![], 0x3FF0, 0x3FF4, 0, 0, 0x3FF8)
-        Uart::new(vec![], 0xF0, 0xF4, 0xF8, 0, 0)
+        Uart::new(vec![], 0xF0, 0xF4, 0xF8, 20, 0)
     }
 
     pub fn to_string(&self) -> String {
@@ -60,46 +60,42 @@ pub enum LineStatusRegisterBitMask {
 pub fn trigger_uart(uart_module: Uart, data_memory: &mut BTreeMap<u32, u8>) -> Uart {
     let mut next_uart = uart_module.clone();
 
-    // Check if Tx buffer is empty (either not set or set to 0)
-    if data_memory.get(&next_uart.tx_buffer_address).is_none()
-        || data_memory.get(&next_uart.tx_buffer_address).unwrap() == &0
-    {
-        // Set TransmitReady bit in LSR and return
-        data_memory.insert(
-            next_uart.lsr_address,
-            LineStatusRegisterBitMask::TransmitReady as u8,
-        );
+    let the_receive_data = *data_memory.get(&next_uart.rx_buffer_address).unwrap();
+    let the_transmit_data = *data_memory.get(&next_uart.tx_buffer_address).unwrap();
+
+    if next_uart.uart_cycle_count > 0 {
+        next_uart.uart_cycle_count -= 1;
         return next_uart;
     }
 
-    // Tx buffer is not empty, so we can send a byte if count is zero
-    if next_uart.uart_cycle_count == 0 {
-        // Get byte from Tx buffer
-        let byte = *data_memory.get(&next_uart.tx_buffer_address).unwrap();
+    // Clear the busy bits and set the corresponding ready bits
+    let old_lsr: u8 = *data_memory.get(&next_uart.lsr_address).unwrap();
+    let new_lsr = (old_lsr
+        & !(LineStatusRegisterBitMask::TransmitBusy as u8
+            | LineStatusRegisterBitMask::ReceiveBusy as u8))
+        | ((old_lsr & LineStatusRegisterBitMask::TransmitBusy as u8) != 0) as u8
+            * (LineStatusRegisterBitMask::TransmitReady as u8)
+        | ((old_lsr & LineStatusRegisterBitMask::ReceiveBusy as u8) != 0) as u8
+            * (LineStatusRegisterBitMask::ReceiveReady as u8);
+    data_memory.insert(next_uart.lsr_address, new_lsr);
 
+    if the_transmit_data != 0 {
         // Set Tx buffer to empty
         data_memory.insert(next_uart.tx_buffer_address, 0);
 
-        // Set TransmitReady bit in LSR
-        data_memory.insert(
-            next_uart.lsr_address,
-            LineStatusRegisterBitMask::TransmitReady as u8,
-        );
-
-        // Set byte in buffer
-        next_uart.uart_output_buffer.push(byte);
-
-        // Set Tx cycle count to delay
-        next_uart.uart_cycle_count = next_uart.uart_delay;
-    } else {
-        // Decrement cycle count
-        next_uart.uart_cycle_count -= 1;
-
-        // Set LSR to TransmitBusy
+        // Set TransmitBusy bit in LSR
         data_memory.insert(
             next_uart.lsr_address,
             LineStatusRegisterBitMask::TransmitBusy as u8,
         );
+
+        // Set byte in buffer
+        next_uart.uart_output_buffer.push(the_transmit_data);
+
+        // Set UART busy for delay cycles
+        next_uart.uart_cycle_count = next_uart.uart_delay;
+    } else if the_receive_data != 0 {
+        todo!();
     }
 
     next_uart
