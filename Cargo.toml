@@ -37,4 +37,5 @@ inherits = "dev"
 inherits = "dev"
 
 [dev-dependencies]
+rand = "0.9.0"
 serde = "1.0.217"

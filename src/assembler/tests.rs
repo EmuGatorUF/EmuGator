@@ -3,6 +3,9 @@ use std::collections::BTreeMap;
 use bimap::BiBTreeMap;
 use ibig::IBig;
 
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
+
 use crate::assembler;
 use crate::assembler::lexer::{Lexer, TokenKind};
 
@@ -62,6 +65,224 @@ fn print_some_output() {
             inst_mem[&(addr + 3)],
         ]);
         println!("0x{:08X}: 0x{:08X}", addr, instruction);
+    }
+}
+
+#[test]
+fn test_randomized_instructions() {
+    use rand::rngs::StdRng;
+    use rand::{Rng, SeedableRng};
+    use std::fmt::Write;
+
+    let seed = [42u8; 32];
+    let mut rng = StdRng::from_seed(seed);
+
+    for i in 0..100 {
+        let mut program = String::from(".text\n");
+        let num_instructions = rng.random_range(5..20);
+
+        for _ in 0..num_instructions {
+            let instr = gen_random_instruction(&mut rng);
+            writeln!(program, "{}", instr).unwrap();
+        }
+
+        match assemble(&program) {
+            Ok(_) => {}
+            Err(errors) => {
+                println!("Test {}: Program failed to assemble:", i);
+                println!("{}", program);
+                for (i, error) in errors.iter().take(3).enumerate() {
+                    println!(
+                        "Error {}: on line {}, col {}: {}",
+                        i + 1,
+                        error.line_number,
+                        error.column,
+                        error.error_message
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_randomized_data_section() {
+    use rand::rngs::StdRng;
+    use rand::{Rng, SeedableRng};
+    use std::fmt::Write;
+
+    let seed = [43u8; 32];
+    let mut rng = StdRng::from_seed(seed);
+
+    for i in 0..50 {
+        let mut program = String::from(".data\n");
+
+        write!(program, "bytes: .byte ").unwrap();
+        let num_bytes = rng.random_range(1..10);
+        for j in 0..num_bytes {
+            if j > 0 {
+                write!(program, ", ").unwrap();
+            }
+            write!(program, "{}", rng.random::<u8>()).unwrap();
+        }
+        writeln!(program).unwrap();
+
+        write!(program, "words: .word ").unwrap();
+        let num_words = rng.random_range(1..5);
+        for j in 0..num_words {
+            if j > 0 {
+                write!(program, ", ").unwrap();
+            }
+            write!(program, "{}", rng.random::<i32>()).unwrap();
+        }
+        writeln!(program).unwrap();
+
+        writeln!(program, "\n.text").unwrap();
+        writeln!(program, "LW x1, 0(x0)").unwrap();
+        writeln!(program, "LW x2, 4(x0)").unwrap();
+        writeln!(program, "ADD x3, x1, x2").unwrap();
+
+        let result = assemble(&program);
+        if result.is_err() {
+            println!("Test {}: Program with data section failed to assemble:", i);
+            println!("{}", program);
+        }
+    }
+}
+
+#[test]
+fn test_randomized_branches() {
+    use rand::rngs::StdRng;
+    use rand::{Rng, SeedableRng};
+    use std::fmt::Write;
+
+    let seed = [44u8; 32];
+    let mut rng = StdRng::from_seed(seed);
+
+    for i in 0..50 {
+        let mut program = String::from(".text\n");
+
+        let num_labels = rng.random_range(2..5);
+        let labels: Vec<String> = (0..num_labels).map(|i| format!("label_{}", i)).collect();
+
+        let num_instructions = rng.random_range(10..30);
+        for instr_idx in 0..num_instructions {
+            if rng.random_bool(0.3) {
+                let label_idx = rng.random_range(0..labels.len());
+                writeln!(program, "{}:", labels[label_idx]).unwrap();
+            }
+
+            if rng.random_bool(0.2) {
+                let branch_instr = match rng.random_range(0..6) {
+                    0 => "BEQ",
+                    1 => "BNE",
+                    2 => "BLT",
+                    3 => "BGE",
+                    4 => "BLTU",
+                    _ => "BGEU",
+                };
+
+                let rs1 = format!("x{}", rng.random_range(0..32));
+                let rs2 = format!("x{}", rng.random_range(0..32));
+                let label_idx = rng.random_range(0..labels.len());
+
+                writeln!(
+                    program,
+                    "{} {}, {}, {}",
+                    branch_instr, rs1, rs2, labels[label_idx]
+                )
+                .unwrap();
+            } else {
+                let instr = gen_random_instruction(&mut rng);
+                writeln!(program, "{}", instr).unwrap();
+            }
+        }
+
+        let has_label_def = program.contains(":");
+        if !has_label_def && !labels.is_empty() {
+            writeln!(program, "{}:", labels[0]).unwrap();
+        }
+
+        let result = assemble(&program);
+        if result.is_err() {
+            println!("Test {}: Branch program failed to assemble:", i);
+            println!("{}", program);
+            // we log the results for manual looking
+        }
+    }
+}
+
+// Random instructions :)
+fn gen_random_instruction<R: rand::Rng>(rng: &mut R) -> String {
+    match rng.random_range(0..8) {
+        0 => {
+            let instrs = [
+                "ADD", "SUB", "SLL", "SLT", "SLTU", "XOR", "SRL", "SRA", "OR", "AND",
+            ];
+            let instr = instrs[rng.random_range(0..instrs.len())];
+            let rd = format!("x{}", rng.random_range(0..32));
+            let rs1 = format!("x{}", rng.random_range(0..32));
+            let rs2 = format!("x{}", rng.random_range(0..32));
+            format!("{} {}, {}, {}", instr, rd, rs1, rs2)
+        }
+
+        1 => {
+            let instrs = ["ADDI", "SLTI", "SLTIU", "XORI", "ORI", "ANDI"];
+            let instr = instrs[rng.random_range(0..instrs.len())];
+            let rd = format!("x{}", rng.random_range(0..32));
+            let rs1 = format!("x{}", rng.random_range(0..32));
+            let imm = rng.random_range(-2048..2048);
+            format!("{} {}, {}, {}", instr, rd, rs1, imm)
+        }
+
+        2 => {
+            let instrs = ["SLLI", "SRLI", "SRAI"];
+            let instr = instrs[rng.random_range(0..instrs.len())];
+            let rd = format!("x{}", rng.random_range(0..32));
+            let rs1 = format!("x{}", rng.random_range(0..32));
+            let shamt = rng.random_range(0..32);
+            format!("{} {}, {}, {}", instr, rd, rs1, shamt)
+        }
+
+        3 => {
+            let instrs = ["LUI", "AUIPC"];
+            let instr = instrs[rng.random_range(0..instrs.len())];
+            let rd = format!("x{}", rng.random_range(0..32));
+            let imm = rng.random_range(0..0x100000);
+            format!("{} {}, {}", instr, rd, imm)
+        }
+
+        4 => {
+            let instrs = ["LB", "LH", "LW", "LBU", "LHU"];
+            let instr = instrs[rng.random_range(0..instrs.len())];
+            let rd = format!("x{}", rng.random_range(0..32));
+            let rs1 = format!("x{}", rng.random_range(0..32));
+            let offset = rng.random_range(-2048..2048);
+            format!("{} {}, {}({})", instr, rd, offset, rs1)
+        }
+
+        5 => {
+            let instrs = ["SB", "SH", "SW"];
+            let instr = instrs[rng.random_range(0..instrs.len())];
+            let rs2 = format!("x{}", rng.random_range(0..32));
+            let rs1 = format!("x{}", rng.random_range(0..32));
+            let offset = rng.random_range(-2048..2048);
+            format!("{} {}, {}({})", instr, rs2, offset, rs1)
+        }
+
+        6 => {
+            let rd = format!("x{}", rng.random_range(0..32));
+            let rs1 = format!("x{}", rng.random_range(0..32));
+            let offset = rng.random_range(-2048..2048);
+            format!("JALR {}, {}, {}", rd, rs1, offset)
+        }
+
+        7 => {
+            let instrs = ["FENCE", "ECALL", "EBREAK"];
+            instrs[rng.random_range(0..instrs.len())].to_string()
+        }
+
+        _ => unreachable!(),
     }
 }
 
