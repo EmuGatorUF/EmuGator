@@ -20,40 +20,48 @@ pub fn DataView(assembled_program: Signal<Option<AssembledProgram>>) -> Element 
     let data_start = program.get_section_start(Section::Data) as usize;
 
     // changed this to fix a bug where partial words did not show in data view
-    let total_words = (data_memory.len() + 3) / 4;
+    let total_quad_words = (data_memory.len() + 15) / 16;
 
     rsx! {
         div { class: "h-full overflow-hidden",
             div { class: "h-full overflow-auto pr-2",
                 div { class: "bg-white rounded shadow-sm p-2",
-                    for i in 0..total_words {
-                        {
-                            let base_addr = data_start + i * 4;
-                            rsx! {
-                                div {
-                                    class: {
-                                        if i < total_words - 1 {
-                                            "flex justify-between items-center border-b border-gray-100 py-1"
-                                        } else {
-                                            "flex justify-between items-center py-1"
+                    table { class: "w-full font-mono text-gray-800 font-bold",    
+                        thead {
+                            tr {class: "bg-gray-300",
+                                th{class: "text-left", scope: "row", colspan: "1", "Address"}
+                                th{scope: "row", colspan: "4", "Hex"}
+                            }
+                            tr {
+                                td{""}
+                                td{class: "text-gray-500", "+ 0x0"}
+                                td{class: "text-gray-500", "+ 0x4"}
+                                td{class: "text-gray-500", "+ 0x8"}
+                                td{class: "text-gray-500", "+ 0xc"}
+                            }
+                        }
+                        tbody {
+                            for i in 0..total_quad_words {
+                                {
+                                    let base_addr = data_start + i * 16;
+                                    {
+                                        let mut words: [u32; 4] = [0,0,0,0];
+                                        for i in 0..4{
+                                            words[i] = (data_memory.get(&((base_addr + i*4) as u32)).copied().unwrap_or(0) as u32)
+                                            | ((data_memory.get(&((base_addr + i*4 + 1) as u32)).copied().unwrap_or(0) as u32)
+                                                << 8)
+                                            | ((data_memory.get(&((base_addr + i*4 + 2) as u32)).copied().unwrap_or(0) as u32)
+                                                << 16)
+                                            | ((data_memory.get(&((base_addr + i*4 + 3) as u32)).copied().unwrap_or(0) as u32)
+                                                << 24);
                                         }
-                                    },
-                                    div { class: "flex-1",
-                                        div { class: "flex justify-between",
-                                            div { class: "font-mono text-gray-500 text-xs", "0x{base_addr:04x}:" }
-                                        }
-                                        div { class: "font-mono font-bold",
-                                            {
-                                                let word = (data_memory.get(&(base_addr as u32)).copied().unwrap_or(0) as u32)
-                                                    | ((data_memory.get(&((base_addr + 1) as u32)).copied().unwrap_or(0) as u32)
-                                                        << 8)
-                                                    | ((data_memory.get(&((base_addr + 2) as u32)).copied().unwrap_or(0) as u32)
-                                                        << 16)
-                                                    | ((data_memory.get(&((base_addr + 3) as u32)).copied().unwrap_or(0) as u32)
-                                                        << 24);
-                                                rsx! {
-                                                "0x{word:08x}"
-                                                }
+                                        rsx!{
+                                            tr {padding: "20px",
+                                                td{class: "flex-1 text-gray-500", "0x{base_addr:04x}:"}
+                                                td{class: "flex-1", "0{words[0]:08x}"}
+                                                td{class: "flex-1", "0{words[1]:08x}"}
+                                                td{class: "flex-1", "0{words[2]:08x}"}
+                                                td{class: "flex-1", "0{words[3]:08x}"}
                                             }
                                         }
                                     }
