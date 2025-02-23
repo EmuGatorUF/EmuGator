@@ -19,8 +19,6 @@ mod assembler_error;
 mod lexer;
 mod rpn;
 
-
-
 fn consume_line<'a>(
     token: &mut Token<'a>,
     lexer: &mut Peekable<Lexer<'a>>,
@@ -106,6 +104,27 @@ fn parse_directive<'a>(
         ))??;
         if let TokenKind::Symbol(directive_str) = token.kind {
             let output = match directive_str {
+                "equ" => {
+                    if let Some(Ok(symbol @ Token { kind: TokenKind::Symbol(name), .. })) = lexer.next_if(|next| matches!(next, Ok(Token { kind: TokenKind::Symbol(_), .. }))) {
+                        if is_kind(lexer.peek(), TokenKind::Comma) {
+                            lexer.next() // Skip comma
+                        } else {
+                            return Err(AssemblerError::from_token(
+                                "Expected comma after symbol in '.equ' directive.".into(),
+                                token,
+                            ));
+                        };
+
+                        let expression = parse_expression(lexer)?;
+
+                        Directive::Symbol(name.into(), (expression, symbol))
+                    } else {
+                        return Err(AssemblerError::from_token(
+                            "Expected symbol after '.equ' directive.".into(),
+                            &token,
+                        ));
+                    }
+                }
                 "data" | "text" => {
                     let expression = parse_expression(lexer)?;
 
@@ -164,7 +183,7 @@ fn parse_directive<'a>(
                                         symbol_table.get(name).ok_or(AssemblerError::from_token(
                                             format!("Symbol {} not defined.", name),
                                             &expression[0].token,
-                                        ))
+                                        )).cloned()
                                     }),
                                     expression,
                                 )
@@ -512,7 +531,7 @@ fn parse_immediate(imm: &[Token], def: &InstructionDefinition, symbol_table: &Ha
         symbol_table.get(name).ok_or(AssemblerError::from_expression(
             format!("Symbol {} not defined.", name),
             &expression
-        ))
+        )).cloned()
     })?
     .try_into()
     .map_err(|e| {
@@ -760,16 +779,19 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
 
     let _ = {
         let mut visited = HashSet::new();
-        for (symbol, _) in symbol_table.iter() {
+        for (symbol, (_, label_token)) in symbol_table.iter() {
             if let Err(err) =
                 resolve_label(symbol, &symbol_table, &mut resolved_symbols, &mut visited).map_err(
-                    |e| match e {
-                        Ok(e) => e,
-                        Err((msg, label)) => AssemblerError::from_token(
-                            msg,
-                            &symbol_table.get(&label).expect("Symbol not found").1,
-                        ),
-                    },
+                    |e| if e.line_number == 0 {
+                        AssemblerError {
+                            error_message: e.error_message,
+                            line_number: label_token.line,
+                            column: label_token.column,
+                            width: label_token.width,
+                        }
+                    } else {
+                        e
+                    }
                 )
             {
                 errors.push(err);
@@ -778,10 +800,6 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
     };
 
     let symbol_table = resolved_symbols;
-
-    for (symbol, value) in symbol_table.iter() {
-        println!("{}: {}", symbol, value);
-    }
 
     let mut instruction_memory = BTreeMap::new();
     let mut data_memory = BTreeMap::new();
@@ -902,50 +920,31 @@ fn resolve_label(
     labels: &HashMap<String, (Expression, Token)>,
     resolved_labels: &mut HashMap<String, IBig>,
     visited: &mut HashSet<String>,
-) -> Result<IBig, Result<AssemblerError, (String, String)>> {
+) -> Result<IBig, AssemblerError> {
     Ok(if let Some(val) = resolved_labels.get(label) {
         val.clone()
     } else {
         if visited.contains(label) {
-            return Err(Ok(AssemblerError::from_token(
-                format!("Recursive loop found while resolving {}", label),
-                &labels[label].1,
-            )));
+            return Err(AssemblerError {
+                error_message: format!("Recursive loop found while resolving {}", label),
+                line_number: 0,
+                column: 0,                
+                width: 0,
+            });
         }
 
         visited.insert(label.clone());
-        let mut stack = Vec::new();
-        let (expression, token) = labels.get(label).ok_or(Err((
-            format!("Symbol {} not defined.", label),
-            label.clone(),
-        )))?;
 
-        for rpn in expression.iter() {
-            match &rpn.kind {
-                RPNKind::Integer(val) => stack.push(val.clone()),
-                RPNKind::Variable(name) => {
-                    stack.push(resolve_label(&name, labels, resolved_labels, visited)?)
-                }
-                RPNKind::Add => {
-                    let a = stack.pop().ok_or(Ok(AssemblerError::from_token(
-                        "Empty stack".into(),
-                        &rpn.token,
-                    )))?;
-                    let b = stack.pop().ok_or(Ok(AssemblerError::from_token(
-                        "Empty stack".into(),
-                        &rpn.token,
-                    )))?;
-                    stack.push(a + b);
-                }
-                _ => todo!(),
-            }
-        }
+        let (expression, token) = labels.get(label).ok_or(AssemblerError {
+            error_message: format!("Label {} not found.", label),
+            line_number: 0,
+            column: 0,
+            width: 0,
+        })?;
 
-        let value = stack.pop().ok_or(Ok(AssemblerError::from_expression(
-            "Invalid expression.".into(),
-            expression,
-        )))?;
+        let value = expression.evaluate(|name| resolve_label(name, labels, resolved_labels, visited) )?;
         resolved_labels.insert(label.clone(), value.clone());
+
         value
     })
 }

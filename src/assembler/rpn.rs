@@ -112,7 +112,7 @@ impl<'a> TryFrom<Token<'a>> for RPN<'a> {
 pub struct Expression<'a>(Vec<RPN<'a>>);
 
 impl<'a> Expression<'a> {
-    pub fn evaluate<F: FnMut(&String) -> Result<&'a IBig, AssemblerError>>(
+    pub fn evaluate<F: FnMut(&String) -> Result<IBig, AssemblerError>>(
         &self,
         mut resolve: F,
     ) -> Result<IBig, AssemblerError> {
