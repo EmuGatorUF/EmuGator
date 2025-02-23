@@ -6,6 +6,7 @@ export const makeTokensProvider = () => {
     keywords: [
       ".data",
       ".text",
+      ".equ",
       "ADD",
       "SUB",
       "SLT",
