@@ -1,7 +1,7 @@
 use bimap::BiBTreeMap;
+use ibig::IBig;
 use std::{
-    collections::{BTreeMap, HashMap},
-    str::FromStr,
+    collections::{BTreeMap, HashMap}, ops::Add, path::Display, str::FromStr
 };
 
 #[derive(Debug)]
@@ -16,10 +16,7 @@ pub struct AssembledProgram {
     pub source_map: BiBTreeMap<u32, usize>,
 
     /// Map of instruction labels to addresses
-    pub labels: HashMap<String, u32>,
-
-    /// Map of data labels to addresses
-    pub data_labels: HashMap<String, u32>,
+    pub symbol_table: HashMap<String, Address>,
 }
 
 impl AssembledProgram {
@@ -28,8 +25,7 @@ impl AssembledProgram {
             instruction_memory: BTreeMap::new(),
             data_memory: BTreeMap::new(),
             source_map: BiBTreeMap::new(),
-            labels: HashMap::new(),
-            data_labels: HashMap::new(),
+            symbol_table: HashMap::new(),
         }
     }
 
@@ -37,38 +33,7 @@ impl AssembledProgram {
         match section {
             Section::Text => self.source_map.left_values().next().copied().unwrap_or(0),
             Section::Data => self.data_memory.keys().next().copied().unwrap_or(0),
-        }
-    }
-
-    pub fn add_label(&mut self, label: String, address: u32, is_data: bool) -> Result<(), String> {
-        if self.labels.contains_key(&label) || self.data_labels.contains_key(&label) {
-            return Err(format!("Label '{}' is already defined", label));
-        }
-
-        if is_data {
-            self.data_labels.insert(label, address);
-        } else {
-            self.labels.insert(label, address);
-        }
-        Ok(())
-    }
-
-    pub fn add_instruction(&mut self, address: u32, encoded: u32, line_num: usize) {
-        self.instruction_memory
-            .insert(address, (encoded & 0xFF) as u8);
-        self.instruction_memory
-            .insert(address + 1, ((encoded >> 8) & 0xFF) as u8);
-        self.instruction_memory
-            .insert(address + 2, ((encoded >> 16) & 0xFF) as u8);
-        self.instruction_memory
-            .insert(address + 3, ((encoded >> 24) & 0xFF) as u8);
-
-        self.source_map.insert(address, line_num);
-    }
-
-    pub fn add_data(&mut self, address: u32, data: &[u8]) {
-        for (i, &byte) in data.iter().enumerate() {
-            self.data_memory.insert(address + i as u32, byte);
+            _ => todo!(), // TODO: Add support for other sections and user-defined sections
         }
     }
 
@@ -87,8 +52,242 @@ impl AssembledProgram {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Section {
+    Absolute,
     Data,
     Text,
+    Bss,
+    User(String),
+}
+
+impl From<&str> for Section {
+    fn from(s: &str) -> Self {
+        match s {
+            "absolute" => Section::Absolute,
+            "data" => Section::Data,
+            "text" => Section::Text,
+            "bss" => Section::Bss,
+            _ => Section::User(s.to_string()),
+        }
+    }
+}
+
+impl Into<String> for Section {
+    fn into(self) -> String {
+        match self {
+            Section::Absolute => "absolute".to_string(),
+            Section::Data => "data".to_string(),
+            Section::Text => "text".to_string(),
+            Section::Bss => "bss".to_string(),
+            Section::User(name) => name,
+        }
+    }
+}
+
+impl std::fmt::Display for Section {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", Into::<String>::into(self.clone()))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Address(pub Section, pub IBig);
+
+impl Address {
+    pub fn new(section: Option<Section>, offset: IBig) -> Self {
+        Address(section.unwrap_or(Section::Absolute), offset)
+    }
+}
+
+impl std::ops::Neg for Address {
+    type Output = Result<Address, String>;
+
+    fn neg(self) -> Self::Output {
+        if self.0 == Section::Absolute {
+            Ok(Address(Section::Absolute, -self.1))
+        } else {
+            Err(format!("Cannot negate address in section {}", self.0))
+        }
+    }
+}
+
+impl std::ops::Not for Address {
+    type Output = Result<Address, String>;
+
+    fn not(self) -> Self::Output {
+        if self.0 == Section::Absolute {
+            Ok(Address(Section::Absolute, !self.1))
+        } else {
+            Err(format!("Cannot bitwise not address in section {}", self.0))
+        }
+    }
+}
+
+impl std::ops::Mul for Address {
+    type Output = Result<Address, String>;
+
+    fn mul(self, other: Address) -> Self::Output {
+        if self.0 == Section::Absolute && other.0 == Section::Absolute {
+            Ok(Address(Section::Absolute, self.1 * other.1))
+        } else {
+            Err(format!(
+                "Cannot multiply addresses from sections {} * {}",
+                self.0, other.0
+            ))
+        }
+    }
+}
+
+impl std::ops::Div for Address {
+    type Output = Result<Address, String>;
+
+    fn div(self, other: Address) -> Self::Output {
+        if self.0 == Section::Absolute && other.0 == Section::Absolute {
+            Ok(Address(Section::Absolute, self.1 / other.1))
+        } else {
+            Err(format!(
+                "Cannot divide addresses from sections {} / {}",
+                self.0, other.0
+            ))
+        }
+    }
+}
+
+impl std::ops::Rem for Address {
+    type Output = Result<Address, String>;
+
+    fn rem(self, other: Address) -> Self::Output {
+        if self.0 == Section::Absolute && other.0 == Section::Absolute {
+            Ok(Address(Section::Absolute, self.1 % other.1))
+        } else {
+            Err(format!(
+                "Cannot modulo addresses from sections {} % {}",
+                self.0, other.0
+            ))
+        }
+    }
+}
+
+impl std::ops::Shl for Address {
+    type Output = Result<Address, String>;
+
+    fn shl(self, other: Address) -> Self::Output {
+        if self.0 == Section::Absolute && other.0 == Section::Absolute {
+            Ok(Address(
+                Section::Absolute,
+                self.1 << usize::try_from(&other.1).map_err(|e| e.to_string())?,
+            ))
+        } else {
+            Err(format!(
+                "Cannot left shift addresses from sections {} << {}",
+                self.0, other.0
+            ))
+        }
+    }
+}
+
+impl std::ops::Shr for Address {
+    type Output = Result<Address, String>;
+
+    fn shr(self, other: Address) -> Self::Output {
+        if self.0 == Section::Absolute && other.0 == Section::Absolute {
+            Ok(Address(
+                Section::Absolute,
+                self.1 >> usize::try_from(&other.1).map_err(|e| e.to_string())?,
+            ))
+        } else {
+            Err(format!(
+                "Cannot right shift addresses from sections {} >> {}",
+                self.0, other.0
+            ))
+        }
+    }
+}
+
+impl std::ops::BitOr for Address {
+    type Output = Result<Address, String>;
+
+    fn bitor(self, other: Address) -> Self::Output {
+        if self.0 == Section::Absolute && other.0 == Section::Absolute {
+            Ok(Address(Section::Absolute, self.1 | other.1))
+        } else {
+            Err(format!(
+                "Cannot bitwise or addresses from sections {} | {}",
+                self.0, other.0
+            ))
+        }
+    }
+}
+
+impl std::ops::BitAnd for Address {
+    type Output = Result<Address, String>;
+
+    fn bitand(self, other: Address) -> Self::Output {
+        if self.0 == Section::Absolute && other.0 == Section::Absolute {
+            Ok(Address(Section::Absolute, self.1 & other.1))
+        } else {
+            Err(format!(
+                "Cannot bitwise and addresses from sections {} & {}",
+                self.0, other.0
+            ))
+        }
+    }
+}
+
+impl std::ops::BitXor for Address {
+    type Output = Result<Address, String>;
+
+    fn bitxor(self, other: Address) -> Self::Output {
+        if self.0 == Section::Absolute && other.0 == Section::Absolute {
+            Ok(Address(Section::Absolute, self.1 ^ other.1))
+        } else {
+            Err(format!(
+                "Cannot bitwise xor addresses from sections {} ^ {}",
+                self.0, other.0
+            ))
+        }
+    }
+}
+
+impl std::ops::Add<Address> for Address {
+    type Output = Result<Address, String>;
+
+    fn add(self, other: Address) -> Self::Output {
+        match (self.0, other.0) {
+            (Section::Absolute, section) | (section, Section::Absolute) => {
+                Ok(Address(section, self.1 + other.1))
+            }
+            (section, other_section) if section == other_section => {
+                Ok(Address(section, self.1 + other.1))
+            }
+            (section, other_section) => Err(format!(
+                "Cannot add addresses from different sections {} + {}",
+                section, other_section
+            )),
+        }
+    }
+}
+
+impl std::ops::Sub<Address> for Address {
+    type Output = Result<Address, String>;
+
+    fn sub(self, other: Address) -> Self::Output {
+        match (self.0, other.0) {
+            (section, Section::Absolute) => Ok(Address(section, self.1 - other.1)),
+            (section, other_section) if section == other_section => {
+                Ok(Address(Section::Absolute, self.1 - other.1))
+            }
+            (section, other_section) => Err(format!(
+                "Cannot subtract addresses from different sections {} - {}",
+                section, other_section
+            )),
+        }
+    }
+}
+
+impl std::fmt::Display for Address {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}({})", self.1, self.0)
+    }
 }

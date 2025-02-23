@@ -379,8 +379,8 @@ fn test_directive_equ() {
     });
 
     assert_eq!(
-        assembled_program.data_labels.get("value").unwrap(),
-        &(42 << 1)
+        assembled_program.symbol_table.get("value").unwrap().1,
+        (42 << 1).into()
     );
 }
 
@@ -1983,7 +1983,8 @@ fn long_expression() {
     let expression = parse_expression(&mut lexer).expect("Tokens should be valid.");
     let result = expression
         .evaluate(|_| unreachable!())
-        .expect("Expression should be valid.");
+        .expect("Expression should be valid.")
+        .1;
 
     let expected_result: IBig = 17.into();
     assert_eq!(result, expected_result)
@@ -1995,7 +1996,8 @@ fn long_neg_expression() {
     let expression = parse_expression(&mut lexer).expect("Tokens should be valid.");
     let result = expression
         .evaluate(|_| unreachable!())
-        .expect("Expression should be valid.");
+        .expect("Expression should be valid.")
+        .1;
 
     let expected_result: IBig = (-12).into();
     assert_eq!(result, expected_result)
@@ -2007,7 +2009,8 @@ fn bitwise_operations() {
     let expression = parse_expression(&mut lexer).expect("Tokens should be valid.");
     let result = expression
         .evaluate(|_| unreachable!())
-        .expect("Expression should be valid.");
+        .expect("Expression should be valid.")
+        .1;
 
     let expected_result: IBig = 11.into();
     assert_eq!(result, expected_result)
@@ -2020,7 +2023,8 @@ fn shift_operations() {
     let expression = parse_expression(&mut lexer).expect("Tokens should be valid.");
     let result = expression
         .evaluate(|_| unreachable!())
-        .expect("Expression should be valid.");
+        .expect("Expression should be valid.")
+        .1;
 
     let expected_result: IBig = 8.into(); // (4 << 3) >> 1 = (32) >> 1 = 16
     assert_eq!(result, expected_result)
@@ -2032,7 +2036,8 @@ fn modulo_operation() {
     let expression = parse_expression(&mut lexer).expect("Tokens should be valid.");
     let result = expression
         .evaluate(|_| unreachable!())
-        .expect("Expression should be valid.");
+        .expect("Expression should be valid.")
+        .1;
 
     let expected_result: IBig = 4.into(); // (10 % 3) * 4 = 1 * 4 = 4
     assert_eq!(result, expected_result)
@@ -2044,7 +2049,8 @@ fn unary_bitwise_not() {
     let expression = parse_expression(&mut lexer).expect("Tokens should be valid.");
     let result = expression
         .evaluate(|_| unreachable!())
-        .expect("Expression should be valid.");
+        .expect("Expression should be valid.")
+        .1;
 
     let expected_result: IBig = (!5).into();
     assert_eq!(result, expected_result)
@@ -2056,9 +2062,10 @@ fn nested_parentheses() {
     let expression = parse_expression(&mut lexer).expect("Tokens should be valid.");
     let result = expression
         .evaluate(|_| unreachable!())
-        .expect("Expression should be valid.");
+        .expect("Expression should be valid.")
+        .1;
 
-    let expected_result: IBig = 4.into(); // (((8 * 2) / 4) << 1) = (16 / 4) << 1 = 4 << 1 = 8
+    let expected_result: IBig = 4.into(); // (((3 + 5) * 2) / 4) = ((8 * 2) / 4) = (16 / 4) = 4
     assert_eq!(result, expected_result)
 }
 
@@ -2069,4 +2076,39 @@ fn divide_by_zero() {
     let result = expression.evaluate(|_| unreachable!());
 
     assert!(result.is_err(), "Division by zero should return an error.");
+}
+
+#[test]
+fn not_enough_arguments() {
+    let mut lexer = Lexer::new("10 +").peekable();
+    let expression = parse_expression(&mut lexer).unwrap();
+    let result = expression.evaluate(|_| unreachable!());
+
+    assert!(
+        result.is_err(),
+        "Invalid expression should return an error."
+    );
+}
+
+#[test]
+fn too_many_arguments() {
+    let mut lexer = Lexer::new("10 + 5 3").peekable();
+    let expression = parse_expression(&mut lexer).unwrap();
+    let result = expression.evaluate(|_| unreachable!());
+
+    println!("{:?}", result);
+    assert!(
+        result.is_err(),
+        "Invalid expression should return an error."
+    );
+}
+
+#[test]
+fn multiple_definition() {
+    let result = assemble(".equ value, 3\n.equ value, 5");
+
+    assert!(
+        result.is_err(),
+        "Multiple definition should return an error."
+    );
 }

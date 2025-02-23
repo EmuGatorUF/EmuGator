@@ -1,4 +1,5 @@
 .data
+.equ value, (0x21 * 2) << 4
 message: .string "test\n"
 numbers: .word 1, 2, 3, 4
 bytes: .byte 0xFF, 0x42, 0x33
@@ -7,7 +8,7 @@ array: .ascii "test"
 .text
 main:
     # Example I-type instruction example
-    ADDI x2, x9, 5      #   x2 = x9 + 5
+    ADDI x2, x9, value  #   x2 = x9 + 5
     XORI x3, x2, 0xFF   #   x3 = x2 ^ 0xFF
     SLLI x9, x2, 2      #   x9 = x2 << 2
 

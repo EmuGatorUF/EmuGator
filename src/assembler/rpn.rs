@@ -1,8 +1,11 @@
-use std::{collections::VecDeque, ops::Deref};
+use std::{collections::VecDeque, fmt::Display, ops::Deref};
 
+use dioxus::html::b;
 use ibig::IBig;
 
 use super::{
+    Section,
+    assembled_program::Address,
     assembler_error::AssemblerError,
     lexer::{Token, TokenKind},
 };
@@ -98,6 +101,30 @@ pub struct RPN<'a> {
     pub token: Token<'a>,
 }
 
+impl<'a> Display for RPN<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.kind {
+            RPNKind::LParenthesis => write!(f, "("),
+            RPNKind::RParenthesis => write!(f, ")"),
+            RPNKind::UnaryMinus => write!(f, "u-"),
+            RPNKind::BitwiseNot => write!(f, "~"),
+            RPNKind::Multiply => write!(f, "*"),
+            RPNKind::Divide => write!(f, "/"),
+            RPNKind::Modulo => write!(f, "%"),
+            RPNKind::ShiftLeft => write!(f, "{}", "<".repeat(self.token.width)),
+            RPNKind::ShiftRight => write!(f, "{}", ">".repeat(self.token.width)),
+            RPNKind::BitwiseOr => write!(f, "|"),
+            RPNKind::BitwiseAnd => write!(f, "&"),
+            RPNKind::BitwiseXor => write!(f, "^"),
+            RPNKind::BitwiseOrNot => write!(f, "!"),
+            RPNKind::Add => write!(f, "+"),
+            RPNKind::Subtract => write!(f, "-"),
+            RPNKind::Integer(val) => write!(f, "{}", val),
+            RPNKind::Variable(name) => write!(f, "{}", name),
+        }
+    }
+}
+
 impl<'a> TryFrom<Token<'a>> for RPN<'a> {
     type Error = AssemblerError;
 
@@ -112,189 +139,91 @@ impl<'a> TryFrom<Token<'a>> for RPN<'a> {
 pub struct Expression<'a>(Vec<RPN<'a>>);
 
 impl<'a> Expression<'a> {
-    pub fn evaluate<F: FnMut(&String) -> Result<IBig, AssemblerError>>(
-        &self,
+    pub fn evaluate<F: FnMut(&String) -> Result<Address, AssemblerError>>(
+        self,
         mut resolve: F,
-    ) -> Result<IBig, AssemblerError> {
-        let mut stack = Vec::new();
-        for rpn in self.iter() {
-            match &rpn.kind {
-                RPNKind::Integer(val) => stack.push(val.clone()),
-                RPNKind::Variable(name) => stack.push(resolve(&name)?.clone()),
-
-                RPNKind::UnaryMinus => {
-                    let a = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for -.".into(),
-                        &rpn.token,
-                    ))?;
-                    stack.push(-a);
-                }
-                RPNKind::BitwiseNot => {
-                    let a = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for ~.".into(),
-                        &rpn.token,
-                    ))?;
-                    stack.push(!a);
-                }
-                RPNKind::Multiply => {
-                    let a = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for *.".into(),
-                        &rpn.token,
-                    ))?;
-                    let b = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for *.".into(),
-                        &rpn.token,
-                    ))?;
-                    stack.push(a * b);
-                }
-                RPNKind::Divide => {
-                    let a = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for /.".into(),
-                        &rpn.token,
-                    ))?;
-                    let b = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for /.".into(),
-                        &rpn.token,
-                    ))?;
-                    if a == 0.into() {
-                        return Err(AssemblerError::from_token(
-                            "Division by zero encountered.".into(),
-                            &rpn.token,
-                        ));
-                    }
-                    stack.push(b / a);
-                }
-                RPNKind::Modulo => {
-                    let a = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for %.".into(),
-                        &rpn.token,
-                    ))?;
-                    let b = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for %.".into(),
-                        &rpn.token,
-                    ))?;
-                    if a == 0.into() {
-                        return Err(AssemblerError::from_token(
-                            "Modulo by zero encountered.".into(),
-                            &rpn.token,
-                        ));
-                    }
-                    stack.push(b % a);
-                }
-                RPNKind::ShiftLeft => {
-                    let a = stack.pop().ok_or(AssemblerError::from_token(
-                        format!("Not enough operands for {}.", "<".repeat(rpn.token.width)),
-                        &rpn.token,
-                    ))?;
-                    let b = stack.pop().ok_or(AssemblerError::from_token(
-                        format!("Not enough operands for {}.", "<".repeat(rpn.token.width)),
-                        &rpn.token,
-                    ))?;
-                    // represented as b << a
-                    // Will panic if a is too large
-                    stack.push(
-                        b << usize::try_from(&a).map_err(|e| {
-                            AssemblerError::from_token(
-                                "Shift amount is too large.".into(),
-                                &rpn.token,
-                            )
-                        })?,
-                    );
-                }
-                RPNKind::ShiftRight => {
-                    let a = stack.pop().ok_or(AssemblerError::from_token(
-                        format!("Not enough operands for {}.", ">".repeat(rpn.token.width)),
-                        &rpn.token,
-                    ))?;
-                    let b = stack.pop().ok_or(AssemblerError::from_token(
-                        format!("Not enough operands for {}.", ">".repeat(rpn.token.width)),
-                        &rpn.token,
-                    ))?;
-                    // represented as b >> a
-                    // Will panic if a is too large
-                    stack.push(
-                        b >> usize::try_from(&a).map_err(|e| {
-                            AssemblerError::from_token(
-                                "Shift amount is too large.".into(),
-                                &rpn.token,
-                            )
-                        })?,
-                    );
-                }
-                RPNKind::BitwiseOr => {
-                    let a = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for |.".into(),
-                        &rpn.token,
-                    ))?;
-                    let b = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for |.".into(),
-                        &rpn.token,
-                    ))?;
-                    stack.push(b | a);
-                }
-                RPNKind::BitwiseAnd => {
-                    let a = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for &.".into(),
-                        &rpn.token,
-                    ))?;
-                    let b = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for &.".into(),
-                        &rpn.token,
-                    ))?;
-                    stack.push(b & a);
-                }
-                RPNKind::BitwiseXor => {
-                    let a = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for ^.".into(),
-                        &rpn.token,
-                    ))?;
-                    let b = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for ^.".into(),
-                        &rpn.token,
-                    ))?;
-                    stack.push(b ^ a);
-                }
-                RPNKind::BitwiseOrNot => {
-                    let a = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for !.".into(),
-                        &rpn.token,
-                    ))?;
-                    let b = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for !.".into(),
-                        &rpn.token,
-                    ))?;
-                    stack.push(b | !a);
-                }
-                RPNKind::Add => {
-                    let a = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for +.".into(),
-                        &rpn.token,
-                    ))?;
-                    let b = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for +.".into(),
-                        &rpn.token,
-                    ))?;
-                    stack.push(a + b);
-                }
-                RPNKind::Subtract => {
-                    let a = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for -.".into(),
-                        &rpn.token,
-                    ))?;
-                    let b = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for -.".into(),
-                        &rpn.token,
-                    ))?;
-                    stack.push(b - a);
-                }
-                _ => todo!(),
-            }
+    ) -> Result<Address, AssemblerError> {
+        if self.is_empty() {
+            return Ok(Address(Section::Absolute, 0.into()));
         }
 
-        Ok(stack.pop().ok_or(AssemblerError::from_expression(
-            "Invalid expression".into(),
-            self,
-        ))?)
+        let invalid_err = AssemblerError::from_expression("Invalid expression".into(), &self);
+
+        let mut stack = Vec::new();
+
+        for rpn in self.0 {
+            let result = match rpn.kind {
+                RPNKind::Integer(val) => Ok(Address(Section::Absolute, val.clone())),
+                RPNKind::Variable(name) => Ok(resolve(&name)?),
+                RPNKind::LParenthesis | RPNKind::RParenthesis => {
+                    Err("Mismatched parenthesis".into())
+                }
+                // Unary operators
+                RPNKind::UnaryMinus | RPNKind::BitwiseNot => {
+                    let a: Address = stack.pop().ok_or(AssemblerError::from_token(
+                        format!("Not enough arguments for operator {}.", rpn),
+                        &rpn.token,
+                    ))?;
+
+                    match &rpn.kind {
+                        RPNKind::UnaryMinus => -a,
+                        RPNKind::BitwiseNot => !a,
+                        _ => unreachable!(),
+                    }
+                }
+                // Binary operators
+                RPNKind::Multiply
+                | RPNKind::Divide
+                | RPNKind::Modulo
+                | RPNKind::ShiftLeft
+                | RPNKind::ShiftRight
+                | RPNKind::BitwiseOr
+                | RPNKind::BitwiseAnd
+                | RPNKind::BitwiseXor
+                | RPNKind::BitwiseOrNot
+                | RPNKind::Add
+                | RPNKind::Subtract => {
+                    let b = stack.pop().ok_or(AssemblerError::from_token(
+                        format!("Not enough arguments for operator {}.", rpn),
+                        &rpn.token,
+                    ))?;
+                    let a = stack.pop().ok_or(AssemblerError::from_token(
+                        format!("Not enough arguments for operator {}.", rpn),
+                        &rpn.token,
+                    ))?;
+
+                    match &rpn.kind {
+                        RPNKind::Multiply => a * b,
+                        RPNKind::Divide => a / b,
+                        RPNKind::Modulo => a % b,
+                        RPNKind::ShiftLeft => a << b,
+                        RPNKind::ShiftRight => a >> b,
+                        RPNKind::BitwiseOr => a | b,
+                        RPNKind::BitwiseAnd => a & b,
+                        RPNKind::BitwiseXor => a ^ b,
+                        RPNKind::BitwiseOrNot => {
+                            let b = !b;
+                            match b {
+                                Ok(b) => a | b,
+                                Err(e) => Err(e),
+                            }
+                        }
+                        RPNKind::Add => a + b,
+                        RPNKind::Subtract => a - b,
+                        _ => unreachable!(),
+                    }
+                }
+            }
+            .map_err(|e| AssemblerError::from_token(e, &rpn.token))?;
+
+            stack.push(result);
+        }
+
+        let result = Ok(stack.pop().ok_or(invalid_err.clone())?);
+        if !stack.is_empty() {
+            return Err(invalid_err.clone());
+        }
+        result
     }
 
     pub fn shunting_yard(
