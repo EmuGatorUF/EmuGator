@@ -17,19 +17,19 @@ enum Associativity {
 pub enum RPNKind {
     LParenthesis,
     RParenthesis,
-    UnaryPlus,
     UnaryMinus,
-    Add,
-    Subtract,
+    BitwiseNot,
     Multiply,
     Divide,
     Modulo,
     ShiftLeft,
     ShiftRight,
-    BitwiseAnd,
     BitwiseOr,
+    BitwiseAnd,
     BitwiseXor,
-    BitwiseNot,
+    BitwiseOrNot,
+    Add,
+    Subtract,
     Integer(IBig),
     Variable(String),
 }
@@ -37,14 +37,17 @@ pub enum RPNKind {
 impl RPNKind {
     fn properties(&self) -> (u32, Associativity) {
         match *self {
-            Self::UnaryPlus | Self::UnaryMinus | Self::BitwiseNot => (2, Associativity::Right),
-            Self::Multiply | Self::Divide | Self::Modulo => (3, Associativity::Left),
-            Self::Add | Self::Subtract => (4, Associativity::Left),
-            Self::ShiftLeft | Self::ShiftRight => (5, Associativity::Left),
-            Self::BitwiseAnd => (8, Associativity::Left),
-            Self::BitwiseXor => (9, Associativity::Left),
-            Self::BitwiseOr => (10, Associativity::Left),
-            _ => (0, Associativity::Left),
+            Self::UnaryMinus | Self::BitwiseNot => (2, Associativity::Right),
+            Self::Multiply | Self::Divide | Self::Modulo | Self::ShiftLeft | Self::ShiftRight => {
+                (3, Associativity::Left)
+            }
+            Self::BitwiseOr | Self::BitwiseAnd | Self::BitwiseXor | Self::BitwiseOrNot => {
+                (4, Associativity::Left)
+            }
+            Self::Add | Self::Subtract => (5, Associativity::Left),
+            Self::LParenthesis | Self::RParenthesis | Self::Integer(_) | Self::Variable(_) => {
+                panic!("Invalid token encountered")
+            }
         }
     }
 
@@ -65,20 +68,23 @@ impl TryFrom<&Token<'_>> for RPNKind {
             TokenKind::LParenthesis => Ok(Self::LParenthesis),
             TokenKind::RParenthesis => Ok(Self::RParenthesis),
 
-            TokenKind::Plus => Ok(Self::Add),
-            TokenKind::Minus => Ok(Self::Subtract),
+            TokenKind::Tilde => Ok(Self::BitwiseNot),
             TokenKind::Asterisk => Ok(Self::Multiply),
             TokenKind::Slash => Ok(Self::Divide),
             TokenKind::Percent => Ok(Self::Modulo),
             TokenKind::ShiftLeft => Ok(Self::ShiftLeft),
             TokenKind::ShiftRight => Ok(Self::ShiftRight),
-            TokenKind::Ampersand => Ok(Self::BitwiseAnd),
             TokenKind::Pipe => Ok(Self::BitwiseOr),
+            TokenKind::Ampersand => Ok(Self::BitwiseAnd),
             TokenKind::Caret => Ok(Self::BitwiseXor),
-            TokenKind::Tilde => Ok(Self::BitwiseNot),
+            TokenKind::Exclamation => Ok(Self::BitwiseOrNot),
+            TokenKind::Plus => Ok(Self::Add),
+            TokenKind::Minus => Ok(Self::Subtract),
+
             TokenKind::IntLiteral(_, _, val) => Ok(Self::Integer(val.clone())),
             TokenKind::ChrLiteral(_, c) => Ok(Self::Integer((*c as u32).into())),
             TokenKind::Symbol(name) => Ok(Self::Variable((*name).into())),
+
             _ => Err(AssemblerError::from_token(
                 "Invalid token encountered".into(),
                 token,
@@ -115,24 +121,7 @@ impl<'a> Expression<'a> {
             match &rpn.kind {
                 RPNKind::Integer(val) => stack.push(val.clone()),
                 RPNKind::Variable(name) => stack.push(resolve(&name)?.clone()),
-                RPNKind::UnaryPlus => {
-                    let a = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for +.".into(),
-                        &rpn.token,
-                    ))?;
-                    stack.push(a);
-                }
-                RPNKind::Add => {
-                    let a = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for +.".into(),
-                        &rpn.token,
-                    ))?;
-                    let b = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for +.".into(),
-                        &rpn.token,
-                    ))?;
-                    stack.push(a + b);
-                }
+
                 RPNKind::UnaryMinus => {
                     let a = stack.pop().ok_or(AssemblerError::from_token(
                         "Not enough operands for -.".into(),
@@ -140,16 +129,12 @@ impl<'a> Expression<'a> {
                     ))?;
                     stack.push(-a);
                 }
-                RPNKind::Subtract => {
+                RPNKind::BitwiseNot => {
                     let a = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for -.".into(),
+                        "Not enough operands for ~.".into(),
                         &rpn.token,
                     ))?;
-                    let b = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for -.".into(),
-                        &rpn.token,
-                    ))?;
-                    stack.push(b - a);
+                    stack.push(!a);
                 }
                 RPNKind::Multiply => {
                     let a = stack.pop().ok_or(AssemblerError::from_token(
@@ -196,16 +181,45 @@ impl<'a> Expression<'a> {
                     }
                     stack.push(b % a);
                 }
-                RPNKind::BitwiseAnd => {
+                RPNKind::ShiftLeft => {
                     let a = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for &.".into(),
+                        format!("Not enough operands for {}.", "<".repeat(rpn.token.width)),
                         &rpn.token,
                     ))?;
                     let b = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for &.".into(),
+                        format!("Not enough operands for {}.", "<".repeat(rpn.token.width)),
                         &rpn.token,
                     ))?;
-                    stack.push(b & a);
+                    // represented as b << a
+                    // Will panic if a is too large
+                    stack.push(
+                        b << usize::try_from(&a).map_err(|e| {
+                            AssemblerError::from_token(
+                                "Shift amount is too large.".into(),
+                                &rpn.token,
+                            )
+                        })?,
+                    );
+                }
+                RPNKind::ShiftRight => {
+                    let a = stack.pop().ok_or(AssemblerError::from_token(
+                        format!("Not enough operands for {}.", ">".repeat(rpn.token.width)),
+                        &rpn.token,
+                    ))?;
+                    let b = stack.pop().ok_or(AssemblerError::from_token(
+                        format!("Not enough operands for {}.", ">".repeat(rpn.token.width)),
+                        &rpn.token,
+                    ))?;
+                    // represented as b >> a
+                    // Will panic if a is too large
+                    stack.push(
+                        b >> usize::try_from(&a).map_err(|e| {
+                            AssemblerError::from_token(
+                                "Shift amount is too large.".into(),
+                                &rpn.token,
+                            )
+                        })?,
+                    );
                 }
                 RPNKind::BitwiseOr => {
                     let a = stack.pop().ok_or(AssemblerError::from_token(
@@ -218,6 +232,17 @@ impl<'a> Expression<'a> {
                     ))?;
                     stack.push(b | a);
                 }
+                RPNKind::BitwiseAnd => {
+                    let a = stack.pop().ok_or(AssemblerError::from_token(
+                        "Not enough operands for &.".into(),
+                        &rpn.token,
+                    ))?;
+                    let b = stack.pop().ok_or(AssemblerError::from_token(
+                        "Not enough operands for &.".into(),
+                        &rpn.token,
+                    ))?;
+                    stack.push(b & a);
+                }
                 RPNKind::BitwiseXor => {
                     let a = stack.pop().ok_or(AssemblerError::from_token(
                         "Not enough operands for ^.".into(),
@@ -229,38 +254,38 @@ impl<'a> Expression<'a> {
                     ))?;
                     stack.push(b ^ a);
                 }
-                RPNKind::BitwiseNot => {
+                RPNKind::BitwiseOrNot => {
                     let a = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for ~.".into(),
-                        &rpn.token,
-                    ))?;
-                    stack.push(!a);
-                }
-                RPNKind::ShiftLeft => {
-                    let a = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for <<.".into(),
+                        "Not enough operands for !.".into(),
                         &rpn.token,
                     ))?;
                     let b = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for <<.".into(),
+                        "Not enough operands for !.".into(),
                         &rpn.token,
                     ))?;
-                    // represented as b << a
-                    // Will panic if a is too large
-                    stack.push(b << usize::try_from(&a).unwrap());
+                    stack.push(b | !a);
                 }
-                RPNKind::ShiftRight => {
+                RPNKind::Add => {
                     let a = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for <<.".into(),
+                        "Not enough operands for +.".into(),
                         &rpn.token,
                     ))?;
                     let b = stack.pop().ok_or(AssemblerError::from_token(
-                        "Not enough operands for <<.".into(),
+                        "Not enough operands for +.".into(),
                         &rpn.token,
                     ))?;
-                    // represented as b >> a
-                    // Will panic if a is too large
-                    stack.push(b >> usize::try_from(&a).unwrap());
+                    stack.push(a + b);
+                }
+                RPNKind::Subtract => {
+                    let a = stack.pop().ok_or(AssemblerError::from_token(
+                        "Not enough operands for -.".into(),
+                        &rpn.token,
+                    ))?;
+                    let b = stack.pop().ok_or(AssemblerError::from_token(
+                        "Not enough operands for -.".into(),
+                        &rpn.token,
+                    ))?;
+                    stack.push(b - a);
                 }
                 _ => todo!(),
             }
@@ -287,26 +312,29 @@ impl<'a> Expression<'a> {
                     output.push_back(token.try_into()?);
                     infix = true;
                 }
-                TokenKind::Plus
-                | TokenKind::Minus
-                | TokenKind::Asterisk
+                TokenKind::Tilde
                 | TokenKind::Slash
                 | TokenKind::Percent
                 | TokenKind::ShiftLeft
                 | TokenKind::ShiftRight
-                | TokenKind::Ampersand
                 | TokenKind::Pipe
+                | TokenKind::Ampersand
                 | TokenKind::Caret
-                | TokenKind::Tilde => {
-                    let o1: RPN<'a> = if token.kind == TokenKind::Minus && !infix {
-                        RPN {
-                            kind: RPNKind::UnaryMinus,
-                            token,
-                        }
-                    } else if token.kind == TokenKind::Plus && !infix {
-                        RPN {
-                            kind: RPNKind::UnaryPlus,
-                            token,
+                | TokenKind::Exclamation
+                | TokenKind::Plus
+                | TokenKind::Minus
+                | TokenKind::Asterisk => {
+                    let o1: RPN<'a> = if !infix {
+                        if token.kind == TokenKind::Minus {
+                            RPN {
+                                kind: RPNKind::UnaryMinus,
+                                token,
+                            }
+                        } else {
+                            return Err(AssemblerError::from_token(
+                                "Invalid token encountered. Expected prefix operator, found infix operator.".into(),
+                                &token,
+                            ));
                         }
                     } else {
                         token.try_into()?

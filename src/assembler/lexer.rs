@@ -10,24 +10,18 @@ pub enum TokenKind<'a> {
     RParenthesis,
 
     // Operators
-    Plus,
-    Minus,
+    Tilde,
     Asterisk,
     Slash,
     Percent,
     ShiftLeft,
     ShiftRight,
-    Ampersand,
     Pipe,
+    Ampersand,
     Caret,
-    Tilde,
-
-    GreaterThan,
-    GreaterThanEqual,
-    LessThan,
-    LessThanEqual,
-    Equal,
-    NotEqual,
+    Exclamation,
+    Plus,
+    Minus,
 
     // Literals
     IntLiteral(&'a str, u32, IBig),
@@ -160,14 +154,20 @@ impl<'a> Iterator for Lexer<'a> {
                                 width: end - i,
                             }
                         }
-                        '+' => Token {
-                            kind: TokenKind::Plus,
+                        '(' => Token {
+                            kind: TokenKind::LParenthesis,
                             line: self.line,
                             column: self.column,
                             width: 1,
                         },
-                        '-' => Token {
-                            kind: TokenKind::Minus,
+                        ')' => Token {
+                            kind: TokenKind::RParenthesis,
+                            line: self.line,
+                            column: self.column,
+                            width: 1,
+                        },
+                        '~' => Token {
+                            kind: TokenKind::Tilde,
                             line: self.line,
                             column: self.column,
                             width: 1,
@@ -191,83 +191,39 @@ impl<'a> Iterator for Lexer<'a> {
                             width: 1,
                         },
                         '<' => {
-                            if let Some((_, c)) = self.char_iter.peek() {
-                                if *c == '<' {
-                                    self.next_char();
-                                    Token {
-                                        kind: TokenKind::ShiftLeft,
-                                        line: self.line,
-                                        column: self.column,
-                                        width: 2,
-                                    }
-                                } else if *c == '=' {
-                                    self.next_char();
-                                    Token {
-                                        kind: TokenKind::LessThanEqual,
-                                        line: self.line,
-                                        column: self.column,
-                                        width: 1,
-                                    }
-                                } else {
-                                    Token {
-                                        kind: TokenKind::LessThan,
-                                        line: self.line,
-                                        column: self.column,
-                                        width: 1,
-                                    }
-                                }
-                            } else {
-                                Token {
-                                    kind: TokenKind::LessThan,
-                                    line: self.line,
-                                    column: self.column,
-                                    width: 1,
-                                }
+                            let mut width = 1;
+                            if let Some((_, '<')) = self.char_iter.peek() {
+                                width += 1;
+                                self.next_char();
+                            }
+                            Token {
+                                kind: TokenKind::ShiftLeft,
+                                line: self.line,
+                                column: self.column,
+                                width
                             }
                         }
                         '>' => {
-                            if let Some((_, c)) = self.char_iter.peek() {
-                                if *c == '>' {
-                                    self.next_char();
-                                    Token {
-                                        kind: TokenKind::ShiftRight,
-                                        line: self.line,
-                                        column: self.column,
-                                        width: 2,
-                                    }
-                                } else if *c == '=' {
-                                    self.next_char();
-                                    Token {
-                                        kind: TokenKind::GreaterThanEqual,
-                                        line: self.line,
-                                        column: self.column,
-                                        width: 2,
-                                    }
-                                } else {
-                                    Token {
-                                        kind: TokenKind::GreaterThan,
-                                        line: self.line,
-                                        column: self.column,
-                                        width: 1,
-                                    }
-                                }
-                            } else {
-                                Token {
-                                    kind: TokenKind::GreaterThan,
-                                    line: self.line,
-                                    column: self.column,
-                                    width: 1,
-                                }
+                            let mut width = 1;
+                            if let Some((_, '>')) = self.char_iter.peek() {
+                                width += 1;
+                                self.next_char();
+                            }
+                            Token {
+                                kind: TokenKind::ShiftRight,
+                                line: self.line,
+                                column: self.column,
+                                width
                             }
                         }
-                        '&' => Token {
-                            kind: TokenKind::Ampersand,
+                        '|' => Token {
+                            kind: TokenKind::Pipe,
                             line: self.line,
                             column: self.column,
                             width: 1,
                         },
-                        '|' => Token {
-                            kind: TokenKind::Pipe,
+                        '&' => Token {
+                            kind: TokenKind::Ampersand,
                             line: self.line,
                             column: self.column,
                             width: 1,
@@ -278,20 +234,20 @@ impl<'a> Iterator for Lexer<'a> {
                             column: self.column,
                             width: 1,
                         },
-                        '~' => Token {
-                            kind: TokenKind::Tilde,
+                        '!' => Token {
+                            kind: TokenKind::Exclamation,
                             line: self.line,
                             column: self.column,
                             width: 1,
                         },
-                        '(' => Token {
-                            kind: TokenKind::LParenthesis,
+                        '+' => Token {
+                            kind: TokenKind::Plus,
                             line: self.line,
                             column: self.column,
                             width: 1,
                         },
-                        ')' => Token {
-                            kind: TokenKind::RParenthesis,
+                        '-' => Token {
+                            kind: TokenKind::Minus,
                             line: self.line,
                             column: self.column,
                             width: 1,
