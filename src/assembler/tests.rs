@@ -77,6 +77,8 @@ fn test_randomized_instructions() {
     let seed = [42u8; 32];
     let mut rng = StdRng::from_seed(seed);
 
+    let mut errors_panic = "".to_string();
+
     for i in 0..100 {
         let mut program = String::from(".text\n");
         let num_instructions = rng.random_range(5..20);
@@ -89,10 +91,11 @@ fn test_randomized_instructions() {
         match assemble(&program) {
             Ok(_) => {}
             Err(errors) => {
-                println!("Test {}: Program failed to assemble:", i);
-                println!("{}", program);
-                for (i, error) in errors.iter().take(3).enumerate() {
-                    println!(
+                writeln!(errors_panic, "Test {}: Program failed to assemble:", i).unwrap();
+                writeln!(errors_panic, "{}", program).unwrap();
+                for (i, error) in errors.iter().enumerate() {
+                    writeln!(
+                        errors_panic,
                         "Error {}: on line {}, col {}: {}",
                         i + 1,
                         error.line_number,
@@ -102,6 +105,10 @@ fn test_randomized_instructions() {
                 }
             }
         }
+    }
+
+    if !errors_panic.is_empty() {
+        panic!("{}", errors_panic);
     }
 }
 
@@ -113,6 +120,8 @@ fn test_randomized_data_section() {
 
     let seed = [43u8; 32];
     let mut rng = StdRng::from_seed(seed);
+
+    let mut errors_panic = "".to_string();
 
     for i in 0..50 {
         let mut program = String::from(".data\n");
@@ -143,10 +152,33 @@ fn test_randomized_data_section() {
         writeln!(program, "ADD x3, x1, x2").unwrap();
 
         let result = assemble(&program);
-        if result.is_err() {
-            println!("Test {}: Program with data section failed to assemble:", i);
-            println!("{}", program);
+        match result {
+            Ok(_) => {}
+            Err(errors) => {
+                writeln!(
+                    errors_panic,
+                    "Test {}: Program with data section failed to assemble:",
+                    i
+                )
+                .unwrap();
+                writeln!(errors_panic, "{}", program).unwrap();
+                for (i, error) in errors.iter().enumerate() {
+                    writeln!(
+                        errors_panic,
+                        "Error {}: on line {}, col {}: {}",
+                        i + 1,
+                        error.line_number,
+                        error.column,
+                        error.error_message
+                    )
+                    .unwrap();
+                }
+            }
         }
+    }
+
+    if !errors_panic.is_empty() {
+        panic!("{}", errors_panic);
     }
 }
 
@@ -158,6 +190,8 @@ fn test_randomized_branches() {
 
     let seed = [44u8; 32];
     let mut rng = StdRng::from_seed(seed);
+
+    let mut errors_panic = "".to_string();
 
     for i in 0..50 {
         let mut program = String::from(".text\n");
@@ -204,10 +238,28 @@ fn test_randomized_branches() {
         }
 
         let result = assemble(&program);
-        if result.is_err() {
-            println!("Test {}: Branch program failed to assemble:", i);
-            println!("{}", program);
-            // we log the results for manual looking
+        match result {
+            Ok(_) => {}
+            Err(errors) => {
+                writeln!(
+                    errors_panic,
+                    "Test {}: Branch program failed to assemble:",
+                    i
+                )
+                .unwrap();
+                writeln!(errors_panic, "{}", program).unwrap();
+                for (i, error) in errors.iter().enumerate() {
+                    writeln!(
+                        errors_panic,
+                        "Error {}: on line {}, col {}: {}",
+                        i + 1,
+                        error.line_number,
+                        error.column,
+                        error.error_message
+                    )
+                    .unwrap();
+                }
+            }
         }
     }
 }
@@ -311,6 +363,25 @@ fn test_large_word() {
             i
         );
     }
+}
+
+#[test]
+fn test_directive_equ() {
+    let program = ".equ value, 42 << 1";
+    let assembled_program = assemble(program).unwrap_or_else(|errors| {
+        for error in errors {
+            panic!(
+                "Assembly Error on line {}, column {}: {}",
+                error.line_number, error.column, error.error_message
+            );
+        }
+        panic!("Assembly failed");
+    });
+
+    assert_eq!(
+        assembled_program.data_labels.get("value").unwrap(),
+        &(42 << 1)
+    );
 }
 
 #[test]
