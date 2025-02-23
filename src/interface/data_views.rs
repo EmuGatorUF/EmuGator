@@ -52,12 +52,6 @@ pub fn DataView(assembled_program: Signal<Option<AssembledProgram>>) -> Element 
 
                 div { class: "bg-white rounded shadow-sm p-2",
                     table { class: "w-full font-mono text-gray-800 font-bold",    
-                        thead {
-                            tr {class: "text-xs",
-                                th{class: "text-left", scope: "row", colspan: "1", " Address"}
-                                th{scope: "row", colspan: "2", "Hex"}
-                            }
-                        }
                         tbody {
                             for i in 0..total_quad_words {
                                 {
