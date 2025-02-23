@@ -330,6 +330,8 @@ impl<'a> Expression<'a> {
                                 kind: RPNKind::UnaryMinus,
                                 token,
                             }
+                        } else if token.kind == TokenKind::Tilde {
+                            token.try_into()?
                         } else {
                             return Err(AssemblerError::from_token(
                                 "Invalid token encountered. Expected prefix operator, found infix operator.".into(),
