@@ -1,6 +1,12 @@
 use crate::assembler::{AssembledProgram, Section};
 use dioxus::prelude::*;
 
+#[derive(PartialEq, Clone, Copy)]
+pub enum DataViewType {
+    Hex,
+    Chars,
+}
+
 #[component]
 #[allow(non_snake_case)]
 pub fn DataView(assembled_program: Signal<Option<AssembledProgram>>) -> Element {
@@ -21,23 +27,35 @@ pub fn DataView(assembled_program: Signal<Option<AssembledProgram>>) -> Element 
 
     // changed this to fix a bug where partial words did not show in data view
     let total_quad_words = (data_memory.len() + 15) / 16;
+    let mut view_type = use_signal(|| DataViewType::Hex);
 
     rsx! {
         div { class: "h-full overflow-hidden",
             div { class: "h-full overflow-auto pr-2",
+
+                // Data type view selector buttons
+                div { class: "flex gap-4 mb-2 flex-shrink-0",
+                    button {
+                        class: "text-lg font-mono font-bold text-gray-900 hover:text-gray-700 transition-colors",
+                        style: if *view_type.read() == DataViewType::Hex { "text-decoration: underline" } else { "" },
+                        onclick: move |_| view_type.set(DataViewType::Hex),
+                        "Hex"
+                    }
+                    span { class: "text-lg font-mono font-bold text-gray-900", "/" }
+                    button {
+                        class: "text-lg font-mono font-bold text-gray-900 hover:text-gray-700 transition-colors",
+                        style: if *view_type.read() == DataViewType::Chars { "text-decoration: underline" } else { "" },
+                        onclick: move |_| view_type.set(DataViewType::Chars),
+                        "Char"
+                    }
+                }
+
                 div { class: "bg-white rounded shadow-sm p-2",
                     table { class: "w-full font-mono text-gray-800 font-bold",    
                         thead {
-                            tr {class: "bg-gray-300",
-                                th{class: "text-left", scope: "row", colspan: "1", "Address"}
-                                th{scope: "row", colspan: "4", "Hex"}
-                            }
-                            tr {
-                                td{""}
-                                td{class: "text-gray-500", "+ 0x0"}
-                                td{class: "text-gray-500", "+ 0x4"}
-                                td{class: "text-gray-500", "+ 0x8"}
-                                td{class: "text-gray-500", "+ 0xc"}
+                            tr {class: "text-xs",
+                                th{class: "text-left", scope: "row", colspan: "1", " Address"}
+                                th{scope: "row", colspan: "2", "Hex"}
                             }
                         }
                         tbody {
@@ -45,23 +63,35 @@ pub fn DataView(assembled_program: Signal<Option<AssembledProgram>>) -> Element 
                                 {
                                     let base_addr = data_start + i * 16;
                                     {
-                                        let mut words: [u32; 4] = [0,0,0,0];
-                                        for i in 0..4{
-                                            words[i] = (data_memory.get(&((base_addr + i*4) as u32)).copied().unwrap_or(0) as u32)
-                                            | ((data_memory.get(&((base_addr + i*4 + 1) as u32)).copied().unwrap_or(0) as u32)
-                                                << 8)
-                                            | ((data_memory.get(&((base_addr + i*4 + 2) as u32)).copied().unwrap_or(0) as u32)
-                                                << 16)
-                                            | ((data_memory.get(&((base_addr + i*4 + 3) as u32)).copied().unwrap_or(0) as u32)
-                                                << 24);
+                                        let mut dw_bytes: [u8; 16] = [0; 16];
+                                        let mut dw_string1 = String::new();
+                                        let mut dw_string2 = String::new();
+                                        for j in 0..16{
+                                            dw_bytes[j] = (data_memory.get(&((base_addr + j) as u32)).copied().unwrap_or(0) as u8);
                                         }
-                                        rsx!{
+                                        match *view_type.read(){
+                                            DataViewType::Hex => {
+                                                dw_string1 = format!("{:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}", dw_bytes[0], dw_bytes[1], 
+                                                    dw_bytes[2], dw_bytes[3], dw_bytes[4], dw_bytes[5], dw_bytes[6], dw_bytes[7]);
+                                                dw_string2 = format!("{:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}", dw_bytes[8], dw_bytes[9], 
+                                                    dw_bytes[10], dw_bytes[11], dw_bytes[12], dw_bytes[13], dw_bytes[14], dw_bytes[15]);
+                                            },
+                                            DataViewType::Chars => {
+                                                // replace invalid characters with '.'
+                                                for j in 0..16 {
+                                                    if dw_bytes[j] < 0x21 || dw_bytes[j] > 0x7e {
+                                                        dw_bytes[j] = b'.';
+                                                    }
+                                                }
+                                                dw_string1 = String::from_utf8_lossy(&dw_bytes[0..8]).to_string();
+                                                dw_string2 = String::from_utf8_lossy(&dw_bytes[8..16]).to_string();
+                                            }
+                                        }
+                                            rsx!{
                                             tr {padding: "20px",
-                                                td{class: "flex-1 text-gray-500", "0x{base_addr:04x}:"}
-                                                td{class: "flex-1", "0{words[0]:08x}"}
-                                                td{class: "flex-1", "0{words[1]:08x}"}
-                                                td{class: "flex-1", "0{words[2]:08x}"}
-                                                td{class: "flex-1", "0{words[3]:08x}"}
+                                                td{class: "flex-1 text-gray-500 text-xs", "0x{base_addr:04x}:"}
+                                                td{class: "flex-1", "{dw_string1}"}
+                                                td{class: "flex-1", "{dw_string2}"}
                                             }
                                         }
                                     }
