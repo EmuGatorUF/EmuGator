@@ -7,7 +7,7 @@ mod tests;
 use crate::assembler::AssembledProgram;
 use crate::isa::Instruction;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     ops::{Index, IndexMut},
 };
 
@@ -75,6 +75,39 @@ fn rw_memory(
     } else {
         return Err(());
     }
+}
+
+pub fn clock_until_break(
+    org_state: &EmulatorState,
+    program: &mut AssembledProgram,
+    breakpoints: &BTreeSet<usize>,
+) -> EmulatorState {
+    let mut state = org_state.clone();
+    let mut num_cycles = 0;
+
+    loop {
+        state = clock(&state, program);
+
+        let hit_breakpoint =
+            if let Some(line_num) = program.source_map.get_by_left(&state.pipeline.IF_pc) {
+                breakpoints.contains(line_num)
+            } else {
+                false
+            };
+        let hit_ebreak = state.pipeline.datapath.debug_req_i;
+
+        if hit_ebreak || hit_breakpoint {
+            state.pipeline.datapath.debug_req_i = false;
+            break;
+        }
+
+        // max 1000 cycles until we can move this to a web worker
+        num_cycles += 1;
+        if num_cycles > 1000 {
+            break;
+        }
+    }
+    state
 }
 
 pub fn clock(org_state: &EmulatorState, program: &mut AssembledProgram) -> EmulatorState {

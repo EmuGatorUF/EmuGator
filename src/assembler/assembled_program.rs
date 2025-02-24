@@ -1,7 +1,10 @@
 use bimap::BiBTreeMap;
 use ibig::IBig;
 use std::{
-    collections::{BTreeMap, HashMap}, ops::Add, path::Display, str::FromStr
+    collections::{BTreeMap, HashMap},
+    ops::Add,
+    path::Display,
+    str::FromStr,
 };
 
 #[derive(Debug)]
@@ -12,7 +15,7 @@ pub struct AssembledProgram {
     /// Map of data memory addresses to data bytes
     pub data_memory: BTreeMap<u32, u8>,
 
-    /// Map of line numbers (left) to instruction addresses (right)
+    /// Map of instruction addresses (left) to line numbers (right)
     pub source_map: BiBTreeMap<u32, usize>,
 
     /// Map of instruction labels to addresses

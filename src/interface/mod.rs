@@ -81,6 +81,7 @@ pub fn App() -> Element {
                     assembler_errors,
                     emulator_state,
                     uart_module,
+                    breakpoints,
                 }
                 if assembled_program.read().is_some() {
                     div { class: "flex-1 relative overflow-hidden",

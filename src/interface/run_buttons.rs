@@ -4,6 +4,7 @@ use crate::uart::{LineStatusRegisterBitMask, Uart, trigger_uart};
 
 use dioxus::prelude::*;
 use dioxus_logger::tracing::info;
+use std::collections::BTreeSet;
 use std::ops::Deref;
 
 #[component]
@@ -14,6 +15,7 @@ pub fn RunButtons(
     assembler_errors: Signal<Vec<AssemblerError>>,
     emulator_state: Signal<EmulatorState>,
     uart_module: Signal<Uart>,
+    breakpoints: ReadOnlySignal<BTreeSet<usize>>,
 ) -> Element {
     rsx! {
         // bottom margin
@@ -33,7 +35,13 @@ pub fn RunButtons(
                             let mut assembled = assembled;
                             assembled.data_memory.insert(uart_module.read().rx_buffer_address, 0);
                             assembled.data_memory.insert(uart_module.read().tx_buffer_address, 0);
-                            assembled.data_memory.insert(uart_module.read().lsr_address, LineStatusRegisterBitMask::TransmitReady as u8 | LineStatusRegisterBitMask::ReceiveReady as u8);
+                            assembled
+                                .data_memory
+                                .insert(
+                                    uart_module.read().lsr_address,
+                                    LineStatusRegisterBitMask::TransmitReady as u8
+                                        | LineStatusRegisterBitMask::ReceiveReady as u8,
+                                );
                             assembled_program.set(Some(assembled));
                             assembler_errors.set(Vec::new());
                         }
@@ -69,19 +77,17 @@ pub fn RunButtons(
                     class: "bg-purple-500 hover:bg-purple-600 text-s text-white font-bold py-1 px-2 rounded",
                     onclick: move |_| {
                         if let Some(mut program) = assembled_program.as_mut() {
-                            let new_state = emulator::clock(
+                            let new_state = emulator::clock_until_break(
                                 emulator_state.read().deref(),
                                 &mut *program,
+                                breakpoints.read().deref(),
                             );
                             *(emulator_state.write()) = new_state;
-                            while !emulator_state.read().deref().pipeline.datapath.debug_req_i && !emulator_state.read().deref().pipeline.datapath.instr_err_i {
-                                let new_state = emulator::clock(
-                                    emulator_state.read().deref(),
-                                    &mut *program,
-                                );
-                                *(emulator_state.write()) = new_state;
-                                println!("Clock");
-                            }
+                            let new_uart = trigger_uart(
+                                uart_module.read().deref().clone(),
+                                &mut program.data_memory,
+                            );
+                            *(uart_module.write()) = new_uart;
                         }
                     },
                     "Run to Break"
