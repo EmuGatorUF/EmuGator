@@ -67,19 +67,18 @@ pub struct CVE2Datapath {
 
     // Extra internal lines not in the top module
     // decoded instruction
-    pub reg_a: u8,
-    pub reg_b: u8,
+    pub reg_s1: u8,
+    pub reg_s2: u8,
     pub imm: Option<u32>,
     pub reg_d: u8,
 
     // intermediate data
-    pub data_a: u32,
-    pub data_b: u32,
-    pub op_a: Option<u32>,    // Operand A input.
-    pub op_b: Option<u32>,    // Operand B input.
-    pub alu_out: Option<u32>, // ALU output.
-    pub lsu_out: Option<u32>, // Load/Store Unit output.
-    pub csr_out: Option<u32>, // Control and Status Register output.
+    pub data_s1: u32,
+    pub data_s2: u32,
+    pub alu_op_a: Option<u32>, // Operand A input.
+    pub alu_op_b: Option<u32>, // Operand B input.
+    pub alu_out: Option<u32>,  // ALU output.
+    pub lsu_out: Option<u32>,  // Load/Store Unit output.
     pub reg_write_data: Option<u32>,
 }
 
@@ -98,31 +97,93 @@ impl CVE2Datapath {
 /// Note: `Option::None` is used to represent a "don't care" value.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct CVE2Control {
-    pub op_a_sel: Option<OpASel>, // Mux control for selecting operand A.
-    pub op_b_sel: Option<OpBSel>, // Mux control for selecting operand B.
-    pub alu_op: Option<ALUOp>,    // ALU operation control.
+    // ALU Control
+    pub alu_op_a_sel: Option<OpASel>, // Mux control for selecting operand A.
+    pub alu_op_b_sel: Option<OpBSel>, // Mux control for selecting operand B.
+    pub alu_op: Option<ALUOp>,        // ALU operation control.
+
+    // LSU Control
+    pub lsu_data_type: Option<LSUDataType>, // Data type for load/store operations.
+    pub lsu_request: bool,                  // Request signal for the LSU.
+    pub lsu_write_enable: bool,             // Write enable for the LSU.
+    pub lsu_sign_ext: bool,                 // Sign extension control for load operations.
+
+    // Register Write Control
     pub data_dest_sel: Option<DataDestSel>, // Mux control for selecting the write-back data.
-    pub reg_write: bool,          // Register write control.
+    pub reg_write: bool,                    // Register write control.
 }
 
 impl CVE2Control {
     pub fn register(op: ALUOp) -> Self {
         Self {
-            op_a_sel: Some(OpASel::RF),
-            op_b_sel: Some(OpBSel::RF),
+            alu_op_a_sel: Some(OpASel::RF),
+            alu_op_b_sel: Some(OpBSel::RF),
             alu_op: Some(op),
             data_dest_sel: Some(DataDestSel::ALU),
             reg_write: true,
+            ..Default::default()
         }
     }
 
     pub fn immediate(op: ALUOp) -> Self {
         Self {
-            op_a_sel: Some(OpASel::RF),
-            op_b_sel: Some(OpBSel::IMM),
+            alu_op_a_sel: Some(OpASel::RF),
+            alu_op_b_sel: Some(OpBSel::IMM),
             alu_op: Some(op),
             data_dest_sel: Some(DataDestSel::ALU),
             reg_write: true,
+            ..Default::default()
+        }
+    }
+
+    pub fn load_request(data_type: LSUDataType) -> Self {
+        Self {
+            // address calculation
+            alu_op_a_sel: Some(OpASel::RF),
+            alu_op_b_sel: Some(OpBSel::IMM),
+            alu_op: Some(ALUOp::ADD),
+
+            // lsu inputs
+            lsu_data_type: Some(data_type),
+            lsu_request: true,
+            lsu_write_enable: false,
+
+            ..Default::default()
+        }
+    }
+
+    pub fn load_write(data_type: LSUDataType, sign_ext: bool) -> Self {
+        Self {
+            // lsu inputs
+            lsu_data_type: Some(data_type),
+            lsu_sign_ext: sign_ext,
+
+            // register write
+            data_dest_sel: Some(DataDestSel::LSU),
+            reg_write: true,
+            ..Default::default()
+        }
+    }
+
+    pub fn store_request(data_type: LSUDataType) -> Self {
+        Self {
+            // address calculation
+            alu_op_a_sel: Some(OpASel::RF),
+            alu_op_b_sel: Some(OpBSel::IMM),
+            alu_op: Some(ALUOp::ADD),
+
+            // lsu inputs
+            lsu_data_type: Some(data_type),
+            lsu_request: true,
+            lsu_write_enable: true,
+
+            ..Default::default()
+        }
+    }
+
+    pub fn store_completion() -> Self {
+        Self {
+            ..Default::default()
         }
     }
 }
@@ -148,7 +209,6 @@ pub enum ALUOp {
 pub enum OpASel {
     PC,
     RF,
-    IMM,
 }
 
 #[allow(dead_code)]
@@ -163,7 +223,33 @@ pub enum OpBSel {
 #[repr(u32)]
 #[derive(Copy, Clone, Debug)]
 pub enum DataDestSel {
-    LSU,
-    CSR,
     ALU,
+    LSU,
+}
+
+#[allow(dead_code)]
+#[repr(u32)]
+#[derive(Copy, Clone, Debug)]
+pub enum LSUDataType {
+    Word,
+    HalfWord,
+    Byte,
+}
+
+impl LSUDataType {
+    pub fn byte_enable(&self) -> [bool; 4] {
+        match self {
+            LSUDataType::Word => [true; 4],
+            LSUDataType::HalfWord => [true, true, false, false],
+            LSUDataType::Byte => [true, false, false, false],
+        }
+    }
+
+    pub fn size_in_bits(&self) -> usize {
+        match self {
+            LSUDataType::Word => 32,
+            LSUDataType::HalfWord => 16,
+            LSUDataType::Byte => 8,
+        }
+    }
 }

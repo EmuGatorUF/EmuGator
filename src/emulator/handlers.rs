@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use super::pipeline::{ALUOp, CVE2Control, DataDestSel, OpASel, OpBSel};
+use super::pipeline::{ALUOp, CVE2Control, LSUDataType};
 use super::{EmulatorState, InstructionHandler};
 use crate::isa::Instruction;
 use crate::{bitmask, bits};
@@ -270,206 +270,97 @@ fn BGEU(instr: &Instruction, state: &mut EmulatorState) {
     }
 }
 
-fn LB(instr: &Instruction, state: &mut EmulatorState) {
+fn LB(_instr: &Instruction, state: &mut EmulatorState) {
     if state.pipeline.datapath.id_multicycle == 0 {
-        let address: u32 =
-            (state.x[instr.rs1() as usize] as i32 + instr.immediate().unwrap()) as u32;
-
-        // set data on pipline
-        let byte_enable = [true, false, false, false];
-        state.pipeline.datapath.data_req_o = true;
-        state.pipeline.datapath.data_addr_o = address;
-        state.pipeline.datapath.data_we_o = false;
-        state.pipeline.datapath.data_be_o = byte_enable;
+        state.pipeline.control = CVE2Control::load_request(LSUDataType::Byte);
         state.pipeline.datapath.id_multicycle = 1;
         state.pipeline.datapath.fetch_enable_i = false;
     } else {
-        let read_value = state.pipeline.datapath.data_rdata_i;
-        state.x[instr.rd() as usize] = bitmask!(31;8) * bits!(read_value, 7) | read_value;
-
-        state.pipeline.datapath.data_req_o = false;
-        state.pipeline.datapath.data_addr_o = 0;
-        state.pipeline.datapath.data_we_o = false;
-        state.pipeline.datapath.data_be_o = [false; 4];
+        state.pipeline.control = CVE2Control::load_write(LSUDataType::Byte, true);
         state.pipeline.datapath.id_multicycle = 0;
         state.pipeline.datapath.fetch_enable_i = true;
     }
 }
 
-fn LH(instr: &Instruction, state: &mut EmulatorState) {
+fn LH(_instr: &Instruction, state: &mut EmulatorState) {
     if state.pipeline.datapath.id_multicycle == 0 {
-        let address: u32 =
-            (state.x[instr.rs1() as usize] as i32 + instr.immediate().unwrap()) as u32;
-
-        // set data on pipline
-        let byte_enable = [true, true, false, false];
-        state.pipeline.datapath.data_req_o = true;
-        state.pipeline.datapath.data_addr_o = address;
-        state.pipeline.datapath.data_we_o = false;
-        state.pipeline.datapath.data_be_o = byte_enable;
+        state.pipeline.control = CVE2Control::load_request(LSUDataType::HalfWord);
         state.pipeline.datapath.id_multicycle = 1;
         state.pipeline.datapath.fetch_enable_i = false;
     } else {
-        let read_value = state.pipeline.datapath.data_rdata_i;
-        state.x[instr.rd() as usize] = bitmask!(31;16) * bits!(read_value, 15) | read_value;
-
-        state.pipeline.datapath.data_req_o = false;
-        state.pipeline.datapath.data_addr_o = 0;
-        state.pipeline.datapath.data_we_o = false;
-        state.pipeline.datapath.data_be_o = [false; 4];
+        state.pipeline.control = CVE2Control::load_write(LSUDataType::HalfWord, true);
         state.pipeline.datapath.id_multicycle = 0;
         state.pipeline.datapath.fetch_enable_i = true;
     }
 }
 
-fn LW(instr: &Instruction, state: &mut EmulatorState) {
+fn LW(_instr: &Instruction, state: &mut EmulatorState) {
     if state.pipeline.datapath.id_multicycle == 0 {
-        let address: u32 =
-            (state.x[instr.rs1() as usize] as i32 + instr.immediate().unwrap()) as u32;
-
-        // set data on pipline
-        let byte_enable = [true, true, true, true];
-        state.pipeline.datapath.data_req_o = true;
-        state.pipeline.datapath.data_addr_o = address;
-        state.pipeline.datapath.data_we_o = false;
-        state.pipeline.datapath.data_be_o = byte_enable;
+        state.pipeline.control = CVE2Control::load_request(LSUDataType::Word);
         state.pipeline.datapath.id_multicycle = 1;
         state.pipeline.datapath.fetch_enable_i = false;
     } else {
-        let read_value = state.pipeline.datapath.data_rdata_i;
-
-        state.pipeline.datapath.data_req_o = false;
-        state.pipeline.datapath.data_addr_o = 0;
-        state.pipeline.datapath.data_we_o = false;
-        state.pipeline.datapath.data_be_o = [false; 4];
-        state.x[instr.rd() as usize] = read_value;
+        state.pipeline.control = CVE2Control::load_write(LSUDataType::Word, false);
         state.pipeline.datapath.id_multicycle = 0;
         state.pipeline.datapath.fetch_enable_i = true;
     }
 }
 
-fn LBU(instr: &Instruction, state: &mut EmulatorState) {
+fn LBU(_instr: &Instruction, state: &mut EmulatorState) {
     if state.pipeline.datapath.id_multicycle == 0 {
-        let address: u32 =
-            (state.x[instr.rs1() as usize] as i32 + instr.immediate().unwrap()) as u32;
-
-        // set data on pipline
-        let byte_enable = [true, false, false, false];
-        state.pipeline.datapath.data_req_o = true;
-        state.pipeline.datapath.data_addr_o = address;
-        state.pipeline.datapath.data_we_o = false;
-        state.pipeline.datapath.data_be_o = byte_enable;
+        state.pipeline.control = CVE2Control::load_request(LSUDataType::Byte);
         state.pipeline.datapath.id_multicycle = 1;
         state.pipeline.datapath.fetch_enable_i = false;
     } else {
-        let read_value = state.pipeline.datapath.data_rdata_i;
-
-        state.pipeline.datapath.data_req_o = false;
-        state.pipeline.datapath.data_addr_o = 0;
-        state.pipeline.datapath.data_we_o = false;
-        state.pipeline.datapath.data_be_o = [false; 4];
-        state.x[instr.rd() as usize] = read_value;
+        state.pipeline.control = CVE2Control::load_write(LSUDataType::Byte, false);
         state.pipeline.datapath.id_multicycle = 0;
         state.pipeline.datapath.fetch_enable_i = true;
     }
 }
 
-fn LHU(instr: &Instruction, state: &mut EmulatorState) {
+fn LHU(_instr: &Instruction, state: &mut EmulatorState) {
     if state.pipeline.datapath.id_multicycle == 0 {
-        let address: u32 =
-            (state.x[instr.rs1() as usize] as i32 + instr.immediate().unwrap()) as u32;
-
-        // set data on pipline
-        let byte_enable = [true, true, false, false];
-        state.pipeline.datapath.data_req_o = true;
-        state.pipeline.datapath.data_addr_o = address;
-        state.pipeline.datapath.data_we_o = false;
-        state.pipeline.datapath.data_be_o = byte_enable;
+        state.pipeline.control = CVE2Control::load_request(LSUDataType::HalfWord);
         state.pipeline.datapath.id_multicycle = 1;
         state.pipeline.datapath.fetch_enable_i = false;
     } else {
-        let read_value = state.pipeline.datapath.data_rdata_i;
-
-        state.pipeline.datapath.data_req_o = false;
-        state.pipeline.datapath.data_addr_o = 0;
-        state.pipeline.datapath.data_we_o = false;
-        state.pipeline.datapath.data_be_o = [false; 4];
-        state.x[instr.rd() as usize] = read_value;
+        state.pipeline.control = CVE2Control::load_write(LSUDataType::HalfWord, false);
         state.pipeline.datapath.id_multicycle = 0;
         state.pipeline.datapath.fetch_enable_i = true;
     }
 }
 
-fn SB(instr: &Instruction, state: &mut EmulatorState) {
+fn SB(_instr: &Instruction, state: &mut EmulatorState) {
     if state.pipeline.datapath.id_multicycle == 0 {
-        let data = state.x[instr.rs2() as usize];
-        let address: u32 =
-            (state.x[instr.rs1() as usize] as i32 + instr.immediate().unwrap()) as u32;
-
-        // set data on pipline
-        state.pipeline.datapath.data_req_o = true;
-        state.pipeline.datapath.data_addr_o = address;
-        state.pipeline.datapath.data_we_o = true;
-        state.pipeline.datapath.data_be_o = [true, false, false, false]; // access LSB only
-        state.pipeline.datapath.data_wdata_o = data;
+        state.pipeline.control = CVE2Control::store_request(LSUDataType::Byte);
         state.pipeline.datapath.id_multicycle = 1;
         state.pipeline.datapath.fetch_enable_i = false;
     } else {
-        state.pipeline.datapath.data_req_o = false;
-        state.pipeline.datapath.data_addr_o = 0;
-        state.pipeline.datapath.data_we_o = false;
-        state.pipeline.datapath.data_be_o = [false; 4];
-        state.pipeline.datapath.data_wdata_o = 0;
+        state.pipeline.control = CVE2Control::store_completion();
         state.pipeline.datapath.id_multicycle = 0;
         state.pipeline.datapath.fetch_enable_i = true;
     }
 }
 
-fn SH(instr: &Instruction, state: &mut EmulatorState) {
+fn SH(_instr: &Instruction, state: &mut EmulatorState) {
     if state.pipeline.datapath.id_multicycle == 0 {
-        let data = state.x[instr.rs2() as usize];
-        let address: u32 =
-            (state.x[instr.rs1() as usize] as i32 + instr.immediate().unwrap()) as u32;
-
-        // set data on pipline
-        state.pipeline.datapath.data_req_o = true;
-        state.pipeline.datapath.data_addr_o = address;
-        state.pipeline.datapath.data_we_o = true;
-        state.pipeline.datapath.data_be_o = [true, true, false, false];
-        state.pipeline.datapath.data_wdata_o = data;
+        state.pipeline.control = CVE2Control::store_request(LSUDataType::HalfWord);
         state.pipeline.datapath.id_multicycle = 1;
         state.pipeline.datapath.fetch_enable_i = false;
     } else {
-        state.pipeline.datapath.data_req_o = false;
-        state.pipeline.datapath.data_addr_o = 0;
-        state.pipeline.datapath.data_we_o = false;
-        state.pipeline.datapath.data_be_o = [false; 4];
-        state.pipeline.datapath.data_wdata_o = 0;
+        state.pipeline.control = CVE2Control::store_completion();
         state.pipeline.datapath.id_multicycle = 0;
         state.pipeline.datapath.fetch_enable_i = true;
     }
 }
 
-fn SW(instr: &Instruction, state: &mut EmulatorState) {
+fn SW(_instr: &Instruction, state: &mut EmulatorState) {
     if state.pipeline.datapath.id_multicycle == 0 {
-        let data = state.x[instr.rs2() as usize];
-        let address: u32 =
-            (state.x[instr.rs1() as usize] as i32 + instr.immediate().unwrap()) as u32;
-
-        // set data on pipline
-        state.pipeline.datapath.data_req_o = true;
-        state.pipeline.datapath.data_addr_o = address;
-        state.pipeline.datapath.data_we_o = true;
-        state.pipeline.datapath.data_be_o = [true, true, true, true];
-        state.pipeline.datapath.data_wdata_o = data;
+        state.pipeline.control = CVE2Control::store_request(LSUDataType::Word);
         state.pipeline.datapath.id_multicycle = 1;
         state.pipeline.datapath.fetch_enable_i = false;
     } else {
-        state.pipeline.datapath.data_req_o = false;
-        state.pipeline.datapath.data_addr_o = 0;
-        state.pipeline.datapath.data_we_o = false;
-        state.pipeline.datapath.data_be_o = [false; 4];
-        state.pipeline.datapath.data_wdata_o = 0;
+        state.pipeline.control = CVE2Control::store_completion();
         state.pipeline.datapath.id_multicycle = 0;
         state.pipeline.datapath.fetch_enable_i = true;
     }
