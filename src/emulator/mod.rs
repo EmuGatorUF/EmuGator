@@ -208,6 +208,7 @@ impl CVE2Datapath {
             ALUOp::SRA => ((a as i32) >> (b & 0x1F)) as u32,
             ALUOp::SLT => ((a as i32) < (b as i32)) as u32,
             ALUOp::SLTU => (a < b) as u32,
+            ALUOp::SELB => b,
         });
     }
 

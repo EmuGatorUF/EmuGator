@@ -201,6 +201,7 @@ pub enum ALUOp {
     SRA,
     SLT,
     SLTU,
+    SELB,
 }
 
 #[allow(dead_code)]

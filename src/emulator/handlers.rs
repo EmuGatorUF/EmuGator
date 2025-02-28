@@ -63,12 +63,8 @@ pub fn get_handler(instr: Instruction) -> Result<InstructionHandler, ()> {
     }
 }
 
-fn LUI(instr: &Instruction, state: &mut EmulatorState) {
-    let rd = instr.rd() as usize;
-    // immediate should already be shifted appropriate amount by encoder
-    let immediate = instr.immediate().unwrap() as i32;
-
-    state.x[rd] = immediate as u32;
+fn LUI(_instr: &Instruction, state: &mut EmulatorState) {
+    state.pipeline.control = CVE2Control::immediate(ALUOp::SELB);
 }
 
 fn AUIPC(instr: &Instruction, state: &mut EmulatorState) {
