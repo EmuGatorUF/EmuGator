@@ -24,7 +24,7 @@ pub fn RunButtons(
                         Ok(assembled) => {
                             let mut new_state = EmulatorState::default();
                             let start_addr = assembled.get_section_start(Section::Text);
-                            new_state.pipeline.datapath.instr_addr_o = start_addr;
+                            new_state.pipeline.IF_pc = start_addr;
                             emulator_state.set(new_state);
 
                             // Setup UART with data memory addresses

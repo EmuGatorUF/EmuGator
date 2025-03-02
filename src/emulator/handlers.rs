@@ -1,9 +1,9 @@
 #![allow(non_snake_case)]
 
-use super::pipeline::{ALUOp, CVE2Control, LSUDataType};
+use super::pipeline::{ALUOp, CVE2Control, DataDestSel, LSUDataType, OpASel, OpBSel};
 use super::{EmulatorState, InstructionHandler};
+use crate::bits;
 use crate::isa::Instruction;
-use crate::{bitmask, bits};
 
 pub fn get_handler(instr: Instruction) -> Result<InstructionHandler, ()> {
     match (instr.opcode(), instr.funct3(), instr.funct7()) {
@@ -67,62 +67,36 @@ fn LUI(_instr: &Instruction, state: &mut EmulatorState) {
     state.pipeline.control = CVE2Control::immediate(ALUOp::SELB);
 }
 
-fn AUIPC(instr: &Instruction, state: &mut EmulatorState) {
-    let rd = instr.rd() as usize;
-
-    // immediate should already be shifted by the appropriate amount by encoder
-    let immediate = instr.immediate().unwrap() as i32;
-    let result = state.pipeline.ID_pc as i32 + immediate;
-
-    state.x[rd] = result as u32;
-}
-
-fn JAL(instr: &Instruction, state: &mut EmulatorState) {
-    // TODO: Push onto Return Address stack when rd = x1 or x5
-    if state.pipeline.datapath.id_multicycle == 0 {
-        let immed = (instr.immediate()).unwrap();
-        let new_pc = state.pipeline.ID_pc.checked_add_signed(immed).unwrap();
-
-        // if unaligned on 4-byte boundary
-        if new_pc & 0x00000003 != 0x00 {
-            panic!("JAL instruction immediate it not on a 4-byte boundary");
-        }
-        // stores pc+4 into rd
-        let rd = instr.rd() as usize;
-        state.x[rd] = state.pipeline.ID_pc + 4;
-
-        // update PC
-        state.pipeline.datapath.instr_addr_o = new_pc;
-        state.pipeline.datapath.fetch_enable_i = false;
-        state.pipeline.datapath.id_multicycle = 1;
-    } else {
-        state.pipeline.datapath.id_multicycle = 0;
-        state.pipeline.datapath.fetch_enable_i = true;
+fn AUIPC(_instr: &Instruction, state: &mut EmulatorState) {
+    state.pipeline.control = CVE2Control {
+        alu_op_a_sel: Some(OpASel::PC),
+        alu_op_b_sel: Some(OpBSel::IMM),
+        alu_op: Some(ALUOp::ADD),
+        data_dest_sel: Some(DataDestSel::ALU),
+        reg_write: true,
+        ..Default::default()
     }
 }
 
-fn JALR(instr: &Instruction, state: &mut EmulatorState) {
-    // TODO: Push onto RAS
+fn JAL(_instr: &Instruction, state: &mut EmulatorState) {
+    // TODO: Push onto Return Address stack when rd = x1 or x5
     if state.pipeline.datapath.id_multicycle == 0 {
-        let immed = (instr.immediate()).unwrap();
-        let new_pc = (state.x[instr.rs1() as usize] as i32 + immed) as u32 & bitmask!(31;1);
-
-        // if unaligned on 4-byte boundary
-        if new_pc & 0x003 != 0x00 {
-            panic!("JALR target addess is not on a 4-byte boundary");
-        }
-
-        // stores pc+4 into rd
-        let rd = instr.rd() as usize;
-        state.x[rd] = state.pipeline.ID_pc + 4;
-
-        // update PC
-        state.pipeline.datapath.instr_addr_o = new_pc;
-        state.pipeline.datapath.fetch_enable_i = false;
+        state.pipeline.control = CVE2Control::jump(OpASel::PC);
         state.pipeline.datapath.id_multicycle = 1;
     } else {
+        state.pipeline.control = CVE2Control::link();
         state.pipeline.datapath.id_multicycle = 0;
-        state.pipeline.datapath.fetch_enable_i = true;
+    }
+}
+
+fn JALR(_instr: &Instruction, state: &mut EmulatorState) {
+    // TODO: Push onto RAS
+    if state.pipeline.datapath.id_multicycle == 0 {
+        state.pipeline.control = CVE2Control::jump(OpASel::RF);
+        state.pipeline.datapath.id_multicycle = 1;
+    } else {
+        state.pipeline.control = CVE2Control::link();
+        state.pipeline.datapath.id_multicycle = 0;
     }
 }
 
@@ -138,13 +112,13 @@ fn BEQ(instr: &Instruction, state: &mut EmulatorState) {
 
         if state.x[instr.rs1() as usize] == state.x[instr.rs2() as usize] {
             // update PC
-            state.pipeline.datapath.instr_addr_o = new_pc;
-            state.pipeline.datapath.fetch_enable_i = false;
+            state.pipeline.IF_pc = new_pc;
+            state.pipeline.control.pc_set = false;
+            state.pipeline.control.id_in_ready = false;
             state.pipeline.datapath.id_multicycle = 1;
         }
     } else {
         state.pipeline.datapath.id_multicycle = 0;
-        state.pipeline.datapath.fetch_enable_i = true;
     }
 }
 
@@ -160,13 +134,13 @@ fn BNE(instr: &Instruction, state: &mut EmulatorState) {
 
         if state.x[instr.rs1() as usize] != state.x[instr.rs2() as usize] {
             // update PC
-            state.pipeline.datapath.instr_addr_o = new_pc;
-            state.pipeline.datapath.fetch_enable_i = false;
+            state.pipeline.IF_pc = new_pc;
+            state.pipeline.control.pc_set = false;
+            state.pipeline.control.id_in_ready = false;
             state.pipeline.datapath.id_multicycle = 1;
         }
     } else {
         state.pipeline.datapath.id_multicycle = 0;
-        state.pipeline.datapath.fetch_enable_i = true;
     }
 }
 
@@ -182,13 +156,13 @@ fn BLT(instr: &Instruction, state: &mut EmulatorState) {
 
         if (state.x[instr.rs1() as usize] as i32) < state.x[instr.rs2() as usize] as i32 {
             // update PC
-            state.pipeline.datapath.instr_addr_o = new_pc;
-            state.pipeline.datapath.fetch_enable_i = false;
+            state.pipeline.IF_pc = new_pc;
+            state.pipeline.control.pc_set = false;
+            state.pipeline.control.id_in_ready = false;
             state.pipeline.datapath.id_multicycle = 1;
         }
     } else {
         state.pipeline.datapath.id_multicycle = 0;
-        state.pipeline.datapath.fetch_enable_i = true;
     }
 }
 
@@ -204,13 +178,13 @@ fn BGE(instr: &Instruction, state: &mut EmulatorState) {
 
         if (state.x[instr.rs1() as usize] as i32) >= state.x[instr.rs2() as usize] as i32 {
             // update PC
-            state.pipeline.datapath.instr_addr_o = new_pc;
-            state.pipeline.datapath.fetch_enable_i = false;
+            state.pipeline.IF_pc = new_pc;
+            state.pipeline.control.pc_set = false;
+            state.pipeline.control.id_in_ready = false;
             state.pipeline.datapath.id_multicycle = 1;
         }
     } else {
         state.pipeline.datapath.id_multicycle = 0;
-        state.pipeline.datapath.fetch_enable_i = true;
     }
 }
 
@@ -227,16 +201,16 @@ fn BLTU(instr: &Instruction, state: &mut EmulatorState) {
         if state.x[instr.rs1() as usize] < state.x[instr.rs2() as usize] {
             // stores pc+4 into rd
             let rd = instr.rd() as usize;
-            state.x[rd] = state.pipeline.datapath.instr_addr_o + 4;
+            state.x[rd] = state.pipeline.IF_pc + 4;
 
             // update PC
-            state.pipeline.datapath.instr_addr_o = new_pc;
-            state.pipeline.datapath.fetch_enable_i = false;
+            state.pipeline.IF_pc = new_pc;
+            state.pipeline.control.pc_set = false;
+            state.pipeline.control.id_in_ready = false;
             state.pipeline.datapath.id_multicycle = 1;
         }
     } else {
         state.pipeline.datapath.id_multicycle = 0;
-        state.pipeline.datapath.fetch_enable_i = true;
     }
 }
 
@@ -253,16 +227,16 @@ fn BGEU(instr: &Instruction, state: &mut EmulatorState) {
         if state.x[instr.rs1() as usize] >= state.x[instr.rs2() as usize] {
             // stores pc+4 into rd
             let rd = instr.rd() as usize;
-            state.x[rd] = state.pipeline.datapath.instr_addr_o + 4;
+            state.x[rd] = state.pipeline.IF_pc + 4;
 
             // update PC
-            state.pipeline.datapath.instr_addr_o = new_pc;
-            state.pipeline.datapath.fetch_enable_i = false;
+            state.pipeline.IF_pc = new_pc;
+            state.pipeline.control.pc_set = false;
+            state.pipeline.control.id_in_ready = false;
             state.pipeline.datapath.id_multicycle = 1;
         }
     } else {
         state.pipeline.datapath.id_multicycle = 0;
-        state.pipeline.datapath.fetch_enable_i = true;
     }
 }
 
@@ -270,11 +244,9 @@ fn LB(_instr: &Instruction, state: &mut EmulatorState) {
     if state.pipeline.datapath.id_multicycle == 0 {
         state.pipeline.control = CVE2Control::load_request(LSUDataType::Byte);
         state.pipeline.datapath.id_multicycle = 1;
-        state.pipeline.datapath.fetch_enable_i = false;
     } else {
         state.pipeline.control = CVE2Control::load_write(LSUDataType::Byte, true);
         state.pipeline.datapath.id_multicycle = 0;
-        state.pipeline.datapath.fetch_enable_i = true;
     }
 }
 
@@ -282,11 +254,9 @@ fn LH(_instr: &Instruction, state: &mut EmulatorState) {
     if state.pipeline.datapath.id_multicycle == 0 {
         state.pipeline.control = CVE2Control::load_request(LSUDataType::HalfWord);
         state.pipeline.datapath.id_multicycle = 1;
-        state.pipeline.datapath.fetch_enable_i = false;
     } else {
         state.pipeline.control = CVE2Control::load_write(LSUDataType::HalfWord, true);
         state.pipeline.datapath.id_multicycle = 0;
-        state.pipeline.datapath.fetch_enable_i = true;
     }
 }
 
@@ -294,11 +264,9 @@ fn LW(_instr: &Instruction, state: &mut EmulatorState) {
     if state.pipeline.datapath.id_multicycle == 0 {
         state.pipeline.control = CVE2Control::load_request(LSUDataType::Word);
         state.pipeline.datapath.id_multicycle = 1;
-        state.pipeline.datapath.fetch_enable_i = false;
     } else {
         state.pipeline.control = CVE2Control::load_write(LSUDataType::Word, false);
         state.pipeline.datapath.id_multicycle = 0;
-        state.pipeline.datapath.fetch_enable_i = true;
     }
 }
 
@@ -306,11 +274,9 @@ fn LBU(_instr: &Instruction, state: &mut EmulatorState) {
     if state.pipeline.datapath.id_multicycle == 0 {
         state.pipeline.control = CVE2Control::load_request(LSUDataType::Byte);
         state.pipeline.datapath.id_multicycle = 1;
-        state.pipeline.datapath.fetch_enable_i = false;
     } else {
         state.pipeline.control = CVE2Control::load_write(LSUDataType::Byte, false);
         state.pipeline.datapath.id_multicycle = 0;
-        state.pipeline.datapath.fetch_enable_i = true;
     }
 }
 
@@ -318,11 +284,9 @@ fn LHU(_instr: &Instruction, state: &mut EmulatorState) {
     if state.pipeline.datapath.id_multicycle == 0 {
         state.pipeline.control = CVE2Control::load_request(LSUDataType::HalfWord);
         state.pipeline.datapath.id_multicycle = 1;
-        state.pipeline.datapath.fetch_enable_i = false;
     } else {
         state.pipeline.control = CVE2Control::load_write(LSUDataType::HalfWord, false);
         state.pipeline.datapath.id_multicycle = 0;
-        state.pipeline.datapath.fetch_enable_i = true;
     }
 }
 
@@ -330,11 +294,9 @@ fn SB(_instr: &Instruction, state: &mut EmulatorState) {
     if state.pipeline.datapath.id_multicycle == 0 {
         state.pipeline.control = CVE2Control::store_request(LSUDataType::Byte);
         state.pipeline.datapath.id_multicycle = 1;
-        state.pipeline.datapath.fetch_enable_i = false;
     } else {
         state.pipeline.control = CVE2Control::store_completion();
         state.pipeline.datapath.id_multicycle = 0;
-        state.pipeline.datapath.fetch_enable_i = true;
     }
 }
 
@@ -342,11 +304,9 @@ fn SH(_instr: &Instruction, state: &mut EmulatorState) {
     if state.pipeline.datapath.id_multicycle == 0 {
         state.pipeline.control = CVE2Control::store_request(LSUDataType::HalfWord);
         state.pipeline.datapath.id_multicycle = 1;
-        state.pipeline.datapath.fetch_enable_i = false;
     } else {
         state.pipeline.control = CVE2Control::store_completion();
         state.pipeline.datapath.id_multicycle = 0;
-        state.pipeline.datapath.fetch_enable_i = true;
     }
 }
 
@@ -354,11 +314,9 @@ fn SW(_instr: &Instruction, state: &mut EmulatorState) {
     if state.pipeline.datapath.id_multicycle == 0 {
         state.pipeline.control = CVE2Control::store_request(LSUDataType::Word);
         state.pipeline.datapath.id_multicycle = 1;
-        state.pipeline.datapath.fetch_enable_i = false;
     } else {
         state.pipeline.control = CVE2Control::store_completion();
         state.pipeline.datapath.id_multicycle = 0;
-        state.pipeline.datapath.fetch_enable_i = true;
     }
 }
 

@@ -1,10 +1,10 @@
 #[allow(non_snake_case)]
 #[derive(Copy, Clone, Debug)]
 pub struct CVE2Pipeline {
-    pub IF: u32,    // Instruction Fetch Buffer
-    pub IF_pc: u32, // Program Counter for the IF stage
-    pub ID: u32,    // Instruction Decode Buffer
-    pub ID_pc: u32, // Program Counter for the ID stage
+    pub IF_inst: u32, // Instruction Fetch Buffer
+    pub IF_pc: u32,   // Program Counter for the IF stage
+    pub ID_inst: u32, // Instruction Decode Buffer
+    pub ID_pc: u32,   // Program Counter for the ID stage
     pub datapath: CVE2Datapath,
     pub control: CVE2Control,
 }
@@ -12,9 +12,9 @@ pub struct CVE2Pipeline {
 impl Default for CVE2Pipeline {
     fn default() -> Self {
         Self {
-            IF: 0,
+            IF_inst: 0,
             IF_pc: 0,
-            ID: 0,
+            ID_inst: 0,
             ID_pc: 0,
             datapath: CVE2Datapath::starting(),
             control: CVE2Control::default(),
@@ -32,12 +32,12 @@ pub struct CVE2Datapath {
     pub rst_ni: bool, // Active-low reset signal.
 
     // Instruction memory interface
-    pub instr_req_o: bool,    // Output signal requesting an instruction fetch.
-    pub instr_addr_o: u32,    // Output address for fetching instructions.
-    pub instr_rdata_i: u32,   // Input data received as the fetched instruction.
-    pub instr_gnt_i: bool,    // Input signal indicating the instruction request is granted.
+    // pub instr_req_o: bool, // Output signal requesting an instruction fetch.
+    // pub instr_addr_o: u32,    // Output address for fetching instructions.
+    // pub instr_rdata_i: u32, // Input data received as the fetched instruction.
+    pub instr_gnt_i: bool, // Input signal indicating the instruction request is granted.
     pub instr_rvalid_i: bool, // Input signal indicating valid instruction data is available.
-    pub instr_err_i: bool,    // Input signal indicating an error during instruction fetch.
+    pub instr_err_i: bool, // Input signal indicating an error during instruction fetch.
 
     // Data memory interface
     pub data_req_o: bool,  // Output signal requesting a data memory operation.
@@ -52,7 +52,7 @@ pub struct CVE2Datapath {
 
     // Core execution control signals
     pub id_multicycle: u32, // Output signal indicating if the instruction is a multi-cycle instruction.
-    pub fetch_enable_i: bool, // Input signal enabling instruction fetch.
+    // pub fetch_enable_i: bool, // Input signal enabling instruction fetch.
     pub core_sleep_o: bool, // Output signal indicating if the core is in sleep mode.
 
     // Interrupt inputs
@@ -72,22 +72,27 @@ pub struct CVE2Datapath {
     pub imm: Option<u32>,
     pub reg_d: u8,
 
-    // intermediate data
+    // register file outputs
     pub data_s1: u32,
     pub data_s2: u32,
+
+    /// alu and lsu
     pub alu_op_a: Option<u32>, // Operand A input.
     pub alu_op_b: Option<u32>, // Operand B input.
     pub alu_out: Option<u32>,  // ALU output.
     pub lsu_out: Option<u32>,  // Load/Store Unit output.
     pub reg_write_data: Option<u32>,
+
+    // program counter
+    pub next_pc: Option<u32>, // Next program counter value.
 }
 
 impl CVE2Datapath {
     fn starting() -> Self {
         Self {
-            instr_req_o: true,
-            instr_addr_o: 0u32,
-            fetch_enable_i: true,
+            // instr_req_o: true,
+            // instr_addr_o: 0u32,
+            // fetch_enable_i: true,
             ..Default::default()
         }
     }
@@ -95,7 +100,7 @@ impl CVE2Datapath {
 
 /// Control signals for the CVE2 datapath.
 /// Note: `Option::None` is used to represent a "don't care" value.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub struct CVE2Control {
     // ALU Control
     pub alu_op_a_sel: Option<OpASel>, // Mux control for selecting operand A.
@@ -111,6 +116,32 @@ pub struct CVE2Control {
     // Register Write Control
     pub data_dest_sel: Option<DataDestSel>, // Mux control for selecting the write-back data.
     pub reg_write: bool,                    // Register write control.
+
+    // PC Control
+    pub pc_sel: PCSel,     // Mux control for selecting the next PC value.
+    pub pc_set: bool,      // Program counter write control.
+    pub instr_req: bool,   // Instruction memory request
+    pub id_in_ready: bool, // ID stage registers ready
+}
+
+impl Default for CVE2Control {
+    fn default() -> Self {
+        Self {
+            alu_op_a_sel: None,
+            alu_op_b_sel: None,
+            alu_op: None,
+            lsu_data_type: None,
+            lsu_request: false,
+            lsu_write_enable: false,
+            lsu_sign_ext: false,
+            data_dest_sel: None,
+            reg_write: false,
+            pc_sel: PCSel::PC4,
+            pc_set: true,
+            instr_req: true,
+            id_in_ready: true,
+        }
+    }
 }
 
 impl CVE2Control {
@@ -148,6 +179,11 @@ impl CVE2Control {
             lsu_request: true,
             lsu_write_enable: false,
 
+            // don't move onto the next instruction
+            pc_set: false,
+            instr_req: false,
+            id_in_ready: false,
+
             ..Default::default()
         }
     }
@@ -177,12 +213,49 @@ impl CVE2Control {
             lsu_request: true,
             lsu_write_enable: true,
 
+            // don't move onto the next instruction
+            pc_set: false,
+            instr_req: false,
+            id_in_ready: false,
+
             ..Default::default()
         }
     }
 
     pub fn store_completion() -> Self {
         Self {
+            ..Default::default()
+        }
+    }
+
+    pub fn jump(base_addr: OpASel) -> Self {
+        CVE2Control {
+            // calculate the destination address
+            alu_op_a_sel: Some(base_addr),
+            alu_op_b_sel: Some(OpBSel::IMM),
+            alu_op: Some(ALUOp::ADD),
+            data_dest_sel: Some(DataDestSel::ALU),
+
+            // set the PC to it
+            pc_sel: PCSel::ALU,
+            pc_set: true,
+
+            // preserve the ID stage registers for link
+            id_in_ready: false,
+
+            ..Default::default()
+        }
+    }
+
+    pub fn link() -> Self {
+        CVE2Control {
+            // add 4 to ID PC and store it in rd
+            alu_op_a_sel: Some(OpASel::PC),
+            alu_op_b_sel: Some(OpBSel::Four),
+            alu_op: Some(ALUOp::ADD),
+            data_dest_sel: Some(DataDestSel::ALU),
+            reg_write: true,
+
             ..Default::default()
         }
     }
@@ -218,6 +291,7 @@ pub enum OpASel {
 pub enum OpBSel {
     RF,
     IMM,
+    Four,
 }
 
 #[allow(dead_code)]
@@ -253,4 +327,10 @@ impl LSUDataType {
             LSUDataType::Byte => 8,
         }
     }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum PCSel {
+    PC4,
+    ALU,
 }
