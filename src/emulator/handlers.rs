@@ -80,28 +80,24 @@ fn AUIPC(_instr: &Instruction, state: &mut EmulatorState) {
 
 fn JAL(_instr: &Instruction, state: &mut EmulatorState) {
     // TODO: Push onto Return Address stack when rd = x1 or x5
-    if state.pipeline.datapath.id_multicycle == 0 {
+    if state.pipeline.datapath.instr_first_cycle {
         state.pipeline.control = CVE2Control::jump(OpASel::PC);
-        state.pipeline.datapath.id_multicycle = 1;
     } else {
         state.pipeline.control = CVE2Control::link();
-        state.pipeline.datapath.id_multicycle = 0;
     }
 }
 
 fn JALR(_instr: &Instruction, state: &mut EmulatorState) {
     // TODO: Push onto RAS
-    if state.pipeline.datapath.id_multicycle == 0 {
+    if state.pipeline.datapath.instr_first_cycle {
         state.pipeline.control = CVE2Control::jump(OpASel::RF);
-        state.pipeline.datapath.id_multicycle = 1;
     } else {
         state.pipeline.control = CVE2Control::link();
-        state.pipeline.datapath.id_multicycle = 0;
     }
 }
 
 fn BEQ(instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.id_multicycle == 0 {
+    if state.pipeline.datapath.instr_first_cycle {
         let immed = (instr.immediate()).unwrap();
         let new_pc = state.pipeline.ID_pc.checked_add_signed(immed).unwrap();
 
@@ -115,15 +111,13 @@ fn BEQ(instr: &Instruction, state: &mut EmulatorState) {
             state.pipeline.IF_pc = new_pc;
             state.pipeline.control.pc_set = false;
             state.pipeline.control.id_in_ready = false;
-            state.pipeline.datapath.id_multicycle = 1;
         }
     } else {
-        state.pipeline.datapath.id_multicycle = 0;
     }
 }
 
 fn BNE(instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.id_multicycle == 0 {
+    if state.pipeline.datapath.instr_first_cycle {
         let immed = (instr.immediate()).unwrap();
         let new_pc = state.pipeline.ID_pc.checked_add_signed(immed).unwrap();
 
@@ -137,15 +131,13 @@ fn BNE(instr: &Instruction, state: &mut EmulatorState) {
             state.pipeline.IF_pc = new_pc;
             state.pipeline.control.pc_set = false;
             state.pipeline.control.id_in_ready = false;
-            state.pipeline.datapath.id_multicycle = 1;
         }
     } else {
-        state.pipeline.datapath.id_multicycle = 0;
     }
 }
 
 fn BLT(instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.id_multicycle == 0 {
+    if state.pipeline.datapath.instr_first_cycle {
         let immed = (instr.immediate()).unwrap();
         let new_pc = state.pipeline.ID_pc.checked_add_signed(immed).unwrap();
 
@@ -159,15 +151,13 @@ fn BLT(instr: &Instruction, state: &mut EmulatorState) {
             state.pipeline.IF_pc = new_pc;
             state.pipeline.control.pc_set = false;
             state.pipeline.control.id_in_ready = false;
-            state.pipeline.datapath.id_multicycle = 1;
         }
     } else {
-        state.pipeline.datapath.id_multicycle = 0;
     }
 }
 
 fn BGE(instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.id_multicycle == 0 {
+    if state.pipeline.datapath.instr_first_cycle {
         let immed = (instr.immediate()).unwrap();
         let new_pc = state.pipeline.ID_pc.checked_add_signed(immed).unwrap();
 
@@ -181,15 +171,13 @@ fn BGE(instr: &Instruction, state: &mut EmulatorState) {
             state.pipeline.IF_pc = new_pc;
             state.pipeline.control.pc_set = false;
             state.pipeline.control.id_in_ready = false;
-            state.pipeline.datapath.id_multicycle = 1;
         }
     } else {
-        state.pipeline.datapath.id_multicycle = 0;
     }
 }
 
 fn BLTU(instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.id_multicycle == 0 {
+    if state.pipeline.datapath.instr_first_cycle {
         let immed = (instr.immediate()).unwrap();
         let new_pc = state.pipeline.ID_pc.checked_add_signed(immed).unwrap();
 
@@ -207,15 +195,13 @@ fn BLTU(instr: &Instruction, state: &mut EmulatorState) {
             state.pipeline.IF_pc = new_pc;
             state.pipeline.control.pc_set = false;
             state.pipeline.control.id_in_ready = false;
-            state.pipeline.datapath.id_multicycle = 1;
         }
     } else {
-        state.pipeline.datapath.id_multicycle = 0;
     }
 }
 
 fn BGEU(instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.id_multicycle == 0 {
+    if state.pipeline.datapath.instr_first_cycle {
         let immed = (instr.immediate()).unwrap();
         let new_pc = state.pipeline.ID_pc.checked_add_signed(immed).unwrap();
 
@@ -233,90 +219,72 @@ fn BGEU(instr: &Instruction, state: &mut EmulatorState) {
             state.pipeline.IF_pc = new_pc;
             state.pipeline.control.pc_set = false;
             state.pipeline.control.id_in_ready = false;
-            state.pipeline.datapath.id_multicycle = 1;
         }
     } else {
-        state.pipeline.datapath.id_multicycle = 0;
     }
 }
 
 fn LB(_instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.id_multicycle == 0 {
+    if state.pipeline.datapath.instr_first_cycle {
         state.pipeline.control = CVE2Control::load_request(LSUDataType::Byte);
-        state.pipeline.datapath.id_multicycle = 1;
     } else {
         state.pipeline.control = CVE2Control::load_write(LSUDataType::Byte, true);
-        state.pipeline.datapath.id_multicycle = 0;
     }
 }
 
 fn LH(_instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.id_multicycle == 0 {
+    if state.pipeline.datapath.instr_first_cycle {
         state.pipeline.control = CVE2Control::load_request(LSUDataType::HalfWord);
-        state.pipeline.datapath.id_multicycle = 1;
     } else {
         state.pipeline.control = CVE2Control::load_write(LSUDataType::HalfWord, true);
-        state.pipeline.datapath.id_multicycle = 0;
     }
 }
 
 fn LW(_instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.id_multicycle == 0 {
+    if state.pipeline.datapath.instr_first_cycle {
         state.pipeline.control = CVE2Control::load_request(LSUDataType::Word);
-        state.pipeline.datapath.id_multicycle = 1;
     } else {
         state.pipeline.control = CVE2Control::load_write(LSUDataType::Word, false);
-        state.pipeline.datapath.id_multicycle = 0;
     }
 }
 
 fn LBU(_instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.id_multicycle == 0 {
+    if state.pipeline.datapath.instr_first_cycle {
         state.pipeline.control = CVE2Control::load_request(LSUDataType::Byte);
-        state.pipeline.datapath.id_multicycle = 1;
     } else {
         state.pipeline.control = CVE2Control::load_write(LSUDataType::Byte, false);
-        state.pipeline.datapath.id_multicycle = 0;
     }
 }
 
 fn LHU(_instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.id_multicycle == 0 {
+    if state.pipeline.datapath.instr_first_cycle {
         state.pipeline.control = CVE2Control::load_request(LSUDataType::HalfWord);
-        state.pipeline.datapath.id_multicycle = 1;
     } else {
         state.pipeline.control = CVE2Control::load_write(LSUDataType::HalfWord, false);
-        state.pipeline.datapath.id_multicycle = 0;
     }
 }
 
 fn SB(_instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.id_multicycle == 0 {
+    if state.pipeline.datapath.instr_first_cycle {
         state.pipeline.control = CVE2Control::store_request(LSUDataType::Byte);
-        state.pipeline.datapath.id_multicycle = 1;
     } else {
         state.pipeline.control = CVE2Control::store_completion();
-        state.pipeline.datapath.id_multicycle = 0;
     }
 }
 
 fn SH(_instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.id_multicycle == 0 {
+    if state.pipeline.datapath.instr_first_cycle {
         state.pipeline.control = CVE2Control::store_request(LSUDataType::HalfWord);
-        state.pipeline.datapath.id_multicycle = 1;
     } else {
         state.pipeline.control = CVE2Control::store_completion();
-        state.pipeline.datapath.id_multicycle = 0;
     }
 }
 
 fn SW(_instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.id_multicycle == 0 {
+    if state.pipeline.datapath.instr_first_cycle {
         state.pipeline.control = CVE2Control::store_request(LSUDataType::Word);
-        state.pipeline.datapath.id_multicycle = 1;
     } else {
         state.pipeline.control = CVE2Control::store_completion();
-        state.pipeline.datapath.id_multicycle = 0;
     }
 }
 

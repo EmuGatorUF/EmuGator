@@ -281,6 +281,9 @@ impl CVE2Pipeline {
         if self.control.id_in_ready {
             self.ID_pc = self.IF_pc;
             self.ID_inst = self.IF_inst;
+            self.datapath.instr_first_cycle = true;
+        } else {
+            self.datapath.instr_first_cycle = false;
         }
     }
 }

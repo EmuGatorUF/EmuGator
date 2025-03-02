@@ -51,9 +51,10 @@ pub struct CVE2Datapath {
     pub data_err_i: bool,     // Input signal indicating an error during the data memory operation.
 
     // Core execution control signals
-    pub id_multicycle: u32, // Output signal indicating if the instruction is a multi-cycle instruction.
+    // pub id_multicycle: u32, // Output signal indicating if the instruction is a multi-cycle instruction.
     // pub fetch_enable_i: bool, // Input signal enabling instruction fetch.
-    pub core_sleep_o: bool, // Output signal indicating if the core is in sleep mode.
+    pub instr_first_cycle: bool, // Output signal indicating if this is the first cycle an instruction is in ID.
+    pub core_sleep_o: bool,      // Output signal indicating if the core is in sleep mode.
 
     // Interrupt inputs
     pub irq_software_i: bool, // Input software interrupt request signal.
