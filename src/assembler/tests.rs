@@ -385,6 +385,34 @@ fn test_directive_equ() {
 }
 
 #[test]
+fn test_ECALL_extra_operands() {
+    let program = ".text\nECALL x1";
+    let assembled_program = assemble(program);
+    println!("{:?}", assembled_program.unwrap_err());
+}
+
+#[test]
+fn test_I_missing_operands() {
+    let program = ".text\nSLLI";
+    let assembled_program = assemble(program);
+    println!("{:?}", assembled_program.unwrap_err());
+}
+
+#[test]
+fn test_I_missing_rs1() {
+    let program = ".text\nSLLI x1";
+    let assembled_program = assemble(program);
+    println!("{:?}", assembled_program.unwrap_err());
+}
+
+#[test]
+fn test_I_missing_imm() {
+    let program = ".text\nSLLI x1, x2";
+    let assembled_program = assemble(program);
+    println!("{:?}", assembled_program.unwrap_err());
+}
+
+#[test]
 fn test_ADD() {
     let program = ".text\nADD X1, X2, X3";
     let assembled_program = assemble(program).unwrap_or_else(|errors| {

@@ -1,7 +1,5 @@
 use std::collections::BTreeMap;
 
-use dioxus_logger::tracing::info;
-
 // UART Module for EmuGator
 
 // Fun Fact: John Uart created the UART protocol in ⧫︎♒︎♋︎■︎🙵⬧︎ ♐︎□︎❒︎ ●︎□︎□︎🙵♓︎■︎♑︎✏︎

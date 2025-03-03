@@ -6,7 +6,25 @@ pub struct Instruction {
     instr: u32,
 }
 
+#[derive(Debug)]
+pub struct InstructionBuildError {
+    pub error_message: String,
+    pub error_type: InstructionBuildErrorType,
+}
+
+#[derive(Debug)]
+pub enum InstructionBuildErrorType {
+    InvalidOpcode,
+    InvalidRd,
+    InvalidFunct3,
+    InvalidRs1,
+    InvalidRs2,
+    InvalidFunct7,
+    InvalidImm,
+}
+
 impl Instruction {
+    #[allow(dead_code)]
     pub fn new(
         format: InstructionFormat,
         opcode: u32,
@@ -17,25 +35,191 @@ impl Instruction {
         funct7: u32,
         imm: i32,
     ) -> Instruction {
-        assert_eq!(opcode, bits!(opcode,6;0));
-        assert_eq!(rd, bits!(rd,4;0));
-        assert_eq!(funct3, bits!(funct3,2;0));
-        assert_eq!(rs1, bits!(rs1,4;0));
-        assert_eq!(rs2, bits!(rs2,4;0));
-        assert_eq!(funct7, bits!(funct7,6;0));
-        let instr = match format {
-            InstructionFormat::R => Self::encode_r(opcode, rd, funct3, rs1, rs2, funct7),
-            InstructionFormat::I => Self::encode_i(opcode, rd, funct3, rs1, imm),
-            InstructionFormat::S => Self::encode_s(opcode, funct3, rs1, rs2, imm),
-            InstructionFormat::B => Self::encode_b(opcode, funct3, rs1, rs2, imm),
-            InstructionFormat::U => Self::encode_u(opcode, rd, imm),
-            InstructionFormat::J => Self::encode_j(opcode, rd, imm),
-        };
-        Self { instr }
+        Self::try_build(format, opcode, rd, funct3, rs1, rs2, funct7, imm)
+            .expect("Invalid instruction")
+    }
+
+    pub fn try_build(
+        format: InstructionFormat,
+        opcode: u32,
+        rd: u32,
+        funct3: u32,
+        rs1: u32,
+        rs2: u32,
+        funct7: u32,
+        imm: i32,
+    ) -> Result<Instruction, InstructionBuildError> {
+        if opcode != bits!(opcode,6;0) {
+            Err(InstructionBuildError {
+                error_message: format!("Opcode {opcode:#05x} is out of range."),
+                error_type: InstructionBuildErrorType::InvalidOpcode,
+            })
+        } else if rd != bits!(rd,4;0) {
+            Err(InstructionBuildError {
+                error_message: format!("Rd {rd:#05x} is out of range."),
+                error_type: InstructionBuildErrorType::InvalidRd,
+            })
+        } else if funct3 != bits!(funct3,2;0) {
+            Err(InstructionBuildError {
+                error_message: format!("Funct3 {funct3:#05x} is out of range."),
+                error_type: InstructionBuildErrorType::InvalidFunct3,
+            })
+        } else if rs1 != bits!(rs1,4;0) {
+            Err(InstructionBuildError {
+                error_message: format!("Rs1 {rs1:#05x} is out of range."),
+                error_type: InstructionBuildErrorType::InvalidRs1,
+            })
+        } else if rs2 != bits!(rs2,4;0) {
+            Err(InstructionBuildError {
+                error_message: format!("Rs2 {rs2:#05x} is out of range."),
+                error_type: InstructionBuildErrorType::InvalidRs2,
+            })
+        } else if funct7 != bits!(funct7,6;0) {
+            Err(InstructionBuildError {
+                error_message: format!("Funct7 {funct7:#05x} is out of range."),
+                error_type: InstructionBuildErrorType::InvalidFunct7,
+            })
+        } else {
+            let instr = match format {
+                InstructionFormat::R => {
+                    if imm != 0 {
+                        Err(InstructionBuildError {
+                            error_message: "Unexpected operand immediate for R type instruction."
+                                .into(),
+                            error_type: InstructionBuildErrorType::InvalidImm,
+                        })
+                    } else {
+                        Self::encode_r(opcode, rd, funct3, rs1, rs2, funct7)
+                    }
+                }
+                InstructionFormat::I => {
+                    if rs2 != 0 {
+                        Err(InstructionBuildError {
+                            error_message: "Unexpected operand rs2 for I type instruction.".into(),
+                            error_type: InstructionBuildErrorType::InvalidRs2,
+                        })
+                    } else if opcode == 0b0010011 && (funct3 == 0b001 || funct3 == 0b101) {
+                        // Special case for the SLLI SRLI SRAI instructions
+                        if bits!(imm,11;5) != 0 {
+                            Err(InstructionBuildError {
+                                error_message: format!(
+                                    "Immediate {imm:#05x} is out of range for shift instruction."
+                                ),
+                                error_type: InstructionBuildErrorType::InvalidImm,
+                            })
+                        } else {
+                            Self::encode_i(opcode, rd, funct3, rs1, imm | ((funct7 << 5) as i32))
+                        }
+                    } else if funct7 != 0 {
+                        Err(InstructionBuildError {
+                            error_message: "Unexpected operand funct7 for I type instruction."
+                                .into(),
+                            error_type: InstructionBuildErrorType::InvalidFunct7,
+                        })
+                    } else {
+                        Self::encode_i(opcode, rd, funct3, rs1, imm)
+                    }
+                }
+                InstructionFormat::S => {
+                    if rd != 0 {
+                        Err(InstructionBuildError {
+                            error_message: "Unexpected operand rd for S type instruction.".into(),
+                            error_type: InstructionBuildErrorType::InvalidRd,
+                        })
+                    } else if funct7 != 0 {
+                        Err(InstructionBuildError {
+                            error_message: "Unexpected operand funct7 for S type instruction."
+                                .into(),
+                            error_type: InstructionBuildErrorType::InvalidFunct7,
+                        })
+                    } else {
+                        Self::encode_s(opcode, funct3, rs1, rs2, imm)
+                    }
+                }
+                InstructionFormat::B => {
+                    if rd != 0 {
+                        Err(InstructionBuildError {
+                            error_message: "Unexpected operand rd for B type instruction.".into(),
+                            error_type: InstructionBuildErrorType::InvalidRd,
+                        })
+                    } else if funct7 != 0 {
+                        Err(InstructionBuildError {
+                            error_message: "Unexpected operand funct7 for B type instruction."
+                                .into(),
+                            error_type: InstructionBuildErrorType::InvalidFunct7,
+                        })
+                    } else {
+                        Self::encode_b(opcode, funct3, rs1, rs2, imm)
+                    }
+                }
+                InstructionFormat::U => {
+                    if funct3 != 0 {
+                        Err(InstructionBuildError {
+                            error_message: "Unexpected operand funct3 for U type instruction."
+                                .into(),
+                            error_type: InstructionBuildErrorType::InvalidFunct3,
+                        })
+                    } else if rs1 != 0 {
+                        Err(InstructionBuildError {
+                            error_message: "Unexpected operand rs1 for U type instruction.".into(),
+                            error_type: InstructionBuildErrorType::InvalidRs1,
+                        })
+                    } else if rs2 != 0 {
+                        Err(InstructionBuildError {
+                            error_message: "Unexpected operand rs2 for U type instruction.".into(),
+                            error_type: InstructionBuildErrorType::InvalidRs2,
+                        })
+                    } else if funct7 != 0 {
+                        Err(InstructionBuildError {
+                            error_message: "Unexpected operand funct7 for U type instruction."
+                                .into(),
+                            error_type: InstructionBuildErrorType::InvalidFunct7,
+                        })
+                    } else {
+                        Self::encode_u(opcode, rd, imm)
+                    }
+                }
+                InstructionFormat::J => {
+                    if funct3 != 0 {
+                        Err(InstructionBuildError {
+                            error_message: "Unexpected operand funct3 for J type instruction."
+                                .into(),
+                            error_type: InstructionBuildErrorType::InvalidFunct3,
+                        })
+                    } else if rs1 != 0 {
+                        Err(InstructionBuildError {
+                            error_message: "Unexpected operand rs1 for J type instruction.".into(),
+                            error_type: InstructionBuildErrorType::InvalidRs1,
+                        })
+                    } else if rs2 != 0 {
+                        Err(InstructionBuildError {
+                            error_message: "Unexpected operand rs2 for J type instruction.".into(),
+                            error_type: InstructionBuildErrorType::InvalidRs2,
+                        })
+                    } else if funct7 != 0 {
+                        Err(InstructionBuildError {
+                            error_message: "Unexpected operand funct7 for J type instruction."
+                                .into(),
+                            error_type: InstructionBuildErrorType::InvalidFunct7,
+                        })
+                    } else {
+                        Self::encode_j(opcode, rd, imm)
+                    }
+                }
+            }?;
+            Ok(Self { instr })
+        }
     }
 
     pub fn from_def_operands(def: InstructionDefinition, operands: Operands) -> Instruction {
-        Instruction::new(
+        Self::try_from_def_operands(def, operands).expect("Invalid instruction")
+    }
+
+    pub fn try_from_def_operands(
+        def: InstructionDefinition,
+        operands: Operands,
+    ) -> Result<Instruction, InstructionBuildError> {
+        Instruction::try_build(
             def.format,
             def.opcode as u32,
             operands.rd,
@@ -51,59 +235,128 @@ impl Instruction {
         Self { instr }
     }
 
-    fn encode_r(opcode: u32, rd: u32, funct3: u32, rs1: u32, rs2: u32, funct7: u32) -> u32 {
-        funct7 << 25 | rs2 << 20 | rs1 << 15 | funct3 << 12 | rd << 7 | opcode << 0
+    fn encode_r(
+        opcode: u32,
+        rd: u32,
+        funct3: u32,
+        rs1: u32,
+        rs2: u32,
+        funct7: u32,
+    ) -> Result<u32, InstructionBuildError> {
+        Ok(funct7 << 25 | rs2 << 20 | rs1 << 15 | funct3 << 12 | rd << 7 | opcode << 0)
     }
 
-    fn encode_i(opcode: u32, rd: u32, funct3: u32, rs1: u32, imm: i32) -> u32 {
-        assert!((imm == bits!(imm,11;0)) || (imm & bitmask!(31;11) == bitmask!(31;11)));
-        let imm: u32 = imm as u32;
-        imm << 20 | rs1 << 15 | funct3 << 12 | rd << 7 | opcode << 0
-    }
-
-    fn encode_s(opcode: u32, funct3: u32, rs1: u32, rs2: u32, imm: i32) -> u32 {
-        assert!((imm == bits!(imm,11;0)) || (imm & bitmask!(31;11) == bitmask!(31;11)));
-        let imm: u32 = imm as u32;
-        (bits!(imm,11;5) << 25
-            | rs2 << 20
-            | rs1 << 15
-            | funct3 << 12
-            | bits!(imm,4;0) << 7
-            | opcode << 0)
-    }
-
-    fn encode_b(opcode: u32, funct3: u32, rs1: u32, rs2: u32, imm: i32) -> u32 {
-        assert!((imm == bits!(imm,11;0)) || (imm & bitmask!(31;11) == bitmask!(31;11)));
-        let imm: u32 = imm as u32;
-        (bits!(imm, 12) << 31
-            | bits!(imm,10;5) << 25
-            | rs2 << 20
-            | rs1 << 15
-            | funct3 << 12
-            | bits!(imm,4;1) << 8
-            | bits!(imm, 11) << 7
-            | opcode << 0)
-    }
-
-    fn encode_u(opcode: u32, rd: u32, imm: i32) -> u32 {
-        assert_eq!(imm, bits!(imm,31;12) << 12);
-        let imm: u32 = imm as u32;
-        (bits!(imm,31;12) << 12 | rd << 7 | opcode << 0)
-    }
-
-    fn encode_j(opcode: u32, rd: u32, imm: i32) -> u32 {
-        if imm >= 0 {
-            assert_eq!(imm, bits!(imm,20;1) << 1);
+    fn encode_i(
+        opcode: u32,
+        rd: u32,
+        funct3: u32,
+        rs1: u32,
+        imm: i32,
+    ) -> Result<u32, InstructionBuildError> {
+        if !((imm == bits!(imm,11;0)) || (imm & bitmask!(31;11) == bitmask!(31;11))) {
+            Err(InstructionBuildError {
+                error_message: format!(
+                    "Immediate {imm:#05x} is out of range for I type instruction."
+                ),
+                error_type: InstructionBuildErrorType::InvalidImm,
+            })
         } else {
-            assert_eq!(bitmask!(12), bits!(imm, 20, 12));
+            let imm: u32 = imm as u32;
+            Ok(imm << 20 | rs1 << 15 | funct3 << 12 | rd << 7 | opcode << 0)
         }
-        let imm: u32 = imm as u32;
-        (bits!(imm, 20) << 31
-            | bits!(imm,10;1) << 21
-            | bits!(imm, 11) << 20
-            | bits!(imm,19;12) << 12
-            | rd << 7
-            | opcode << 0)
+    }
+
+    fn encode_s(
+        opcode: u32,
+        funct3: u32,
+        rs1: u32,
+        rs2: u32,
+        imm: i32,
+    ) -> Result<u32, InstructionBuildError> {
+        if !((imm == bits!(imm,11;0)) || (imm & bitmask!(31;11) == bitmask!(31;11))) {
+            Err(InstructionBuildError {
+                error_message: format!(
+                    "Immediate {imm:#05x} is out of range for S type instruction."
+                ),
+                error_type: InstructionBuildErrorType::InvalidImm,
+            })
+        } else {
+            let imm: u32 = imm as u32;
+            Ok(bits!(imm,11;5) << 25
+                | rs2 << 20
+                | rs1 << 15
+                | funct3 << 12
+                | bits!(imm,4;0) << 7
+                | opcode << 0)
+        }
+    }
+
+    fn encode_b(
+        opcode: u32,
+        funct3: u32,
+        rs1: u32,
+        rs2: u32,
+        imm: i32,
+    ) -> Result<u32, InstructionBuildError> {
+        if !((imm == bits!(imm,11;0)) || (imm & bitmask!(31;11) == bitmask!(31;11))) {
+            Err(InstructionBuildError {
+                error_message: format!(
+                    "Immediate {imm:#05x} is out of range for B type instruction."
+                ),
+                error_type: InstructionBuildErrorType::InvalidImm,
+            })
+        } else {
+            let imm: u32 = imm as u32;
+            Ok(bits!(imm, 12) << 31
+                | bits!(imm,10;5) << 25
+                | rs2 << 20
+                | rs1 << 15
+                | funct3 << 12
+                | bits!(imm,4;1) << 8
+                | bits!(imm, 11) << 7
+                | opcode << 0)
+        }
+    }
+
+    fn encode_u(opcode: u32, rd: u32, imm: i32) -> Result<u32, InstructionBuildError> {
+        if imm != bits!(imm,31;12) << 12 {
+            Err(InstructionBuildError {
+                error_message: format!(
+                    "Immediate {imm:#05x} is out of range for U type instruction. Lower 12 bits must be 0."
+                ),
+                error_type: InstructionBuildErrorType::InvalidImm,
+            })
+        } else {
+            let imm: u32 = imm as u32;
+            Ok(bits!(imm,31;12) << 12 | rd << 7 | opcode << 0)
+        }
+    }
+
+    fn encode_j(opcode: u32, rd: u32, imm: i32) -> Result<u32, InstructionBuildError> {
+        let _shifted = bits!(imm, 20;1) << 1;
+        if imm >= 0 && imm != bits!(imm,20;1) << 1 {
+            Err(InstructionBuildError {
+                error_message: format!(
+                    "Immediate {imm:#05x} is out of range for J type instruction."
+                ),
+                error_type: InstructionBuildErrorType::InvalidImm,
+            })
+        } else if imm < 0 && bits!(imm, 20, 12) != bitmask!(12) {
+            Err(InstructionBuildError {
+                error_message: format!(
+                    "Immediate {imm:#05x} is out of range for J type instruction."
+                ),
+                error_type: InstructionBuildErrorType::InvalidImm,
+            })
+        } else {
+            let imm: u32 = imm as u32;
+            Ok(bits!(imm, 20) << 31
+                | bits!(imm,10;1) << 21
+                | bits!(imm, 11) << 20
+                | bits!(imm,19;12) << 12
+                | rd << 7
+                | opcode << 0)
+        }
     }
 
     pub fn raw(&self) -> u32 {

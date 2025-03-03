@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use crate::isa::{Operands, ISA};
+use crate::isa::{ISA, Operands};
 
 use super::*;
 
@@ -1288,7 +1288,7 @@ fn test_SLLI() {
         ISA::SLLI.build(Operands {
             rd: 3,
             rs1: 1,
-            imm: 0b100001,
+            imm: 1,
             ..Default::default()
         }),
         ISA::SLLI.build(Operands {
@@ -1339,7 +1339,7 @@ fn test_SRLI() {
         ISA::SRLI.build(Operands {
             rd: 3,
             rs1: 1,
-            imm: 0b100010,
+            imm: 0b00010,
             ..Default::default()
         }),
         ISA::SRLI.build(Operands {
@@ -1384,13 +1384,13 @@ fn test_SRAI() {
         ISA::SRAI.build(Operands {
             rd: 2,
             rs1: 1,
-            imm: -1 & 0x1F | 1 << 10,
+            imm: 0b11111,
             ..Default::default()
         }),
         ISA::SRAI.build(Operands {
             rd: 3,
             rs1: 1,
-            imm: 0b100001 & 0x1F | 1 << 10,
+            imm: 0b01 & 0x1F,
             ..Default::default()
         }),
         ISA::SRAI.build(Operands {
@@ -2188,14 +2188,14 @@ fn test_CSRRCI() {
     let csr1 = 5;
 
     let mut program = populate(&[
-        // CSRRCI x1, csr1, x1
+        // CSRRCI x1, csr1, 25
         ISA::CSRRCI.build(Operands {
             rd: 1,
             rs1: 25,
             imm: csr1,
             ..Default::default()
         }),
-        // CSRRCI x1, csr1, x2
+        // CSRRCI x1, csr1, 2
         ISA::CSRRCI.build(Operands {
             rd: 1,
             rs1: 2,

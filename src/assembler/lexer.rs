@@ -1,7 +1,8 @@
+use std::iter::Enumerate;
+
 use ibig::IBig;
 
 use super::AssemblerError;
-use std::iter::Enumerate;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum TokenKind<'a> {
@@ -84,33 +85,54 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn parse_string(literal: &'a str) -> String {
+    fn parse_string(&mut self, quote: char, i: usize) -> Result<(&'a str, String), AssemblerError> {
+        let mut end = i;
         let mut out = String::new();
-        let mut str_iter = literal.chars();
+        let token_col = self.column;
 
-        while let Some(c) = str_iter.next() {
-            out.push(match c {
-                '\\' => match str_iter.next() {
-                    Some('n') => '\n',
-                    Some('r') => '\r',
-                    Some('t') => '\t',
-                    Some(escaped_c) => escaped_c,
-                    None => unreachable!(),
-                },
-                _ => c,
-            });
+        loop {
+            if let Some((j, c)) = self.next_char() {
+                end = j;
+                out.push(if c == '\\' {
+                    match self.next_char() {
+                        Some((k, c)) => match c {
+                            'b' => '\x08',
+                            'f' => '\x0e',
+                            'n' => '\n',
+                            'r' => '\r',
+                            't' => '\t',
+                            '0'..'9' => todo!(),
+                            'x' | 'x' => todo!(),
+                            '\\' => '\\',
+                            '"' => '"',
+                            escaped_c => escaped_c,
+                        },
+                        None => {
+                            return Err(AssemblerError::new(
+                                "Unexpected EOF while parsing escape sequence.".to_string(),
+                                self.line,
+                                token_col,
+                                end - i,
+                            ));
+                        }
+                    }
+                } else if c == quote {
+                    break;
+                } else {
+                    c
+                });
+            } else {
+                return Err(AssemblerError::new(
+                    "Unexpected EOF while parsing string".to_string(),
+                    self.line,
+                    token_col,
+                    end - i,
+                ));
+            }
         }
 
-        out
-    }
-
-    fn parse_char(literal: &'a str) -> char {
-        let parsed_str = Self::parse_string(literal);
-
-        let mut iter = parsed_str.chars();
-        let c = iter.next().expect("String is non-empty.");
-
-        c
+        let literal = &self.source[i..end + 1];
+        Ok((literal, out))
     }
 }
 
@@ -200,7 +222,7 @@ impl<'a> Iterator for Lexer<'a> {
                                 kind: TokenKind::ShiftLeft,
                                 line: self.line,
                                 column: self.column,
-                                width
+                                width,
                             }
                         }
                         '>' => {
@@ -213,7 +235,7 @@ impl<'a> Iterator for Lexer<'a> {
                                 kind: TokenKind::ShiftRight,
                                 line: self.line,
                                 column: self.column,
-                                width
+                                width,
                             }
                         }
                         '|' => Token {
@@ -349,83 +371,38 @@ impl<'a> Iterator for Lexer<'a> {
                                 width: literal.len(),
                             }
                         }
-                        '\'' => {
-                            // Char token
-                            let mut end = i;
+                        quote @ '"' | quote @ '\'' => {
+                            // Char or String token
                             let token_col = self.column;
+                            let (literal, parsed) = self.parse_string(quote, i)?;
 
-                            loop {
-                                if let Some((j, c)) = self.next_char() {
-                                    end = j;
-                                    if c == '\\' {
-                                        self.next_char();
-                                    } else if c == '\'' {
-                                        break;
-                                    }
-                                } else {
+                            if quote == '\'' {
+                                if parsed.len() != 1 {
                                     return Err(AssemblerError::new(
-                                        "Unexpected EOF while parsing string".to_string(),
+                                        "Character literal must contain exactly one character"
+                                            .to_string(),
                                         self.line,
-                                        token_col,
-                                        end - i,
+                                        self.column,
+                                        1,
                                     ));
-                                }
-                            }
-
-                            let literal = &self.source[i..end + 1];
-
-                            if literal.len() < 3 {
-                                return Err(AssemblerError::new(
-                                    "Invalid character literal".to_string(),
-                                    self.line,
-                                    token_col,
-                                    end - i,
-                                ));
-                            }
-
-                            Token {
-                                kind: TokenKind::ChrLiteral(
-                                    literal,
-                                    Self::parse_char(&literal[1..literal.len() - 1]),
-                                ),
-                                line: self.line,
-                                column: token_col,
-                                width: literal.len(),
-                            }
-                        }
-                        '"' => {
-                            // String token
-                            let mut end = i;
-                            let token_col = self.column;
-
-                            loop {
-                                if let Some((j, c)) = self.next_char() {
-                                    end = j;
-                                    if c == '\\' {
-                                        self.next_char();
-                                    } else if c == '"' {
-                                        break;
-                                    }
                                 } else {
-                                    return Err(AssemblerError::new(
-                                        "Unexpected EOF while parsing string".to_string(),
-                                        self.line,
-                                        token_col,
-                                        end - i,
-                                    ));
+                                    Token {
+                                        kind: TokenKind::ChrLiteral(
+                                            literal,
+                                            parsed.chars().next().unwrap(),
+                                        ),
+                                        line: self.line,
+                                        column: token_col,
+                                        width: literal.len(),
+                                    }
                                 }
-                            }
-
-                            let literal = &self.source[i..end + 1];
-
-                            Token {
-                                kind: TokenKind::StrLiteral(
-                                    literal,
-                                    Self::parse_string(&literal[1..literal.len() - 1]),
-                                ),
-                                line: self.line,
-                                column: token_col,
-                                width: literal.len(),
+                            } else {
+                                Token {
+                                    kind: TokenKind::StrLiteral(literal, parsed),
+                                    line: self.line,
+                                    column: token_col,
+                                    width: literal.len(),
+                                }
                             }
                         }
                         _ => {

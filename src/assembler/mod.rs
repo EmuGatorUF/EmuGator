@@ -8,7 +8,7 @@ use lexer::{Lexer, Token, TokenKind};
 use peeking_take_while::PeekableExt;
 use rpn::{Expression, RPNKind, RPN};
 
-use crate::{bits, isa::{Instruction, InstructionDefinition, InstructionFormat, Operands, ISA}, utils::IBigLittleEndianIterator};
+use crate::{bits, isa::{InstructionBuildError, InstructionBuildErrorType, Instruction, InstructionDefinition, InstructionFormat, Operands, ISA}, utils::IBigLittleEndianIterator};
 
 pub use assembled_program::{AssembledProgram, Section};
 pub use assembler_error::AssemblerError;
@@ -307,23 +307,38 @@ fn parse_instruction<'a>(
             })?
             .definition();
 
-        let operands = match (def.format, &parts.as_slice()) {
-            (InstructionFormat::I, &[]) => {
-                if def.opcode == 0b1110011 {
-                    Operands {
-                        imm: match instr.to_uppercase().as_str() {
-                            "ECALL" => 0,
-                            "EBREAK" => 1,
-                            _ => unreachable!(),
-                        },
-                        ..Default::default()
-                    }
-                } else {
-                    Operands {
-                        ..Default::default()
-                    }
-                }
+        let (operands, (rd_token, rs1_token, rs2_token, imm_expression)) = match (def.format, &parts.as_slice()) {
+            // Special syntax for ECALL and EBREAK
+            // ECALL
+            (InstructionFormat::I, &[]) if def.opcode == ISA::ECALL.definition().opcode => {
+                (Operands {
+                    imm: match instr.to_uppercase().as_str() {
+                        "ECALL" => 0,
+                        "EBREAK" => 1,
+                        _ => unreachable!(),
+                    },
+                    ..Default::default()
+                }, (
+                    None,
+                    None,
+                    None,
+                    None,
+                ))
             }
+            // Special syntax for FENCE
+            // FENCE
+            (InstructionFormat::I, &[]) if def.opcode == ISA::FENCE.definition().opcode => {
+                (Operands {
+                    ..Default::default()
+                }, (
+                    None,
+                    None,
+                    None,
+                    None,
+                ))
+            }
+            // Register-relative Load and Store instructions
+            // LB rd, imm(rs1)
             (InstructionFormat::I | InstructionFormat::S, &[
                 other_token @ Token {
                     kind: TokenKind::Symbol(other),
@@ -333,7 +348,7 @@ fn parse_instruction<'a>(
                     kind: TokenKind::Comma,
                     ..
                 },
-                imm @ ..,
+                imm_expression @ ..,
                 Token {
                     kind: TokenKind::LParenthesis,
                     ..
@@ -346,31 +361,43 @@ fn parse_instruction<'a>(
                     kind: TokenKind::RParenthesis,
                     ..
                 },
-            ]) => {
+            ]) if def.opcode == ISA::LB.definition().opcode || def.opcode == ISA::SB.definition().opcode => {
                 let other =
                     parse_register(other).map_err(|e| AssemblerError::from_token(e, &other_token))?;
                 let rs1 =
                     parse_register(rs1).map_err(|e| AssemblerError::from_token(e, &rs1_token))?;
-                let imm = parse_immediate(imm, &def, symbol_table, current_address)?;
+                let imm = parse_immediate(imm_expression, &def, symbol_table, current_address)?;
 
                 if def.format == InstructionFormat::S {
                     // S-type
-                    Operands {
+                    (Operands {
                         rs1,
                         rs2: other,
                         imm,
                         ..Default::default()
-                    }
+                    }, (
+                        None,
+                        Some(rs1_token),
+                        Some(other_token),
+                        Some(imm_expression),
+                    ))
                 } else {
                     // I-type
-                    Operands {
+                    (Operands {
                         rd: other,
                         rs1,
                         imm,
                         ..Default::default()
-                    }
+                    }, (
+                        Some(other_token),
+                        Some(rs1_token),
+                        None,
+                        Some(imm_expression),
+                    ))
                 }
             }
+            // Register-register arithmetic instructions
+            // ADD rd, rs1, rs2
             (InstructionFormat::R, &[
                 rd_token @ Token {
                     kind: TokenKind::Symbol(rd),
@@ -400,13 +427,20 @@ fn parse_instruction<'a>(
                 let rs2 = 
                     parse_register(rs2).map_err(|e| AssemblerError::from_token(e, &rs2_token))?;
 
-                Operands {
+                (Operands {
                     rd,
                     rs1,
                     rs2,
                     ..Default::default()
-                }
+                }, (
+                    Some(rd_token),
+                    Some(rs1_token),
+                    Some(rs2_token),
+                    None,
+                ))
             }
+            // Branch instructions
+            // BEQ rs1, rs2, address
             (InstructionFormat::B, &[
                 rs1_token @ Token {
                     kind: TokenKind::Symbol(rs1),
@@ -424,22 +458,29 @@ fn parse_instruction<'a>(
                     kind: TokenKind::Comma,
                     ..
                 },
-                imm @ ..,
+                imm_expression @ ..,
             ]) => {
                 let rs1 =
                     parse_register(rs1).map_err(|e| AssemblerError::from_token(e, &rs1_token))?;
                 let rs2 =
                     parse_register(rs2).map_err(|e| AssemblerError::from_token(e, &rs2_token))?;
-                let imm = parse_immediate(imm, &def, symbol_table, current_address)?;
+                let imm = parse_immediate(imm_expression, &def, symbol_table, current_address)?;
 
-                Operands {
+                (Operands {
                     rs1,
                     rs2,
                     imm,
                     ..Default::default()
-                }
+                }, (
+                    None,
+                    Some(rs1_token),
+                    Some(rs2_token),
+                    Some(imm_expression),
+                ))
             }
-            (_, &[
+            // Register-immediate arithmetic instructions
+            // ADDI rd, rs1, imm
+            (InstructionFormat::I, &[
                 rd_token @ Token {
                     kind: TokenKind::Symbol(rd),
                     ..
@@ -456,21 +497,28 @@ fn parse_instruction<'a>(
                     kind: TokenKind::Comma,
                     ..
                 },
-                imm @ ..,
+                imm_expression @ ..,
             ]) => {
                 let rd =
                     parse_register(rd).map_err(|e| AssemblerError::from_token(e, &rd_token))?;
                 let rs1 =
                     parse_register(rs1).map_err(|e| AssemblerError::from_token(e, &rs1_token))?;
-                let imm = parse_immediate(imm, &def, symbol_table, current_address)?;
+                let imm = parse_immediate(imm_expression, &def, symbol_table, current_address)?;
 
-                Operands {
+                (Operands {
                     rd,
                     rs1,
                     imm,
                     ..Default::default()
-                }
+                }, (
+                    Some(rd_token),
+                    Some(rs1_token),
+                    None,
+                    Some(imm_expression),
+                ))
             }
+            // Absolute Load and Store instructions
+            // LB rd, imm
             (InstructionFormat::I | InstructionFormat::S, &[
                 other_token @ Token {
                     kind: TokenKind::Symbol(other),
@@ -480,45 +528,91 @@ fn parse_instruction<'a>(
                     kind: TokenKind::Comma,
                     ..
                 },
-                imm @ ..,
-            ]) => {
+                imm_expression @ ..,
+            ]) if def.opcode == ISA::LB.definition().opcode || def.opcode == ISA::SB.definition().opcode => {
                 let other =
                     parse_register(other).map_err(|e| AssemblerError::from_token(e, &other_token))?;
                 let rs1 = 0;
-                let imm = parse_immediate(imm, &def, symbol_table, current_address)?;
+                let imm = parse_immediate(imm_expression, &def, symbol_table, current_address)?;
 
                 if def.format == InstructionFormat::S {
-                    // S-type
-                    Operands {
+                    // S-type store instructions
+                    (Operands {
                         rs1,
                         rs2: other,
                         imm,
                         ..Default::default()
-                    }
+                    }, 
+                    (
+                        None,
+                        None,
+                        Some(other_token),
+                        Some(imm_expression),
+                    ))
                 } else {
-                    // I-type
-                    Operands {
+                    // I-type load instructions
+                    (Operands {
                         rd: other,
                         rs1,
                         imm,
                         ..Default::default()
-                    }
+                    }, (
+                        Some(other_token),
+                        None,
+                        None,
+                        Some(imm_expression),
+                    ))
                 }
             }
-            (_, &[rd_token @ Token { kind: TokenKind::Symbol(rd), .. }, Token { kind: TokenKind::Comma, ..}, imm @ ..]) => {
+            // Load Upper Immediate and Jump instructions
+            // LUI rd, imm
+            // JAL rd, address
+            (InstructionFormat::U | InstructionFormat::J, &[
+                rd_token @ Token { kind: TokenKind::Symbol(rd), .. },
+                Token { kind: TokenKind::Comma, ..},
+                imm_expression @ ..,
+            ]) => {
                 let rd = parse_register(rd).map_err(|e| AssemblerError::from_token(e, &rd_token))?;
-                let imm = parse_immediate(imm, &def, symbol_table, current_address)?;
+                let imm = parse_immediate(imm_expression, &def, symbol_table, current_address)?;
 
-                Operands {
+                (Operands {
                     rd,
                     imm,
                     ..Default::default()
-                }
+                }, (
+                    Some(rd_token),
+                    None,
+                    None,
+                    Some(imm_expression),
+                ))
             },
-            _ => todo!(),
+            _ => {
+                return Err(AssemblerError::from_token(
+                    format!("Invalid operands for instruction {}", instr),
+                    &token,
+                ));
+            }
         };
 
-        Ok(Some((Instruction::from_def_operands(def, operands), instruction_token)))
+        Ok(Some((Instruction::try_from_def_operands(def, operands).map_err(|e|
+            match e.error_type {
+                    InstructionBuildErrorType::InvalidOpcode | InstructionBuildErrorType::InvalidFunct3 | InstructionBuildErrorType::InvalidFunct7 => AssemblerError::from_token(e.error_message, &instruction_token),
+                    InstructionBuildErrorType::InvalidRd => AssemblerError::from_token(e.error_message, rd_token.unwrap_or(&instruction_token)),
+                    InstructionBuildErrorType::InvalidRs1 => AssemblerError::from_token(e.error_message, rs1_token.unwrap_or(&instruction_token)),
+                    InstructionBuildErrorType::InvalidRs2 => AssemblerError::from_token(e.error_message, rs2_token.unwrap_or(&instruction_token)),
+                    InstructionBuildErrorType::InvalidImm => match imm_expression {
+                        Some([first, rest @ ..]) => {
+                            AssemblerError {
+                                error_message: e.error_message,
+                                line_number: first.line,
+                                column: first.column,
+                                width: rest.iter().fold(first.width, |acc, token| acc + token.width),
+                            }
+                        }
+                        _ => AssemblerError::from_token(e.error_message, &instruction_token)
+                    }
+                }
+            )?, instruction_token)))
     } else {
         Ok(None)
     }
@@ -555,7 +649,7 @@ fn parse_immediate(imm: &[Token], def: &InstructionDefinition, symbol_table: &Ha
     })?;
 
     match def.format {
-        InstructionFormat::I | InstructionFormat::S | InstructionFormat::S => {
+        InstructionFormat::I | InstructionFormat::S => {
             if imm > 2047 || imm < -2048 {
                 Err(AssemblerError { 
                     error_message: format!(
@@ -563,21 +657,10 @@ fn parse_immediate(imm: &[Token], def: &InstructionDefinition, symbol_table: &Ha
                     imm
                 ), ..expression_err })
             } else {
-                // Shift instructions use the lower 5 bits of the immediate as the shift amount
-                if def.opcode == 0b0010011 && matches!(def.funct3, Some(0x1) | Some(0x5)) {
-                    if let Some(funct7) = def.funct7 {
-                        let shamt = imm & 0b11111;
-                        Ok(((funct7 as i32) << 5) | shamt)
-                    } else {
-                        Ok(imm)
-                    }
-                } else {
-                    Ok(imm)
-                }
+                Ok(imm)
             }
         },
         InstructionFormat::U => {
-            // TODO: Bounds checking
             let imm = imm as u32;
             if imm > 0xFFFFF {
                 Err(AssemblerError {
@@ -780,7 +863,7 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
                         Directive::Symbol(symbol, entry) => {
                             insert(&mut symbol_table, symbol, (None, entry.0, entry.1))?;
                         }
-                        Directive::Section(section, _) => unreachable!(),
+                        Directive::Section(section, _) => unreachable!(), // Section directives are handled above
                     }
                 }
             }
@@ -905,9 +988,8 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
 
                             address += data.len() as u32;
                         }
-                        Directive::Symbol(symbol, entry) => {
-                        }
-                        Directive::Section(section, _) => unreachable!(),
+                        Directive::Symbol(symbol, entry) => {} // Symbols are already resolved
+                        Directive::Section(section, _) => unreachable!(), // Section directives are handled above
                     }
                 }
             }
