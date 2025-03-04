@@ -10,6 +10,7 @@ use std::collections::BTreeSet;
 
 use crate::assembler::AssembledProgram;
 use crate::isa::Instruction;
+use crate::uart::{trigger_uart, Uart};
 
 use controller::get_control_signals;
 use pipeline::CVE2Pipeline;
@@ -25,8 +26,10 @@ pub fn clock_until_break(
     org_state: &EmulatorState,
     program: &mut AssembledProgram,
     breakpoints: &BTreeSet<usize>,
-) -> EmulatorState {
+    uart_module: Uart
+) -> (EmulatorState, Uart) {
     let mut state = org_state.clone();
+    let mut uart_module = uart_module;
     let mut num_cycles = 0;
 
     loop {
@@ -44,13 +47,19 @@ pub fn clock_until_break(
             break;
         }
 
+        uart_module = trigger_uart(
+            uart_module,
+            &mut program.data_memory,
+        );
+
+
         // max 1000 cycles until we can move this to a web worker
         num_cycles += 1;
         if num_cycles > 1000 {
             break;
         }
     }
-    state
+    (state, uart_module)
 }
 
 pub fn clock(org_state: &EmulatorState, program: &mut AssembledProgram) -> EmulatorState {
