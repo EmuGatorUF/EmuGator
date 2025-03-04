@@ -20,6 +20,12 @@ The emulator is modeled as a finite state machine. Instructions are decoded acco
 
 The emulator's internal state is modeled after the OpenHW CVE2 2-stage pipelined RISC-V processor. By reviewing the top-level SystemVerilog file, we extracted the CVE2's datapath and pipeline components to enable cycle-level debugging.
 
+Modifications were made to the original design of CVE2 better this context of an emulator made for education. Modifications include:
+- Control lines were moved from the decoder to the controller to better match textbooks
+- Branching has been reworked to not use branch prediction
+- CSR instructions are a nop because there is no hardware to interface with
+- Fence instructions are a nop because there is no hardware to interface with
+
 ## RISC-V Assembler
 The assembler is long yet simple and integrates with the frontend to take in assembly code as input, producing machine code output for the emulator.
 
