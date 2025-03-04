@@ -1,28 +1,18 @@
 #[allow(non_snake_case)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default)]
 pub struct CVE2Pipeline {
-    pub IF_inst: u32, // Instruction Fetch Buffer
-    pub IF_pc: u32,   // Program Counter for the IF stage
-    pub ID_inst: u32, // Instruction Decode Buffer
-    pub ID_pc: u32,   // Program Counter for the ID stage
+    pub IF_inst: u32,    // Instruction Fetch Buffer
+    pub IF_pc: u32,      // Program Counter for the IF stage
+    pub ID_inst: u32,    // Instruction Decode Buffer
+    pub ID_pc: u32,      // Program Counter for the ID stage
+    pub instr_cycle: u8, // The number of cycles that this instruction has been in ID.
     pub datapath: CVE2Datapath,
     pub control: CVE2Control,
 }
 
-impl Default for CVE2Pipeline {
-    fn default() -> Self {
-        Self {
-            IF_inst: 0,
-            IF_pc: 0,
-            ID_inst: 0,
-            ID_pc: 0,
-            datapath: CVE2Datapath::starting(),
-            control: CVE2Control::default(),
-        }
-    }
-}
-
-/// Struct representing the datapath for the `cve2_top` module.
+/// Lines in the datapath
+///
+/// Initially based on the `cve2_top` module.
 /// Taken from https://github.com/openhwgroup/cve2/blob/main/rtl/cve2_top.sv
 #[allow(dead_code)]
 #[derive(Clone, Copy, Debug, Default)]
@@ -53,8 +43,7 @@ pub struct CVE2Datapath {
     // Core execution control signals
     // pub id_multicycle: u32, // Output signal indicating if the instruction is a multi-cycle instruction.
     // pub fetch_enable_i: bool, // Input signal enabling instruction fetch.
-    pub instr_first_cycle: bool, // Output signal indicating if this is the first cycle an instruction is in ID.
-    pub core_sleep_o: bool,      // Output signal indicating if the core is in sleep mode.
+    pub core_sleep_o: bool, // Output signal indicating if the core is in sleep mode.
 
     // Interrupt inputs
     pub irq_software_i: bool, // Input software interrupt request signal.
@@ -85,18 +74,10 @@ pub struct CVE2Datapath {
     pub reg_write_data: Option<u32>,
 
     // program counter
-    pub next_pc: Option<u32>, // Next program counter value.
-}
-
-impl CVE2Datapath {
-    fn starting() -> Self {
-        Self {
-            // instr_req_o: true,
-            // instr_addr_o: 0u32,
-            // fetch_enable_i: true,
-            ..Default::default()
-        }
-    }
+    pub cmp_result: bool,       // Result of the branch comparison operation.
+    pub should_cond_jump: bool, // If the branch should be taken
+    pub next_pc_sel: PCSel,     // Mux control for selecting the next program counter.
+    pub next_pc: Option<u32>,   // Next program counter value.
 }
 
 /// Control signals for the CVE2 datapath.
@@ -119,7 +100,9 @@ pub struct CVE2Control {
     pub reg_write: bool,                    // Register write control.
 
     // PC Control
-    pub pc_sel: PCSel,     // Mux control for selecting the next PC value.
+    pub cmp_set: bool,     // Comparison result register set control.
+    pub jump_uncond: bool, // Unconditional jump control.
+    pub jump_cond: bool,   // Conditional jump control.
     pub pc_set: bool,      // Program counter write control.
     pub instr_req: bool,   // Instruction memory request
     pub id_in_ready: bool, // ID stage registers ready
@@ -137,7 +120,9 @@ impl Default for CVE2Control {
             lsu_sign_ext: false,
             data_dest_sel: None,
             reg_write: false,
-            pc_sel: PCSel::PC4,
+            cmp_set: false,
+            jump_uncond: false,
+            jump_cond: false,
             pc_set: true,
             instr_req: true,
             id_in_ready: true,
@@ -235,10 +220,9 @@ impl CVE2Control {
             alu_op_a_sel: Some(base_addr),
             alu_op_b_sel: Some(OpBSel::IMM),
             alu_op: Some(ALUOp::ADD),
-            data_dest_sel: Some(DataDestSel::ALU),
 
             // set the PC to it
-            pc_sel: PCSel::ALU,
+            jump_uncond: true,
             pc_set: true,
 
             // preserve the ID stage registers for link
@@ -260,6 +244,41 @@ impl CVE2Control {
             ..Default::default()
         }
     }
+
+    pub fn branch_cmp(op: ALUOp) -> Self {
+        CVE2Control {
+            // compare rs1 and rs2
+            alu_op_a_sel: Some(OpASel::RF),
+            alu_op_b_sel: Some(OpBSel::RF),
+            alu_op: Some(op),
+            cmp_set: true,
+
+            // don't move onto the next instruction
+            pc_set: false,
+            instr_req: false,
+            id_in_ready: false,
+
+            ..Default::default()
+        }
+    }
+
+    pub fn branch_jump() -> Self {
+        CVE2Control {
+            // calculate the destination address
+            alu_op_a_sel: Some(OpASel::PC),
+            alu_op_b_sel: Some(OpBSel::IMM),
+            alu_op: Some(ALUOp::ADD),
+
+            // jump if the comparison was true
+            jump_cond: true,
+            pc_set: true,
+
+            // wait until new PC before loading IF into ID
+            id_in_ready: false,
+
+            ..Default::default()
+        }
+    }
 }
 
 #[repr(u32)]
@@ -273,12 +292,15 @@ pub enum ALUOp {
     SLL,
     SRL,
     SRA,
-    SLT,
-    SLTU,
+    EQ,
+    NEQ,
+    LT,
+    GE,
+    LTU,
+    GEU,
     SELB,
 }
 
-#[allow(dead_code)]
 #[repr(u32)]
 #[derive(Copy, Clone, Debug)]
 pub enum OpASel {
@@ -286,7 +308,6 @@ pub enum OpASel {
     RF,
 }
 
-#[allow(dead_code)]
 #[repr(u32)]
 #[derive(Copy, Clone, Debug)]
 pub enum OpBSel {
@@ -295,7 +316,6 @@ pub enum OpBSel {
     Four,
 }
 
-#[allow(dead_code)]
 #[repr(u32)]
 #[derive(Copy, Clone, Debug)]
 pub enum DataDestSel {
@@ -303,7 +323,6 @@ pub enum DataDestSel {
     LSU,
 }
 
-#[allow(dead_code)]
 #[repr(u32)]
 #[derive(Copy, Clone, Debug)]
 pub enum LSUDataType {
@@ -330,8 +349,10 @@ impl LSUDataType {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[repr(u32)]
+#[derive(Copy, Clone, Debug, Default)]
 pub enum PCSel {
+    #[default]
     PC4,
     ALU,
 }

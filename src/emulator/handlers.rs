@@ -11,12 +11,7 @@ pub fn get_handler(instr: Instruction) -> Result<InstructionHandler, ()> {
         (0b0010111, _, _) => Ok(AUIPC),
         (0b1101111, _, _) => Ok(JAL),
         (0b1100111, _, _) => Ok(JALR),
-        (0b1100011, 0b000, _) => Ok(BEQ),
-        (0b1100011, 0b001, _) => Ok(BNE),
-        (0b1100011, 0b100, _) => Ok(BLT),
-        (0b1100011, 0b101, _) => Ok(BGE),
-        (0b1100011, 0b110, _) => Ok(BLTU),
-        (0b1100011, 0b111, _) => Ok(BGEU),
+        (0b1100011, funct3, _) => Ok(branch),
         (0b0000011, 0b000, _) => Ok(LB),
         (0b0000011, 0b001, _) => Ok(LH),
         (0b0000011, 0b010, _) => Ok(LW),
@@ -80,7 +75,7 @@ fn AUIPC(_instr: &Instruction, state: &mut EmulatorState) {
 
 fn JAL(_instr: &Instruction, state: &mut EmulatorState) {
     // TODO: Push onto Return Address stack when rd = x1 or x5
-    if state.pipeline.datapath.instr_first_cycle {
+    if state.pipeline.instr_cycle == 0 {
         state.pipeline.control = CVE2Control::jump(OpASel::PC);
     } else {
         state.pipeline.control = CVE2Control::link();
@@ -89,143 +84,34 @@ fn JAL(_instr: &Instruction, state: &mut EmulatorState) {
 
 fn JALR(_instr: &Instruction, state: &mut EmulatorState) {
     // TODO: Push onto RAS
-    if state.pipeline.datapath.instr_first_cycle {
+    if state.pipeline.instr_cycle == 0 {
         state.pipeline.control = CVE2Control::jump(OpASel::RF);
     } else {
         state.pipeline.control = CVE2Control::link();
     }
 }
 
-fn BEQ(instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.instr_first_cycle {
-        let immed = (instr.immediate()).unwrap();
-        let new_pc = state.pipeline.ID_pc.checked_add_signed(immed).unwrap();
-
-        // if unaligned on 4-byte boundary
-        if new_pc & 0x003 != 0x00 {
-            panic!("BEQ instruction immediate it not on a 4-byte boundary");
-        }
-
-        if state.x[instr.rs1() as usize] == state.x[instr.rs2() as usize] {
-            // update PC
-            state.pipeline.IF_pc = new_pc;
-            state.pipeline.control.pc_set = false;
-            state.pipeline.control.id_in_ready = false;
-        }
+fn branch(instr: &Instruction, state: &mut EmulatorState) {
+    if state.pipeline.instr_cycle == 0 {
+        let op = match instr.funct3() {
+            0b000 => ALUOp::EQ,
+            0b001 => ALUOp::NEQ,
+            0b100 => ALUOp::LT,
+            0b101 => ALUOp::GE,
+            0b110 => ALUOp::LTU,
+            0b111 => ALUOp::GEU,
+            _ => panic!("Invalid funct7 for branch instruction"),
+        };
+        state.pipeline.control = CVE2Control::branch_cmp(op);
+    } else if state.pipeline.instr_cycle == 1 {
+        state.pipeline.control = CVE2Control::branch_jump();
     } else {
-    }
-}
-
-fn BNE(instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.instr_first_cycle {
-        let immed = (instr.immediate()).unwrap();
-        let new_pc = state.pipeline.ID_pc.checked_add_signed(immed).unwrap();
-
-        // if unaligned on 4-byte boundary
-        if new_pc & 0x003 != 0x00 {
-            panic!("BNE instruction immediate it not on a 4-byte boundary");
-        }
-
-        if state.x[instr.rs1() as usize] != state.x[instr.rs2() as usize] {
-            // update PC
-            state.pipeline.IF_pc = new_pc;
-            state.pipeline.control.pc_set = false;
-            state.pipeline.control.id_in_ready = false;
-        }
-    } else {
-    }
-}
-
-fn BLT(instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.instr_first_cycle {
-        let immed = (instr.immediate()).unwrap();
-        let new_pc = state.pipeline.ID_pc.checked_add_signed(immed).unwrap();
-
-        // if unaligned on 4-byte boundary
-        if new_pc & 0x003 != 0x00 {
-            panic!("BLT instruction immediate it not on a 4-byte boundary");
-        }
-
-        if (state.x[instr.rs1() as usize] as i32) < state.x[instr.rs2() as usize] as i32 {
-            // update PC
-            state.pipeline.IF_pc = new_pc;
-            state.pipeline.control.pc_set = false;
-            state.pipeline.control.id_in_ready = false;
-        }
-    } else {
-    }
-}
-
-fn BGE(instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.instr_first_cycle {
-        let immed = (instr.immediate()).unwrap();
-        let new_pc = state.pipeline.ID_pc.checked_add_signed(immed).unwrap();
-
-        // if unaligned on 4-byte boundary
-        if new_pc & 0x003 != 0x00 {
-            panic!("BGE instruction immediate it not on a 4-byte boundary");
-        }
-
-        if (state.x[instr.rs1() as usize] as i32) >= state.x[instr.rs2() as usize] as i32 {
-            // update PC
-            state.pipeline.IF_pc = new_pc;
-            state.pipeline.control.pc_set = false;
-            state.pipeline.control.id_in_ready = false;
-        }
-    } else {
-    }
-}
-
-fn BLTU(instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.instr_first_cycle {
-        let immed = (instr.immediate()).unwrap();
-        let new_pc = state.pipeline.ID_pc.checked_add_signed(immed).unwrap();
-
-        // if unaligned on 4-byte boundary
-        if new_pc & 0x003 != 0x00 {
-            panic!("BLTU instruction immediate it not on a 4-byte boundary");
-        }
-
-        if state.x[instr.rs1() as usize] < state.x[instr.rs2() as usize] {
-            // stores pc+4 into rd
-            let rd = instr.rd() as usize;
-            state.x[rd] = state.pipeline.IF_pc + 4;
-
-            // update PC
-            state.pipeline.IF_pc = new_pc;
-            state.pipeline.control.pc_set = false;
-            state.pipeline.control.id_in_ready = false;
-        }
-    } else {
-    }
-}
-
-fn BGEU(instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.instr_first_cycle {
-        let immed = (instr.immediate()).unwrap();
-        let new_pc = state.pipeline.ID_pc.checked_add_signed(immed).unwrap();
-
-        // if unaligned on 4-byte boundary
-        if new_pc & 0x003 != 0x00 {
-            panic!("BGEU instruction immediate it not on a 4-byte boundary");
-        }
-
-        if state.x[instr.rs1() as usize] >= state.x[instr.rs2() as usize] {
-            // stores pc+4 into rd
-            let rd = instr.rd() as usize;
-            state.x[rd] = state.pipeline.IF_pc + 4;
-
-            // update PC
-            state.pipeline.IF_pc = new_pc;
-            state.pipeline.control.pc_set = false;
-            state.pipeline.control.id_in_ready = false;
-        }
-    } else {
+        state.pipeline.control = CVE2Control::default();
     }
 }
 
 fn LB(_instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.instr_first_cycle {
+    if state.pipeline.instr_cycle == 0 {
         state.pipeline.control = CVE2Control::load_request(LSUDataType::Byte);
     } else {
         state.pipeline.control = CVE2Control::load_write(LSUDataType::Byte, true);
@@ -233,7 +119,7 @@ fn LB(_instr: &Instruction, state: &mut EmulatorState) {
 }
 
 fn LH(_instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.instr_first_cycle {
+    if state.pipeline.instr_cycle == 0 {
         state.pipeline.control = CVE2Control::load_request(LSUDataType::HalfWord);
     } else {
         state.pipeline.control = CVE2Control::load_write(LSUDataType::HalfWord, true);
@@ -241,7 +127,7 @@ fn LH(_instr: &Instruction, state: &mut EmulatorState) {
 }
 
 fn LW(_instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.instr_first_cycle {
+    if state.pipeline.instr_cycle == 0 {
         state.pipeline.control = CVE2Control::load_request(LSUDataType::Word);
     } else {
         state.pipeline.control = CVE2Control::load_write(LSUDataType::Word, false);
@@ -249,7 +135,7 @@ fn LW(_instr: &Instruction, state: &mut EmulatorState) {
 }
 
 fn LBU(_instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.instr_first_cycle {
+    if state.pipeline.instr_cycle == 0 {
         state.pipeline.control = CVE2Control::load_request(LSUDataType::Byte);
     } else {
         state.pipeline.control = CVE2Control::load_write(LSUDataType::Byte, false);
@@ -257,7 +143,7 @@ fn LBU(_instr: &Instruction, state: &mut EmulatorState) {
 }
 
 fn LHU(_instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.instr_first_cycle {
+    if state.pipeline.instr_cycle == 0 {
         state.pipeline.control = CVE2Control::load_request(LSUDataType::HalfWord);
     } else {
         state.pipeline.control = CVE2Control::load_write(LSUDataType::HalfWord, false);
@@ -265,7 +151,7 @@ fn LHU(_instr: &Instruction, state: &mut EmulatorState) {
 }
 
 fn SB(_instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.instr_first_cycle {
+    if state.pipeline.instr_cycle == 0 {
         state.pipeline.control = CVE2Control::store_request(LSUDataType::Byte);
     } else {
         state.pipeline.control = CVE2Control::store_completion();
@@ -273,7 +159,7 @@ fn SB(_instr: &Instruction, state: &mut EmulatorState) {
 }
 
 fn SH(_instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.instr_first_cycle {
+    if state.pipeline.instr_cycle == 0 {
         state.pipeline.control = CVE2Control::store_request(LSUDataType::HalfWord);
     } else {
         state.pipeline.control = CVE2Control::store_completion();
@@ -281,7 +167,7 @@ fn SH(_instr: &Instruction, state: &mut EmulatorState) {
 }
 
 fn SW(_instr: &Instruction, state: &mut EmulatorState) {
-    if state.pipeline.datapath.instr_first_cycle {
+    if state.pipeline.instr_cycle == 0 {
         state.pipeline.control = CVE2Control::store_request(LSUDataType::Word);
     } else {
         state.pipeline.control = CVE2Control::store_completion();
@@ -293,11 +179,11 @@ fn ADDI(_instr: &Instruction, state: &mut EmulatorState) {
 }
 
 fn SLTI(_instr: &Instruction, state: &mut EmulatorState) {
-    state.pipeline.control = CVE2Control::immediate(ALUOp::SLT);
+    state.pipeline.control = CVE2Control::immediate(ALUOp::LT);
 }
 
 fn SLTIU(_instr: &Instruction, state: &mut EmulatorState) {
-    state.pipeline.control = CVE2Control::immediate(ALUOp::SLTU);
+    state.pipeline.control = CVE2Control::immediate(ALUOp::LTU);
 }
 
 fn XORI(_instr: &Instruction, state: &mut EmulatorState) {
@@ -338,11 +224,11 @@ fn SLL(_instr: &Instruction, state: &mut EmulatorState) {
 }
 
 fn SLT(_instr: &Instruction, state: &mut EmulatorState) {
-    state.pipeline.control = CVE2Control::register(ALUOp::SLT);
+    state.pipeline.control = CVE2Control::register(ALUOp::LT);
 }
 
 fn SLTU(_instr: &Instruction, state: &mut EmulatorState) {
-    state.pipeline.control = CVE2Control::register(ALUOp::SLTU);
+    state.pipeline.control = CVE2Control::register(ALUOp::LTU);
 }
 
 fn XOR(_instr: &Instruction, state: &mut EmulatorState) {

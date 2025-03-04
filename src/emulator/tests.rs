@@ -178,7 +178,7 @@ fn test_JAL_neg_offset() {
 }
 
 #[test]
-#[should_panic(expected = "JAL instruction immediate it not on a 4-byte boundary")]
+#[should_panic(expected = "PC must be on a 4-byte boundary")]
 fn test_JAL_panic() {
     let mut emulator_state = EmulatorState::default();
 
@@ -349,18 +349,19 @@ fn test_BEQ() {
     // BEQ (branch if x1 == x2) - should not branch because x1 != x2
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
+    emulator_state = clock(&emulator_state, &mut program);
+    emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x4);
 
     // BEQ (branch if x0 == x2) - should branch because x0 == x2
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.pipeline.IF_pc, pc + 0x8);
-
-    // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[5], 0);
+    emulator_state = clock(&emulator_state, &mut program);
+    assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x8);
 
     // ADDI ( x5 := x0 + 2)
+    assert_eq!(emulator_state.x[5], 0);
     emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.x[5], 2);
 }
@@ -411,18 +412,19 @@ fn test_BNE() {
     // BNE (branch if x0 != x2) - should not branch because x0 == x2
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
+    emulator_state = clock(&emulator_state, &mut program);
+    emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x4);
 
     // BNE (branch if x1 != x2) - should branch because x1 != x2
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.pipeline.IF_pc, pc + 0x8);
-
-    // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[5], 0);
+    emulator_state = clock(&emulator_state, &mut program);
+    assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x8);
 
     // ADDI ( x5 := x0 + 2)
+    assert_eq!(emulator_state.x[5], 0);
     emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.x[5], 2);
 }
@@ -474,18 +476,19 @@ fn test_BLT() {
     // BLT (branch if x0 < x1) - should not branch because x0 > x1
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
+    emulator_state = clock(&emulator_state, &mut program);
+    emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x4);
 
     // BLT (branch if x1 < x0) - should branch because x1 < x0
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.pipeline.IF_pc, pc + 0x8);
-
-    // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[5], 0);
+    emulator_state = clock(&emulator_state, &mut program);
+    assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x8);
 
     // ADDI ( x5 := x0 + 2)
+    assert_eq!(emulator_state.x[5], 0);
     emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.x[5], 2);
 }
@@ -543,31 +546,31 @@ fn test_BGE() {
     // BGE (branch if x1 >= x0) - should not branch because x0 > x1
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
+    emulator_state = clock(&emulator_state, &mut program);
+    emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x4);
 
     // BLT (branch if x0 >= x1) - should branch because x1 < x0
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.pipeline.IF_pc, pc + 0x8);
-
-    // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[5], 0);
+    emulator_state = clock(&emulator_state, &mut program);
+    assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x8);
 
     // ADDI ( x5 := x0 + 2)
+    assert_eq!(emulator_state.x[5], 0);
     emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.x[5], 2);
 
     // BGE (branch if x0 >= x2) - should branch because x0 == x2
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.pipeline.IF_pc, pc - 0x8);
-
-    // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[5], 2);
+    emulator_state = clock(&emulator_state, &mut program);
+    assert_eq!(emulator_state.pipeline.ID_pc, pc - 0x8);
 
     // ADDI ( x5 := x0 + 1)
+    assert_eq!(emulator_state.x[5], 2);
     emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.x[5], 1);
 }
@@ -619,18 +622,19 @@ fn test_BLTU() {
     // BLTU (branch if x1 < x0) - should not branch because x1 > x0
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
+    emulator_state = clock(&emulator_state, &mut program);
+    emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x4);
 
     // BLTU (branch if x0 < x1) - should branch because x0 < x1
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.pipeline.IF_pc, pc + 0x8);
-
-    // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[5], 0);
+    emulator_state = clock(&emulator_state, &mut program);
+    assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x8);
 
     // ADDI ( x5 := x0 + 2)
+    assert_eq!(emulator_state.x[5], 0);
     emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.x[5], 2);
 }
@@ -688,31 +692,31 @@ fn test_BGEU() {
     // BGEU (branch if x0 >= x1) - should not branch because x0 < x1
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
+    emulator_state = clock(&emulator_state, &mut program);
+    emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x4);
 
     // BLT (branch if x1 >= x0) - should branch because x1 > x0
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.pipeline.IF_pc, pc + 0x8);
-
-    // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[5], 0);
+    emulator_state = clock(&emulator_state, &mut program);
+    assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x8);
 
     // ADDI ( x5 := x0 + 2)
+    assert_eq!(emulator_state.x[5], 0);
     emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.x[5], 2);
 
     // BGEU (branch if x0 >= x2) - should branch because x0 == x2
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.pipeline.IF_pc, pc - 0x8);
-
-    // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[5], 2);
+    emulator_state = clock(&emulator_state, &mut program);
+    assert_eq!(emulator_state.pipeline.ID_pc, pc - 0x8);
 
     // ADDI ( x5 := x0 + 1)
+    assert_eq!(emulator_state.x[5], 2);
     emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.x[5], 1);
 }

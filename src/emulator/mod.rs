@@ -94,6 +94,7 @@ pub fn clock(org_state: &EmulatorState, program: &mut AssembledProgram) -> Emula
     next_state.pipeline.run_pipeline_buffer_registers();
 
     // Find the next PC
+    next_state.pipeline.run_cmp_reg();
     next_state.pipeline.run_pc_mux();
     next_state.pipeline.run_pc_reg();
 
@@ -173,8 +174,12 @@ impl CVE2Pipeline {
             ALUOp::SLL => a << (b & 0x1F),
             ALUOp::SRL => a >> (b & 0x1F),
             ALUOp::SRA => ((a as i32) >> (b & 0x1F)) as u32,
-            ALUOp::SLT => ((a as i32) < (b as i32)) as u32,
-            ALUOp::SLTU => (a < b) as u32,
+            ALUOp::EQ => (a == b) as u32,
+            ALUOp::NEQ => (a != b) as u32,
+            ALUOp::LT => ((a as i32) < (b as i32)) as u32,
+            ALUOp::GE => ((a as i32) >= (b as i32)) as u32,
+            ALUOp::LTU => (a < b) as u32,
+            ALUOp::GEU => (a >= b) as u32,
             ALUOp::SELB => b,
         });
     }
@@ -258,10 +263,19 @@ impl CVE2Pipeline {
         }
     }
 
+    pub fn run_cmp_reg(&mut self) {
+        if self.control.cmp_set {
+            self.datapath.cmp_result = self.datapath.alu_out.map_or(false, |x| x != 0);
+        }
+    }
+
     pub fn run_pc_mux(&mut self) {
-        self.datapath.next_pc = match self.control.pc_sel {
+        self.datapath.should_cond_jump = self.control.jump_cond && self.datapath.cmp_result;
+        let should_jump = self.control.jump_uncond || self.datapath.should_cond_jump;
+        self.datapath.next_pc_sel = if should_jump { PCSel::ALU } else { PCSel::PC4 };
+        self.datapath.next_pc = match self.datapath.next_pc_sel {
             PCSel::PC4 => Some(self.ID_pc + 4),
-            PCSel::ALU => self.datapath.reg_write_data,
+            PCSel::ALU => self.datapath.alu_out,
         }
     }
 
@@ -269,7 +283,7 @@ impl CVE2Pipeline {
         if self.control.pc_set {
             if let Some(next_pc) = self.datapath.next_pc {
                 if next_pc & 0x00000003 != 0x00 {
-                    panic!("JAL instruction immediate it not on a 4-byte boundary");
+                    panic!("PC must be on a 4-byte boundary");
                 }
                 self.IF_pc = next_pc;
             }
@@ -281,9 +295,9 @@ impl CVE2Pipeline {
         if self.control.id_in_ready {
             self.ID_pc = self.IF_pc;
             self.ID_inst = self.IF_inst;
-            self.datapath.instr_first_cycle = true;
+            self.instr_cycle = 0;
         } else {
-            self.datapath.instr_first_cycle = false;
+            self.instr_cycle += 1;
         }
     }
 }
