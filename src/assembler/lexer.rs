@@ -95,18 +95,21 @@ impl<'a> Lexer<'a> {
                 end = j;
                 out.push(if c == '\\' {
                     match self.next_char() {
-                        Some((k, c)) => match c {
-                            'b' => '\x08',
-                            'f' => '\x0e',
-                            'n' => '\n',
-                            'r' => '\r',
-                            't' => '\t',
-                            '0'..'9' => todo!(),
-                            'x' | 'x' => todo!(),
-                            '\\' => '\\',
-                            '"' => '"',
-                            escaped_c => escaped_c,
-                        },
+                        Some((j, c)) => {
+                            end = j;
+                            match c {
+                                'b' => '\x08',
+                                'f' => '\x0e',
+                                'n' => '\n',
+                                'r' => '\r',
+                                't' => '\t',
+                                '0'..'9' => todo!(),
+                                'x' | 'X' => todo!(),
+                                '\\' => '\\',
+                                '"' => '"',
+                                escaped_c => escaped_c,
+                            }
+                        }
                         None => {
                             return Err(AssemblerError::new(
                                 "Unexpected EOF while parsing escape sequence.".to_string(),
@@ -299,7 +302,7 @@ impl<'a> Iterator for Lexer<'a> {
 
                             // Detect base
                             let base = if c == '0' {
-                                let (j, b) = self.char_iter.peek().ok_or(AssemblerError::new(
+                                let (_, b) = self.char_iter.peek().ok_or(AssemblerError::new(
                                     "Unexpected EOF while parsing string".to_string(),
                                     self.line,
                                     token_col,
@@ -326,7 +329,7 @@ impl<'a> Iterator for Lexer<'a> {
                                 10
                             };
 
-                            let start = if let Some((j, c)) = self.char_iter.peek() {
+                            let start = if let Some((j, _)) = self.char_iter.peek() {
                                 *j - 1
                             } else {
                                 i
@@ -347,7 +350,6 @@ impl<'a> Iterator for Lexer<'a> {
                                         token_col + (end - i),
                                         1,
                                     ));
-                                    break;
                                 }
                                 self.next_char();
                             }
@@ -433,7 +435,7 @@ impl<'a> Iterator for Lexer<'a> {
                 })())
             });
 
-        if let Some(Err(error)) = &output {
+        if let Some(Err(_)) = &output {
             // Consume the rest of the line if there was an error
             while let Some((_, c)) = self.next_char() {
                 if c == '\n' {

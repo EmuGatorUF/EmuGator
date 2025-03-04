@@ -211,6 +211,7 @@ impl Instruction {
         }
     }
 
+    #[allow(dead_code)]
     pub fn from_def_operands(def: InstructionDefinition, operands: Operands) -> Instruction {
         Self::try_from_def_operands(def, operands).expect("Invalid instruction")
     }
@@ -411,6 +412,7 @@ impl Instruction {
         bits!(self.instr, 25, 7) as u8
     }
 
+    #[allow(dead_code)]
     pub fn is_valid(&self) -> bool {
         InstructionDefinition::from_instr(*self).is_some()
     }

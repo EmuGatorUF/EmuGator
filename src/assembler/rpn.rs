@@ -1,11 +1,9 @@
 use std::{collections::VecDeque, fmt::Display, ops::Deref};
 
-use dioxus::html::b;
 use ibig::IBig;
 
 use super::{
-    Section,
-    assembled_program::Address,
+    Address, Section,
     assembler_error::AssemblerError,
     lexer::{Token, TokenKind},
 };

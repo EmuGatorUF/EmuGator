@@ -1,6 +1,8 @@
 #![allow(non_snake_case)]
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
+
+use bimap::BiBTreeMap;
 
 use crate::isa::{ISA, Operands};
 
@@ -25,15 +27,21 @@ fn populate(instructions: &[Instruction]) -> AssembledProgram {
 }
 
 fn populate_with_offset(instructions: &[Instruction], offset: u32) -> AssembledProgram {
-    let mut program = AssembledProgram::new();
+    let mut instruction_memory = BTreeMap::new();
     for (i, &instruction) in instructions.iter().enumerate() {
         write(
-            &mut program.instruction_memory,
+            &mut instruction_memory,
             offset + (4 * i) as u32,
             &instruction.raw().to_le_bytes(),
         );
     }
-    program
+
+    AssembledProgram {
+        instruction_memory,
+        data_memory: BTreeMap::new(),
+        source_map: BiBTreeMap::new(),
+        symbol_table: HashMap::new(),
+    }
 }
 
 #[test]

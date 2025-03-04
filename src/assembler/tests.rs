@@ -5,13 +5,8 @@ use std::collections::BTreeMap;
 use bimap::BiBTreeMap;
 use ibig::IBig;
 
-use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use crate::assembler::lexer::Lexer;
 
-use crate::assembler;
-use crate::assembler::lexer::{Lexer, TokenKind};
-
-use super::rpn::Expression;
 use super::{assemble, parse_expression};
 use crate::include_test_file;
 
@@ -20,7 +15,7 @@ use crate::include_test_file;
 fn print_lexer() {
     let source = include_test_file!("syntax-check.s");
 
-    let mut lexer = Lexer::new(source).peekable();
+    let lexer = Lexer::new(source).peekable();
     let tokens: Vec<_> = lexer.map(|token_result| token_result.unwrap()).collect();
 
     for token in tokens {
@@ -103,7 +98,8 @@ fn test_randomized_instructions() {
                         error.line_number,
                         error.column,
                         error.error_message
-                    );
+                    )
+                    .unwrap();
                 }
             }
         }
@@ -202,7 +198,7 @@ fn test_randomized_branches() {
         let labels: Vec<String> = (0..num_labels).map(|i| format!("label_{}", i)).collect();
 
         let num_instructions = rng.random_range(10..30);
-        for instr_idx in 0..num_instructions {
+        for _instr_idx in 0..num_instructions {
             if rng.random_bool(0.3) {
                 let label_idx = rng.random_range(0..labels.len());
                 writeln!(program, "{}:", labels[label_idx]).unwrap();
