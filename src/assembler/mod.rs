@@ -13,12 +13,9 @@ use peeking_take_while::PeekableExt;
 use rpn::{Expression, RPN, RPNKind};
 
 use crate::{
-    bits,
-    isa::{
-        ISA, Instruction, InstructionBuildErrorType, InstructionDefinition,
-        InstructionFormat, Operands,
-    },
-    utils::IBigLittleEndianIterator,
+    bitmask, bits, isa::{
+        Instruction, InstructionBuildErrorType, InstructionDefinition, InstructionFormat, Operands, ISA
+    }, utils::IBigLittleEndianIterator
 };
 
 pub use address::Address;
@@ -35,7 +32,7 @@ mod lexer;
 mod rpn;
 
 fn aligned(value: u32, alignment: u32) -> u32 {
-    (value + alignment - 1) & !(alignment - 1)
+    (value + bitmask!(alignment)) & !bitmask!(alignment)
 }
 
 fn consume_line<'a>(
@@ -200,7 +197,7 @@ fn parse_directive<'a>(
                     let expression = parse_expression(lexer)?;
 
                     let expression_err = AssemblerError::from_expression("".into(), &expression);
-                    let alignment = expression
+                    let alignment: u32 = expression
                         .evaluate(|_| {
                             Err(AssemblerError {
                                 error_message: "Cannot use symbols in '.align' directive.".into(),
@@ -208,23 +205,24 @@ fn parse_directive<'a>(
                             })
                         })?
                         .1
-                        .try_into()
-                        .map_err(|_| AssemblerError {
-                            error_message: format!("Invalid alignment value."),
-                            ..expression_err
-                        })?;
+                        .try_into().map_err(
+                            |_| AssemblerError {
+                                error_message: "Alignment is too large.".into(),
+                                ..expression_err
+                            }
+                        )?;
 
                     Directive::Alignment(alignment)
                 }
                 "byte" | "2byte" | "4byte" | "8byte" | "half" | "word" | "dword" => {
                     let (width, alignment) = match directive_str {
-                        "byte" => (1, 1),
-                        "2byte" => (2, 1),
-                        "4byte" => (4, 1),
-                        "8byte" => (8, 1),
-                        "half" => (2, 1),
-                        "word" => (4, 1),
-                        "dword" => (8, 1),
+                        "byte" => (1, 0),
+                        "2byte" => (2, 0),
+                        "4byte" => (4, 0),
+                        "8byte" => (8, 0),
+                        "half" => (2, 0),
+                        "word" => (4, 0),
+                        "dword" => (8, 0),
                         _ => unreachable!(),
                     };
                     let mut data = vec![];
@@ -332,7 +330,7 @@ fn parse_directive<'a>(
                     }
 
                     // Return string length
-                    Directive::Data(data, 1)
+                    Directive::Data(data, 0)
                 }
                 _ => {
                     return Err(AssemblerError::from_token(
@@ -987,7 +985,7 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
                             offset = aligned(offset, alignment);
                         }
                         Directive::Data(data, alignment) => {
-                            offset = (offset + alignment - 1) & !(alignment - 1);
+                            offset = aligned(offset, alignment);
                             offset += data.len() as u32;
                         }
                         Directive::Symbol(symbol, entry) => {
@@ -1008,7 +1006,7 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
                 consume_line(token, lexer)?;
 
                 // Instructions are 4 bytes and must be aligned
-                offset = aligned(offset, 4);
+                offset = aligned(offset, 2);
                 offset += 4;
             }
 
