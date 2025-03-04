@@ -1,358 +1,252 @@
+use std::collections::BTreeMap;
+
+use crate::{assembler::AssembledProgram, bitmask, bits, isa::Instruction};
+
+use super::{
+    controller::{ALUOp, CVE2Control, DataDestSel, OpASel, OpBSel},
+    datapath::{CVE2Datapath, PCSel},
+    register_file::RegisterFile,
+};
+
 #[allow(non_snake_case)]
 #[derive(Copy, Clone, Debug, Default)]
 pub struct CVE2Pipeline {
-    pub IF_inst: u32,    // Instruction Fetch Buffer
-    pub IF_pc: u32,      // Program Counter for the IF stage
-    pub ID_inst: u32,    // Instruction Decode Buffer
-    pub ID_pc: u32,      // Program Counter for the ID stage
-    pub instr_cycle: u8, // The number of cycles that this instruction has been in ID.
+    pub IF_inst: u32,     // Instruction Fetch Buffer
+    pub IF_pc: u32,       // Program Counter for the IF stage
+    pub ID_inst: u32,     // Instruction Decode Buffer
+    pub ID_pc: u32,       // Program Counter for the ID stage
+    pub instr_cycle: u32, // The number of cycles that this instruction has been in ID.
     pub datapath: CVE2Datapath,
     pub control: CVE2Control,
 }
 
-/// Lines in the datapath
-///
-/// Initially based on the `cve2_top` module.
-/// Taken from https://github.com/openhwgroup/cve2/blob/main/rtl/cve2_top.sv
-#[allow(dead_code)]
-#[derive(Clone, Copy, Debug, Default)]
-pub struct CVE2Datapath {
-    // Clock and Reset
-    pub clk_i: bool,  // Input clock signal.
-    pub rst_ni: bool, // Active-low reset signal.
+impl CVE2Pipeline {
+    pub fn run_instruction_fetch(&mut self, program: &mut AssembledProgram) {
+        // Load the fetched instruction into the instr_rdata lines
+        if self.control.instr_req {
+            // Read the next instruction into the instruction fetch register
+            match rw_memory(
+                &mut program.instruction_memory,
+                self.IF_pc,
+                [true; 4],
+                false,
+                0,
+            ) {
+                Ok(instr_data) => {
+                    self.IF_inst = instr_data;
+                    self.datapath.instr_gnt_i = true;
+                    self.datapath.instr_rvalid_i = true;
+                    self.datapath.instr_err_i = false;
+                }
+                Err(_) => {
+                    self.datapath.instr_gnt_i = true;
+                    self.datapath.instr_rvalid_i = false;
+                    self.datapath.instr_err_i = true;
+                }
+            }
+        }
+    }
 
-    // Instruction memory interface
-    // pub instr_req_o: bool, // Output signal requesting an instruction fetch.
-    // pub instr_addr_o: u32,    // Output address for fetching instructions.
-    // pub instr_rdata_i: u32, // Input data received as the fetched instruction.
-    pub instr_gnt_i: bool, // Input signal indicating the instruction request is granted.
-    pub instr_rvalid_i: bool, // Input signal indicating valid instruction data is available.
-    pub instr_err_i: bool, // Input signal indicating an error during instruction fetch.
+    pub fn run_decode(&mut self, instr: Instruction) {
+        self.datapath.reg_s1 = instr.rs1();
+        self.datapath.reg_s2 = instr.rs2();
+        self.datapath.reg_d = instr.rd();
+        self.datapath.imm = instr.immediate().ok().map(|x| x as u32); // FIXME: signed support
+    }
 
-    // Data memory interface
-    pub data_req_o: bool,  // Output signal requesting a data memory operation.
-    pub data_addr_o: u32,  // Output address for the data memory operation.
-    pub data_wdata_o: u32, // Output data to be written to memory.
-    pub data_rdata_i: u32, // Input data read from memory.
-    pub data_we_o: bool,   // Output write-enable signal for data memory.
-    pub data_be_o: [bool; 4], // Output byte-enable (4-bit) for selective byte access in 32-bit words.
-    pub data_gnt_i: bool,     // Input signal indicating the data request is granted.
-    pub data_rvalid_i: bool,  // Input signal indicating valid data is available.
-    pub data_err_i: bool,     // Input signal indicating an error during the data memory operation.
+    pub fn run_read_registers(&mut self, register_file: &RegisterFile) {
+        self.datapath.data_s1 = register_file[self.datapath.reg_s1 as usize];
+        self.datapath.data_s2 = register_file[self.datapath.reg_s2 as usize];
+    }
 
-    // Core execution control signals
-    // pub id_multicycle: u32, // Output signal indicating if the instruction is a multi-cycle instruction.
-    // pub fetch_enable_i: bool, // Input signal enabling instruction fetch.
-    pub core_sleep_o: bool, // Output signal indicating if the core is in sleep mode.
+    pub fn run_operand_muxes(&mut self) {
+        self.datapath.alu_op_a = match self.control.alu_op_a_sel {
+            Some(OpASel::PC) => Some(self.ID_pc),
+            Some(OpASel::RF) => Some(self.datapath.data_s1),
+            None => None,
+        };
+        self.datapath.alu_op_b = match self.control.alu_op_b_sel {
+            Some(OpBSel::RF) => Some(self.datapath.data_s2),
+            Some(OpBSel::IMM) => self.datapath.imm,
+            Some(OpBSel::Four) => Some(4),
+            None => None,
+        };
+    }
 
-    // Interrupt inputs
-    pub irq_software_i: bool, // Input software interrupt request signal.
-    pub irq_timer_i: bool,    // Input timer interrupt request signal.
-    pub irq_external_i: bool, // Input external interrupt request signal.
-    pub irq_fast_i: u16,      // Input fast interrupt vector, 16 bits for fast IRQs.
-    pub irq_nm_i: bool,       // Input non-maskable interrupt request signal.
+    pub fn run_alu(&mut self) {
+        let Some(op) = self.control.alu_op else {
+            return;
+        };
+        let Some(a) = self.datapath.alu_op_a else {
+            return;
+        };
+        let Some(b) = self.datapath.alu_op_b else {
+            return;
+        };
 
-    // Debug Interface
-    pub debug_req_i: bool, // Input signal indicating a debug request.
+        self.datapath.alu_out = Some(match op {
+            ALUOp::ADD => ((a as i32) + (b as i32)) as u32,
+            ALUOp::SUB => ((a as i32) - (b as i32)) as u32,
+            ALUOp::XOR => a ^ b,
+            ALUOp::OR => a | b,
+            ALUOp::AND => a & b,
+            ALUOp::SLL => a << (b & 0x1F),
+            ALUOp::SRL => a >> (b & 0x1F),
+            ALUOp::SRA => ((a as i32) >> (b & 0x1F)) as u32,
+            ALUOp::EQ => (a == b) as u32,
+            ALUOp::NEQ => (a != b) as u32,
+            ALUOp::LT => ((a as i32) < (b as i32)) as u32,
+            ALUOp::GE => ((a as i32) >= (b as i32)) as u32,
+            ALUOp::LTU => (a < b) as u32,
+            ALUOp::GEU => (a >= b) as u32,
+            ALUOp::SELB => b,
+        });
+    }
 
-    // Extra internal lines not in the top module
-    // decoded instruction
-    pub reg_s1: u8,
-    pub reg_s2: u8,
-    pub imm: Option<u32>,
-    pub reg_d: u8,
+    pub fn run_lsu(&mut self) {
+        // pass through data memory output
+        self.datapath.lsu_out = if self.datapath.data_rvalid_i {
+            let data = self.datapath.data_rdata_i;
+            if self.control.lsu_sign_ext {
+                // sign-extend the data
+                let data_size = self
+                    .control
+                    .lsu_data_type
+                    .map(|d| d.size_in_bits())
+                    .unwrap_or(0);
+                let sign_mask = bitmask!(31;data_size) * bits!(data, data_size - 1);
+                Some(sign_mask | data)
+            } else {
+                Some(data)
+            }
+        } else {
+            None
+        };
 
-    // register file outputs
-    pub data_s1: u32,
-    pub data_s2: u32,
+        // pass through inputs to the data memory
+        self.datapath.data_req_o = self.control.lsu_request;
+        self.datapath.data_we_o = self.control.lsu_write_enable;
+        self.datapath.data_addr_o = self.datapath.alu_out.unwrap_or_default();
+        self.datapath.data_be_o = self
+            .control
+            .lsu_data_type
+            .map(|d| d.byte_enable())
+            .unwrap_or_default();
+        self.datapath.data_wdata_o = self.datapath.data_s2;
+    }
 
-    /// alu and lsu
-    pub alu_op_a: Option<u32>, // Operand A input.
-    pub alu_op_b: Option<u32>, // Operand B input.
-    pub alu_out: Option<u32>,  // ALU output.
-    pub lsu_out: Option<u32>,  // Load/Store Unit output.
-    pub reg_write_data: Option<u32>,
+    pub fn run_write_data_mux(&mut self) {
+        self.datapath.reg_write_data = match self.control.data_dest_sel {
+            Some(DataDestSel::ALU) => self.datapath.alu_out,
+            Some(DataDestSel::LSU) => self.datapath.lsu_out,
+            None => None,
+        };
+    }
 
-    // program counter
-    pub cmp_result: bool,       // Result of the branch comparison operation.
-    pub should_cond_jump: bool, // If the branch should be taken
-    pub next_pc_sel: PCSel,     // Mux control for selecting the next program counter.
-    pub next_pc: Option<u32>,   // Next program counter value.
-}
+    pub fn run_data_memory(&mut self, data_memory: &mut BTreeMap<u32, u8>) {
+        // Perform any requested memory read/write
+        if self.datapath.data_req_o {
+            match rw_memory(
+                data_memory,
+                self.datapath.data_addr_o,
+                self.datapath.data_be_o,
+                self.datapath.data_we_o,
+                self.datapath.data_wdata_o,
+            ) {
+                Ok(rdata) => {
+                    self.datapath.data_rdata_i = rdata;
+                    self.datapath.data_gnt_i = true;
+                    self.datapath.data_rvalid_i = true;
+                    self.datapath.data_err_i = false;
+                }
+                Err(_) => {
+                    self.datapath.data_rdata_i = 0;
+                    self.datapath.data_gnt_i = true;
+                    self.datapath.data_rvalid_i = false;
+                    self.datapath.data_err_i = true;
+                }
+            }
+        } else {
+            self.datapath.data_rdata_i = 0;
+            self.datapath.data_gnt_i = false;
+            self.datapath.data_rvalid_i = false;
+            self.datapath.data_err_i = false;
+        }
+    }
 
-/// Control signals for the CVE2 datapath.
-/// Note: `Option::None` is used to represent a "don't care" value.
-#[derive(Clone, Copy, Debug)]
-pub struct CVE2Control {
-    // ALU Control
-    pub alu_op_a_sel: Option<OpASel>, // Mux control for selecting operand A.
-    pub alu_op_b_sel: Option<OpBSel>, // Mux control for selecting operand B.
-    pub alu_op: Option<ALUOp>,        // ALU operation control.
+    pub fn run_write_register(&mut self, register_file: &mut RegisterFile) {
+        if self.control.reg_write {
+            if let Some(data) = self.datapath.reg_write_data {
+                register_file[self.datapath.reg_d as usize] = data;
+            }
+        }
+    }
 
-    // LSU Control
-    pub lsu_data_type: Option<LSUDataType>, // Data type for load/store operations.
-    pub lsu_request: bool,                  // Request signal for the LSU.
-    pub lsu_write_enable: bool,             // Write enable for the LSU.
-    pub lsu_sign_ext: bool,                 // Sign extension control for load operations.
+    pub fn run_cmp_reg(&mut self) {
+        if self.control.cmp_set {
+            self.datapath.cmp_result = self.datapath.alu_out.map_or(false, |x| x != 0);
+        }
+    }
 
-    // Register Write Control
-    pub data_dest_sel: Option<DataDestSel>, // Mux control for selecting the write-back data.
-    pub reg_write: bool,                    // Register write control.
+    pub fn run_pc_mux(&mut self) {
+        self.datapath.should_cond_jump = self.control.jump_cond && self.datapath.cmp_result;
+        let should_jump = self.control.jump_uncond || self.datapath.should_cond_jump;
+        self.datapath.next_pc_sel = if should_jump { PCSel::ALU } else { PCSel::PC4 };
+        self.datapath.next_pc = match self.datapath.next_pc_sel {
+            PCSel::PC4 => Some(self.ID_pc + 4),
+            PCSel::ALU => self.datapath.alu_out,
+        }
+    }
 
-    // PC Control
-    pub cmp_set: bool,     // Comparison result register set control.
-    pub jump_uncond: bool, // Unconditional jump control.
-    pub jump_cond: bool,   // Conditional jump control.
-    pub pc_set: bool,      // Program counter write control.
-    pub instr_req: bool,   // Instruction memory request
-    pub id_in_ready: bool, // ID stage registers ready
-}
+    pub fn run_pc_reg(&mut self) {
+        if self.control.pc_set {
+            if let Some(next_pc) = self.datapath.next_pc {
+                if next_pc & 0x00000003 != 0x00 {
+                    panic!("PC must be on a 4-byte boundary");
+                }
+                self.IF_pc = next_pc;
+            }
+        }
+    }
 
-impl Default for CVE2Control {
-    fn default() -> Self {
-        Self {
-            alu_op_a_sel: None,
-            alu_op_b_sel: None,
-            alu_op: None,
-            lsu_data_type: None,
-            lsu_request: false,
-            lsu_write_enable: false,
-            lsu_sign_ext: false,
-            data_dest_sel: None,
-            reg_write: false,
-            cmp_set: false,
-            jump_uncond: false,
-            jump_cond: false,
-            pc_set: true,
-            instr_req: true,
-            id_in_ready: true,
+    pub fn run_pipeline_buffer_registers(&mut self) {
+        // Move the pipeline forward
+        if self.control.id_in_ready {
+            self.ID_pc = self.IF_pc;
+            self.ID_inst = self.IF_inst;
+            self.instr_cycle = 0;
+        } else {
+            self.instr_cycle += 1;
         }
     }
 }
 
-impl CVE2Control {
-    pub fn register(op: ALUOp) -> Self {
-        Self {
-            alu_op_a_sel: Some(OpASel::RF),
-            alu_op_b_sel: Some(OpBSel::RF),
-            alu_op: Some(op),
-            data_dest_sel: Some(DataDestSel::ALU),
-            reg_write: true,
-            ..Default::default()
+fn rw_memory(
+    memory: &mut BTreeMap<u32, u8>,
+    address: u32,
+    byte_enable: [bool; 4],
+    wenable: bool,
+    wdata: u32,
+) -> Result<u32, ()> {
+    let mut rdata_bytes: [u8; 4] = [0; 4];
+    let wdata_bytes = wdata.to_le_bytes();
+    let success = (0usize..4usize).all(|i| {
+        if byte_enable[i] {
+            let addr = address + i as u32;
+            rdata_bytes[i] = if wenable {
+                memory.insert(addr, wdata_bytes[i]).unwrap_or_default()
+            } else {
+                memory.get(&addr).copied().unwrap_or_default()
+            };
+            true
+        } else {
+            true
         }
+    });
+
+    if success {
+        return Ok(u32::from_le_bytes(rdata_bytes));
+    } else {
+        return Err(());
     }
-
-    pub fn immediate(op: ALUOp) -> Self {
-        Self {
-            alu_op_a_sel: Some(OpASel::RF),
-            alu_op_b_sel: Some(OpBSel::IMM),
-            alu_op: Some(op),
-            data_dest_sel: Some(DataDestSel::ALU),
-            reg_write: true,
-            ..Default::default()
-        }
-    }
-
-    pub fn load_request(data_type: LSUDataType) -> Self {
-        Self {
-            // address calculation
-            alu_op_a_sel: Some(OpASel::RF),
-            alu_op_b_sel: Some(OpBSel::IMM),
-            alu_op: Some(ALUOp::ADD),
-
-            // lsu inputs
-            lsu_data_type: Some(data_type),
-            lsu_request: true,
-            lsu_write_enable: false,
-
-            // don't move onto the next instruction
-            pc_set: false,
-            instr_req: false,
-            id_in_ready: false,
-
-            ..Default::default()
-        }
-    }
-
-    pub fn load_write(data_type: LSUDataType, sign_ext: bool) -> Self {
-        Self {
-            // lsu inputs
-            lsu_data_type: Some(data_type),
-            lsu_sign_ext: sign_ext,
-
-            // register write
-            data_dest_sel: Some(DataDestSel::LSU),
-            reg_write: true,
-            ..Default::default()
-        }
-    }
-
-    pub fn store_request(data_type: LSUDataType) -> Self {
-        Self {
-            // address calculation
-            alu_op_a_sel: Some(OpASel::RF),
-            alu_op_b_sel: Some(OpBSel::IMM),
-            alu_op: Some(ALUOp::ADD),
-
-            // lsu inputs
-            lsu_data_type: Some(data_type),
-            lsu_request: true,
-            lsu_write_enable: true,
-
-            // don't move onto the next instruction
-            pc_set: false,
-            instr_req: false,
-            id_in_ready: false,
-
-            ..Default::default()
-        }
-    }
-
-    pub fn store_completion() -> Self {
-        Self {
-            ..Default::default()
-        }
-    }
-
-    pub fn jump(base_addr: OpASel) -> Self {
-        CVE2Control {
-            // calculate the destination address
-            alu_op_a_sel: Some(base_addr),
-            alu_op_b_sel: Some(OpBSel::IMM),
-            alu_op: Some(ALUOp::ADD),
-
-            // set the PC to it
-            jump_uncond: true,
-            pc_set: true,
-
-            // preserve the ID stage registers for link
-            id_in_ready: false,
-
-            ..Default::default()
-        }
-    }
-
-    pub fn link() -> Self {
-        CVE2Control {
-            // add 4 to ID PC and store it in rd
-            alu_op_a_sel: Some(OpASel::PC),
-            alu_op_b_sel: Some(OpBSel::Four),
-            alu_op: Some(ALUOp::ADD),
-            data_dest_sel: Some(DataDestSel::ALU),
-            reg_write: true,
-
-            ..Default::default()
-        }
-    }
-
-    pub fn branch_cmp(op: ALUOp) -> Self {
-        CVE2Control {
-            // compare rs1 and rs2
-            alu_op_a_sel: Some(OpASel::RF),
-            alu_op_b_sel: Some(OpBSel::RF),
-            alu_op: Some(op),
-            cmp_set: true,
-
-            // don't move onto the next instruction
-            pc_set: false,
-            instr_req: false,
-            id_in_ready: false,
-
-            ..Default::default()
-        }
-    }
-
-    pub fn branch_jump() -> Self {
-        CVE2Control {
-            // calculate the destination address
-            alu_op_a_sel: Some(OpASel::PC),
-            alu_op_b_sel: Some(OpBSel::IMM),
-            alu_op: Some(ALUOp::ADD),
-
-            // jump if the comparison was true
-            jump_cond: true,
-            pc_set: true,
-
-            // wait until new PC before loading IF into ID
-            id_in_ready: false,
-
-            ..Default::default()
-        }
-    }
-}
-
-#[repr(u32)]
-#[derive(Copy, Clone, Debug)]
-pub enum ALUOp {
-    ADD,
-    SUB,
-    XOR,
-    OR,
-    AND,
-    SLL,
-    SRL,
-    SRA,
-    EQ,
-    NEQ,
-    LT,
-    GE,
-    LTU,
-    GEU,
-    SELB,
-}
-
-#[repr(u32)]
-#[derive(Copy, Clone, Debug)]
-pub enum OpASel {
-    PC,
-    RF,
-}
-
-#[repr(u32)]
-#[derive(Copy, Clone, Debug)]
-pub enum OpBSel {
-    RF,
-    IMM,
-    Four,
-}
-
-#[repr(u32)]
-#[derive(Copy, Clone, Debug)]
-pub enum DataDestSel {
-    ALU,
-    LSU,
-}
-
-#[repr(u32)]
-#[derive(Copy, Clone, Debug)]
-pub enum LSUDataType {
-    Word,
-    HalfWord,
-    Byte,
-}
-
-impl LSUDataType {
-    pub fn byte_enable(&self) -> [bool; 4] {
-        match self {
-            LSUDataType::Word => [true; 4],
-            LSUDataType::HalfWord => [true, true, false, false],
-            LSUDataType::Byte => [true, false, false, false],
-        }
-    }
-
-    pub fn size_in_bits(&self) -> usize {
-        match self {
-            LSUDataType::Word => 32,
-            LSUDataType::HalfWord => 16,
-            LSUDataType::Byte => 8,
-        }
-    }
-}
-
-#[repr(u32)]
-#[derive(Copy, Clone, Debug, Default)]
-pub enum PCSel {
-    #[default]
-    PC4,
-    ALU,
 }

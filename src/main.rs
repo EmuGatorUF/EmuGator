@@ -1,4 +1,3 @@
-#[allow(non_snake_case, unused)]
 mod assembler;
 mod code_editor;
 mod emulator;
