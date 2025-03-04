@@ -1,4 +1,10 @@
-use std::{collections::{BTreeMap, HashMap, HashSet}, io::Write, iter::Peekable, mem::replace, str::FromStr};
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    io::Write,
+    iter::Peekable,
+    mem::replace,
+    str::FromStr,
+};
 
 use assembled_program::Address;
 use bimap::BiBTreeMap;
@@ -6,9 +12,16 @@ use dioxus::html::symbol;
 use ibig::IBig;
 use lexer::{Lexer, Token, TokenKind};
 use peeking_take_while::PeekableExt;
-use rpn::{Expression, RPNKind, RPN};
+use rpn::{Expression, RPN, RPNKind};
 
-use crate::{bits, isa::{InstructionBuildError, InstructionBuildErrorType, Instruction, InstructionDefinition, InstructionFormat, Operands, ISA}, utils::IBigLittleEndianIterator};
+use crate::{
+    bits,
+    isa::{
+        ISA, Instruction, InstructionBuildError, InstructionBuildErrorType, InstructionDefinition,
+        InstructionFormat, Operands,
+    },
+    utils::IBigLittleEndianIterator,
+};
 
 pub use assembled_program::{AssembledProgram, Section};
 pub use assembler_error::AssemblerError;
@@ -107,7 +120,20 @@ fn parse_directive<'a>(
         if let TokenKind::Symbol(directive_str) = token.kind {
             let output = match directive_str {
                 "equ" => {
-                    if let Some(Ok(symbol @ Token { kind: TokenKind::Symbol(name), .. })) = lexer.next_if(|next| matches!(next, Ok(Token { kind: TokenKind::Symbol(_), .. }))) {
+                    if let Some(Ok(
+                        symbol @ Token {
+                            kind: TokenKind::Symbol(name),
+                            ..
+                        },
+                    )) = lexer.next_if(|next| {
+                        matches!(
+                            next,
+                            Ok(Token {
+                                kind: TokenKind::Symbol(_),
+                                ..
+                            })
+                        )
+                    }) {
                         if is_kind(lexer.peek(), TokenKind::Comma) {
                             lexer.next() // Skip comma
                         } else {
@@ -129,7 +155,18 @@ fn parse_directive<'a>(
                 }
                 "data" | "text" | "section" => {
                     let section_str = if directive_str == "section" {
-                        if let Some(Ok(Token { kind: TokenKind::Symbol(section_str), .. })) = lexer.next_if(|token_result| matches!(token_result, Ok(Token { kind: TokenKind::Symbol(_), .. }))) {
+                        if let Some(Ok(Token {
+                            kind: TokenKind::Symbol(section_str),
+                            ..
+                        })) = lexer.next_if(|token_result| {
+                            matches!(
+                                token_result,
+                                Ok(Token {
+                                    kind: TokenKind::Symbol(_),
+                                    ..
+                                })
+                            )
+                        }) {
                             section_str
                         } else {
                             return Err(AssemblerError::from_token(
@@ -187,17 +224,22 @@ fn parse_directive<'a>(
                         let ibig: Vec<_> = data
                             .into_iter()
                             .map(|expression| {
-                                let expression_err = AssemblerError::from_expression(
-                                    "".into(),
-                                    &expression,
-                                );
+                                let expression_err =
+                                    AssemblerError::from_expression("".into(), &expression);
                                 (
-                                expression.evaluate(|name| {
-                                    symbol_table.get(name).ok_or(AssemblerError {
-                                        error_message: format!("Symbol {} not defined.", name),
-                                        ..expression_err.clone()
-                                    }).cloned()
-                                }), expression_err
+                                    expression.evaluate(|name| {
+                                        symbol_table
+                                            .get(name)
+                                            .ok_or(AssemblerError {
+                                                error_message: format!(
+                                                    "Symbol {} not defined.",
+                                                    name
+                                                ),
+                                                ..expression_err.clone()
+                                            })
+                                            .cloned()
+                                    }),
+                                    expression_err,
                                 )
                             })
                             .collect();
@@ -211,7 +253,10 @@ fn parse_directive<'a>(
 
                             if bytes.len() > width {
                                 return Err(AssemblerError {
-                                    error_message: format!("Value {} is too large for {} bytes.", value, width),
+                                    error_message: format!(
+                                        "Value {} is too large for {} bytes.",
+                                        value, width
+                                    ),
                                     ..expression_err
                                 });
                             } else {
@@ -307,312 +352,341 @@ fn parse_instruction<'a>(
             })?
             .definition();
 
-        let (operands, (rd_token, rs1_token, rs2_token, imm_expression)) = match (def.format, &parts.as_slice()) {
-            // Special syntax for ECALL and EBREAK
-            // ECALL
-            (InstructionFormat::I, &[]) if def.opcode == ISA::ECALL.definition().opcode => {
-                (Operands {
-                    imm: match instr.to_uppercase().as_str() {
-                        "ECALL" => 0,
-                        "EBREAK" => 1,
-                        _ => unreachable!(),
+        let (operands, (rd_token, rs1_token, rs2_token, imm_expression)) =
+            match (def.format, &parts.as_slice()) {
+                // Special syntax for ECALL and EBREAK
+                // ECALL
+                (InstructionFormat::I, &[]) if def.opcode == ISA::ECALL.definition().opcode => (
+                    Operands {
+                        imm: match instr.to_uppercase().as_str() {
+                            "ECALL" => 0,
+                            "EBREAK" => 1,
+                            _ => unreachable!(),
+                        },
+                        ..Default::default()
                     },
-                    ..Default::default()
-                }, (
-                    None,
-                    None,
-                    None,
-                    None,
-                ))
-            }
-            // Special syntax for FENCE
-            // FENCE
-            (InstructionFormat::I, &[]) if def.opcode == ISA::FENCE.definition().opcode => {
-                (Operands {
-                    ..Default::default()
-                }, (
-                    None,
-                    None,
-                    None,
-                    None,
-                ))
-            }
-            // Register-relative Load and Store instructions
-            // LB rd, imm(rs1)
-            (InstructionFormat::I | InstructionFormat::S, &[
-                other_token @ Token {
-                    kind: TokenKind::Symbol(other),
-                    ..
-                },
-                Token {
-                    kind: TokenKind::Comma,
-                    ..
-                },
-                imm_expression @ ..,
-                Token {
-                    kind: TokenKind::LParenthesis,
-                    ..
-                },
-                rs1_token @ Token {
-                    kind: TokenKind::Symbol(rs1),
-                    ..
-                },  
-                Token {
-                    kind: TokenKind::RParenthesis,
-                    ..
-                },
-            ]) if def.opcode == ISA::LB.definition().opcode || def.opcode == ISA::SB.definition().opcode => {
-                let other =
-                    parse_register(other).map_err(|e| AssemblerError::from_token(e, &other_token))?;
-                let rs1 =
-                    parse_register(rs1).map_err(|e| AssemblerError::from_token(e, &rs1_token))?;
-                let imm = parse_immediate(imm_expression, &def, symbol_table, current_address)?;
-
-                if def.format == InstructionFormat::S {
-                    // S-type
-                    (Operands {
-                        rs1,
-                        rs2: other,
-                        imm,
+                    (None, None, None, None),
+                ),
+                // Special syntax for FENCE
+                // FENCE
+                (InstructionFormat::I, &[]) if def.opcode == ISA::FENCE.definition().opcode => (
+                    Operands {
                         ..Default::default()
-                    }, (
-                        None,
-                        Some(rs1_token),
-                        Some(other_token),
-                        Some(imm_expression),
-                    ))
-                } else {
-                    // I-type
-                    (Operands {
-                        rd: other,
-                        rs1,
-                        imm,
-                        ..Default::default()
-                    }, (
-                        Some(other_token),
-                        Some(rs1_token),
-                        None,
-                        Some(imm_expression),
-                    ))
-                }
-            }
-            // Register-register arithmetic instructions
-            // ADD rd, rs1, rs2
-            (InstructionFormat::R, &[
-                rd_token @ Token {
-                    kind: TokenKind::Symbol(rd),
-                    ..
-                },
-                Token {
-                    kind: TokenKind::Comma,
-                    ..
-                },
-                rs1_token @ Token {
-                    kind: TokenKind::Symbol(rs1),
-                    ..
-                },
-                Token {
-                    kind: TokenKind::Comma,
-                    ..
-                },
-                rs2_token @ Token {
-                    kind: TokenKind::Symbol(rs2),
-                    ..
-                },
-            ]) => {
-                let rd =
-                    parse_register(rd).map_err(|e| AssemblerError::from_token(e, &rd_token))?;
-                let rs1 =
-                    parse_register(rs1).map_err(|e| AssemblerError::from_token(e, &rs1_token))?;
-                let rs2 = 
-                    parse_register(rs2).map_err(|e| AssemblerError::from_token(e, &rs2_token))?;
+                    },
+                    (None, None, None, None),
+                ),
+                // Register-relative Load and Store instructions
+                // LB rd, imm(rs1)
+                (
+                    InstructionFormat::I | InstructionFormat::S,
+                    &[
+                        other_token @ Token {
+                            kind: TokenKind::Symbol(other),
+                            ..
+                        },
+                        Token {
+                            kind: TokenKind::Comma,
+                            ..
+                        },
+                        imm_expression @ ..,
+                        Token {
+                            kind: TokenKind::LParenthesis,
+                            ..
+                        },
+                        rs1_token @ Token {
+                            kind: TokenKind::Symbol(rs1),
+                            ..
+                        },
+                        Token {
+                            kind: TokenKind::RParenthesis,
+                            ..
+                        },
+                    ],
+                ) if def.opcode == ISA::LB.definition().opcode
+                    || def.opcode == ISA::SB.definition().opcode =>
+                {
+                    let other = parse_register(other)
+                        .map_err(|e| AssemblerError::from_token(e, &other_token))?;
+                    let rs1 = parse_register(rs1)
+                        .map_err(|e| AssemblerError::from_token(e, &rs1_token))?;
+                    let imm = parse_immediate(imm_expression, &def, symbol_table, current_address)?;
 
-                (Operands {
-                    rd,
-                    rs1,
-                    rs2,
-                    ..Default::default()
-                }, (
-                    Some(rd_token),
-                    Some(rs1_token),
-                    Some(rs2_token),
-                    None,
-                ))
-            }
-            // Branch instructions
-            // BEQ rs1, rs2, address
-            (InstructionFormat::B, &[
-                rs1_token @ Token {
-                    kind: TokenKind::Symbol(rs1),
-                    ..
-                },
-                Token {
-                    kind: TokenKind::Comma,
-                    ..
-                },
-                rs2_token @ Token {
-                    kind: TokenKind::Symbol(rs2),
-                    ..
-                },
-                Token {
-                    kind: TokenKind::Comma,
-                    ..
-                },
-                imm_expression @ ..,
-            ]) => {
-                let rs1 =
-                    parse_register(rs1).map_err(|e| AssemblerError::from_token(e, &rs1_token))?;
-                let rs2 =
-                    parse_register(rs2).map_err(|e| AssemblerError::from_token(e, &rs2_token))?;
-                let imm = parse_immediate(imm_expression, &def, symbol_table, current_address)?;
-
-                (Operands {
-                    rs1,
-                    rs2,
-                    imm,
-                    ..Default::default()
-                }, (
-                    None,
-                    Some(rs1_token),
-                    Some(rs2_token),
-                    Some(imm_expression),
-                ))
-            }
-            // Register-immediate arithmetic instructions
-            // ADDI rd, rs1, imm
-            (InstructionFormat::I, &[
-                rd_token @ Token {
-                    kind: TokenKind::Symbol(rd),
-                    ..
-                },
-                Token {
-                    kind: TokenKind::Comma,
-                    ..
-                },
-                rs1_token @ Token {
-                    kind: TokenKind::Symbol(rs1),
-                    ..
-                },
-                Token {
-                    kind: TokenKind::Comma,
-                    ..
-                },
-                imm_expression @ ..,
-            ]) => {
-                let rd =
-                    parse_register(rd).map_err(|e| AssemblerError::from_token(e, &rd_token))?;
-                let rs1 =
-                    parse_register(rs1).map_err(|e| AssemblerError::from_token(e, &rs1_token))?;
-                let imm = parse_immediate(imm_expression, &def, symbol_table, current_address)?;
-
-                (Operands {
-                    rd,
-                    rs1,
-                    imm,
-                    ..Default::default()
-                }, (
-                    Some(rd_token),
-                    Some(rs1_token),
-                    None,
-                    Some(imm_expression),
-                ))
-            }
-            // Absolute Load and Store instructions
-            // LB rd, imm
-            (InstructionFormat::I | InstructionFormat::S, &[
-                other_token @ Token {
-                    kind: TokenKind::Symbol(other),
-                    ..
-                },
-                Token {
-                    kind: TokenKind::Comma,
-                    ..
-                },
-                imm_expression @ ..,
-            ]) if def.opcode == ISA::LB.definition().opcode || def.opcode == ISA::SB.definition().opcode => {
-                let other =
-                    parse_register(other).map_err(|e| AssemblerError::from_token(e, &other_token))?;
-                let rs1 = 0;
-                let imm = parse_immediate(imm_expression, &def, symbol_table, current_address)?;
-
-                if def.format == InstructionFormat::S {
-                    // S-type store instructions
-                    (Operands {
-                        rs1,
-                        rs2: other,
-                        imm,
-                        ..Default::default()
-                    }, 
-                    (
-                        None,
-                        None,
-                        Some(other_token),
-                        Some(imm_expression),
-                    ))
-                } else {
-                    // I-type load instructions
-                    (Operands {
-                        rd: other,
-                        rs1,
-                        imm,
-                        ..Default::default()
-                    }, (
-                        Some(other_token),
-                        None,
-                        None,
-                        Some(imm_expression),
-                    ))
-                }
-            }
-            // Load Upper Immediate and Jump instructions
-            // LUI rd, imm
-            // JAL rd, address
-            (InstructionFormat::U | InstructionFormat::J, &[
-                rd_token @ Token { kind: TokenKind::Symbol(rd), .. },
-                Token { kind: TokenKind::Comma, ..},
-                imm_expression @ ..,
-            ]) => {
-                let rd = parse_register(rd).map_err(|e| AssemblerError::from_token(e, &rd_token))?;
-                let imm = parse_immediate(imm_expression, &def, symbol_table, current_address)?;
-
-                (Operands {
-                    rd,
-                    imm,
-                    ..Default::default()
-                }, (
-                    Some(rd_token),
-                    None,
-                    None,
-                    Some(imm_expression),
-                ))
-            },
-            _ => {
-                return Err(AssemblerError::from_token(
-                    format!("Invalid operands for instruction {}", instr),
-                    &token,
-                ));
-            }
-        };
-
-        Ok(Some((Instruction::try_from_def_operands(def, operands).map_err(|e|
-            match e.error_type {
-                    InstructionBuildErrorType::InvalidOpcode | InstructionBuildErrorType::InvalidFunct3 | InstructionBuildErrorType::InvalidFunct7 => AssemblerError::from_token(e.error_message, &instruction_token),
-                    InstructionBuildErrorType::InvalidRd => AssemblerError::from_token(e.error_message, rd_token.unwrap_or(&instruction_token)),
-                    InstructionBuildErrorType::InvalidRs1 => AssemblerError::from_token(e.error_message, rs1_token.unwrap_or(&instruction_token)),
-                    InstructionBuildErrorType::InvalidRs2 => AssemblerError::from_token(e.error_message, rs2_token.unwrap_or(&instruction_token)),
-                    InstructionBuildErrorType::InvalidImm => match imm_expression {
-                        Some([first, rest @ ..]) => {
-                            AssemblerError {
-                                error_message: e.error_message,
-                                line_number: first.line,
-                                column: first.column,
-                                width: rest.iter().fold(first.width, |acc, token| acc + token.width),
-                            }
-                        }
-                        _ => AssemblerError::from_token(e.error_message, &instruction_token)
+                    if def.format == InstructionFormat::S {
+                        // S-type
+                        (
+                            Operands {
+                                rs1,
+                                rs2: other,
+                                imm,
+                                ..Default::default()
+                            },
+                            (
+                                None,
+                                Some(rs1_token),
+                                Some(other_token),
+                                Some(imm_expression),
+                            ),
+                        )
+                    } else {
+                        // I-type
+                        (
+                            Operands {
+                                rd: other,
+                                rs1,
+                                imm,
+                                ..Default::default()
+                            },
+                            (
+                                Some(other_token),
+                                Some(rs1_token),
+                                None,
+                                Some(imm_expression),
+                            ),
+                        )
                     }
                 }
-            )?, instruction_token)))
+                // Register-register arithmetic instructions
+                // ADD rd, rs1, rs2
+                (
+                    InstructionFormat::R,
+                    &[
+                        rd_token @ Token {
+                            kind: TokenKind::Symbol(rd),
+                            ..
+                        },
+                        Token {
+                            kind: TokenKind::Comma,
+                            ..
+                        },
+                        rs1_token @ Token {
+                            kind: TokenKind::Symbol(rs1),
+                            ..
+                        },
+                        Token {
+                            kind: TokenKind::Comma,
+                            ..
+                        },
+                        rs2_token @ Token {
+                            kind: TokenKind::Symbol(rs2),
+                            ..
+                        },
+                    ],
+                ) => {
+                    let rd =
+                        parse_register(rd).map_err(|e| AssemblerError::from_token(e, &rd_token))?;
+                    let rs1 = parse_register(rs1)
+                        .map_err(|e| AssemblerError::from_token(e, &rs1_token))?;
+                    let rs2 = parse_register(rs2)
+                        .map_err(|e| AssemblerError::from_token(e, &rs2_token))?;
+
+                    (
+                        Operands {
+                            rd,
+                            rs1,
+                            rs2,
+                            ..Default::default()
+                        },
+                        (Some(rd_token), Some(rs1_token), Some(rs2_token), None),
+                    )
+                }
+                // Branch instructions
+                // BEQ rs1, rs2, address
+                (
+                    InstructionFormat::B,
+                    &[
+                        rs1_token @ Token {
+                            kind: TokenKind::Symbol(rs1),
+                            ..
+                        },
+                        Token {
+                            kind: TokenKind::Comma,
+                            ..
+                        },
+                        rs2_token @ Token {
+                            kind: TokenKind::Symbol(rs2),
+                            ..
+                        },
+                        Token {
+                            kind: TokenKind::Comma,
+                            ..
+                        },
+                        imm_expression @ ..,
+                    ],
+                ) => {
+                    let rs1 = parse_register(rs1)
+                        .map_err(|e| AssemblerError::from_token(e, &rs1_token))?;
+                    let rs2 = parse_register(rs2)
+                        .map_err(|e| AssemblerError::from_token(e, &rs2_token))?;
+                    let imm = parse_immediate(imm_expression, &def, symbol_table, current_address)?;
+
+                    (
+                        Operands {
+                            rs1,
+                            rs2,
+                            imm,
+                            ..Default::default()
+                        },
+                        (None, Some(rs1_token), Some(rs2_token), Some(imm_expression)),
+                    )
+                }
+                // Register-immediate arithmetic instructions
+                // ADDI rd, rs1, imm
+                (
+                    InstructionFormat::I,
+                    &[
+                        rd_token @ Token {
+                            kind: TokenKind::Symbol(rd),
+                            ..
+                        },
+                        Token {
+                            kind: TokenKind::Comma,
+                            ..
+                        },
+                        rs1_token @ Token {
+                            kind: TokenKind::Symbol(rs1),
+                            ..
+                        },
+                        Token {
+                            kind: TokenKind::Comma,
+                            ..
+                        },
+                        imm_expression @ ..,
+                    ],
+                ) => {
+                    let rd =
+                        parse_register(rd).map_err(|e| AssemblerError::from_token(e, &rd_token))?;
+                    let rs1 = parse_register(rs1)
+                        .map_err(|e| AssemblerError::from_token(e, &rs1_token))?;
+                    let imm = parse_immediate(imm_expression, &def, symbol_table, current_address)?;
+
+                    (
+                        Operands {
+                            rd,
+                            rs1,
+                            imm,
+                            ..Default::default()
+                        },
+                        (Some(rd_token), Some(rs1_token), None, Some(imm_expression)),
+                    )
+                }
+                // Absolute Load and Store instructions
+                // LB rd, imm
+                (
+                    InstructionFormat::I | InstructionFormat::S,
+                    &[
+                        other_token @ Token {
+                            kind: TokenKind::Symbol(other),
+                            ..
+                        },
+                        Token {
+                            kind: TokenKind::Comma,
+                            ..
+                        },
+                        imm_expression @ ..,
+                    ],
+                ) if def.opcode == ISA::LB.definition().opcode
+                    || def.opcode == ISA::SB.definition().opcode =>
+                {
+                    let other = parse_register(other)
+                        .map_err(|e| AssemblerError::from_token(e, &other_token))?;
+                    let rs1 = 0;
+                    let imm = parse_immediate(imm_expression, &def, symbol_table, current_address)?;
+
+                    if def.format == InstructionFormat::S {
+                        // S-type store instructions
+                        (
+                            Operands {
+                                rs1,
+                                rs2: other,
+                                imm,
+                                ..Default::default()
+                            },
+                            (None, None, Some(other_token), Some(imm_expression)),
+                        )
+                    } else {
+                        // I-type load instructions
+                        (
+                            Operands {
+                                rd: other,
+                                rs1,
+                                imm,
+                                ..Default::default()
+                            },
+                            (Some(other_token), None, None, Some(imm_expression)),
+                        )
+                    }
+                }
+                // Load Upper Immediate and Jump instructions
+                // LUI rd, imm
+                // JAL rd, address
+                (
+                    InstructionFormat::U | InstructionFormat::J,
+                    &[
+                        rd_token @ Token {
+                            kind: TokenKind::Symbol(rd),
+                            ..
+                        },
+                        Token {
+                            kind: TokenKind::Comma,
+                            ..
+                        },
+                        imm_expression @ ..,
+                    ],
+                ) => {
+                    let rd =
+                        parse_register(rd).map_err(|e| AssemblerError::from_token(e, &rd_token))?;
+                    let imm = parse_immediate(imm_expression, &def, symbol_table, current_address)?;
+
+                    (
+                        Operands {
+                            rd,
+                            imm,
+                            ..Default::default()
+                        },
+                        (Some(rd_token), None, None, Some(imm_expression)),
+                    )
+                }
+                _ => {
+                    return Err(AssemblerError::from_token(
+                        format!("Invalid operands for instruction {}", instr),
+                        &token,
+                    ));
+                }
+            };
+
+        Ok(Some((
+            Instruction::try_from_def_operands(def, operands).map_err(|e| match e.error_type {
+                InstructionBuildErrorType::InvalidOpcode
+                | InstructionBuildErrorType::InvalidFunct3
+                | InstructionBuildErrorType::InvalidFunct7 => {
+                    AssemblerError::from_token(e.error_message, &instruction_token)
+                }
+                InstructionBuildErrorType::InvalidRd => AssemblerError::from_token(
+                    e.error_message,
+                    rd_token.unwrap_or(&instruction_token),
+                ),
+                InstructionBuildErrorType::InvalidRs1 => AssemblerError::from_token(
+                    e.error_message,
+                    rs1_token.unwrap_or(&instruction_token),
+                ),
+                InstructionBuildErrorType::InvalidRs2 => AssemblerError::from_token(
+                    e.error_message,
+                    rs2_token.unwrap_or(&instruction_token),
+                ),
+                InstructionBuildErrorType::InvalidImm => match imm_expression {
+                    Some([first, rest @ ..]) => AssemblerError {
+                        error_message: e.error_message,
+                        line_number: first.line,
+                        column: first.column,
+                        width: rest
+                            .iter()
+                            .fold(first.width, |acc, token| acc + token.width),
+                    },
+                    _ => AssemblerError::from_token(e.error_message, &instruction_token),
+                },
+            })?,
+            instruction_token,
+        )))
     } else {
         Ok(None)
     }
@@ -630,43 +704,55 @@ fn parse_register(reg: &str) -> Result<u32, String> {
     }
 }
 
-fn parse_immediate(imm: &[Token], def: &InstructionDefinition, symbol_table: &HashMap<String, Address>, current_address: u32) -> Result<i32, AssemblerError> {
+fn parse_immediate(
+    imm: &[Token],
+    def: &InstructionDefinition,
+    symbol_table: &HashMap<String, Address>,
+    current_address: u32,
+) -> Result<i32, AssemblerError> {
     let expression = Expression::shunting_yard(&mut imm.iter().cloned())?;
     let expression_err = AssemblerError::from_expression("".into(), &expression);
     let imm = expression
-    .evaluate(|name| {
-        symbol_table.get(name).ok_or(AssemblerError {
-            error_message: format!("Symbol {} not defined.", name),
-            ..expression_err.clone()
-    }).cloned()
-    })?.1
-    .try_into()
-    .map_err(|e| {
-        AssemblerError {
+        .evaluate(|name| {
+            symbol_table
+                .get(name)
+                .ok_or(AssemblerError {
+                    error_message: format!("Symbol {} not defined.", name),
+                    ..expression_err.clone()
+                })
+                .cloned()
+        })?
+        .1
+        .try_into()
+        .map_err(|e| AssemblerError {
             error_message: format!("Invalid immediate value."),
             ..expression_err
-        }
-    })?;
+        })?;
 
     match def.format {
         InstructionFormat::I | InstructionFormat::S => {
             if imm > 2047 || imm < -2048 {
-                Err(AssemblerError { 
+                Err(AssemblerError {
                     error_message: format!(
-                    "Immediate value {} is out of range (-2048 to 2047)",
-                    imm
-                ), ..expression_err })
+                        "Immediate value {} is out of range (-2048 to 2047)",
+                        imm
+                    ),
+                    ..expression_err
+                })
             } else {
                 Ok(imm)
             }
-        },
+        }
         InstructionFormat::U => {
             let imm = imm as u32;
             if imm > 0xFFFFF {
                 Err(AssemblerError {
-                    error_message: format!("Immediate value {} is out of range (0 to 0xFFFFF)", imm),
+                    error_message: format!(
+                        "Immediate value {} is out of range (0 to 0xFFFFF)",
+                        imm
+                    ),
                     ..expression_err
-            })
+                })
             } else {
                 Ok((imm << 12) as i32)
             }
@@ -681,7 +767,10 @@ fn parse_immediate(imm: &[Token], def: &InstructionDefinition, symbol_table: &Ha
                 })
             } else if offset > 0xFFFFF || offset < -0x100000 {
                 Err(AssemblerError {
-                    error_message: format!("Jump target is too far ({} bytes), must be within -1048576 to +1048575 bytes", offset),
+                    error_message: format!(
+                        "Jump target is too far ({} bytes), must be within -1048576 to +1048575 bytes",
+                        offset
+                    ),
                     ..expression_err
                 })
             } else {
@@ -698,14 +787,17 @@ fn parse_immediate(imm: &[Token], def: &InstructionDefinition, symbol_table: &Ha
                 })
             } else if offset > 0xFFF || offset < -0x1000 {
                 Err(AssemblerError {
-                    error_message: format!("Branch target is too far ({} bytes), must be within -4096 to +4095 bytes", offset),
+                    error_message: format!(
+                        "Branch target is too far ({} bytes), must be within -4096 to +4095 bytes",
+                        offset
+                    ),
                     ..expression_err
                 })
             } else {
                 Ok(offset)
             }
         }
-        InstructionFormat::R => unreachable!(),  // R-type instructions should not have immediates
+        InstructionFormat::R => unreachable!(), // R-type instructions should not have immediates
     }
 }
 
@@ -757,21 +849,29 @@ fn is_kind(token: Option<&Result<Token, AssemblerError>>, token_kind: TokenKind)
     }
 }
 
-fn insert<'a>(symbol_table: &mut HashMap<String, (Option<Section>, Expression<'a>, Token<'a>)>, symbol: String, entry: (Option<Section>, Expression<'a>, Token<'a>)) -> Result<(), AssemblerError> {
+fn insert<'a>(
+    symbol_table: &mut HashMap<String, (Option<Section>, Expression<'a>, Token<'a>)>,
+    symbol: String,
+    entry: (Option<Section>, Expression<'a>, Token<'a>),
+) -> Result<(), AssemblerError> {
     let line = entry.2.line;
     match symbol_table.insert(symbol.clone(), entry) {
-        Some((_, _, token)) => Err(AssemblerError::from_token(format!("Symbol {} redefined at line {}.", symbol, line), &token)),
-        None => Ok(())
+        Some((_, _, token)) => Err(AssemblerError::from_token(
+            format!("Symbol {} redefined at line {}.", symbol, line),
+            &token,
+        )),
+        None => Ok(()),
     }
 }
 
 pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerError>> {
     let mut errors = Vec::new();
 
-    let mut symbol_table: HashMap<String, (Option<Section>, Expression<'a>, Token<'a>)> = std::collections::HashMap::new();
+    let mut symbol_table: HashMap<String, (Option<Section>, Expression<'a>, Token<'a>)> =
+        std::collections::HashMap::new();
     let first_org: &str = ".section(0,0)".into();
     insert(
-        &mut symbol_table, 
+        &mut symbol_table,
         first_org.into(),
         (
             Some(Section::Text),
@@ -792,7 +892,8 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
                 width: 0,
             },
         ),
-    ).expect("There should be no errors inserting the initial section.");
+    )
+    .expect("There should be no errors inserting the initial section.");
 
     // First Pass
     let _ = {
@@ -826,7 +927,7 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
             } else {
                 if let Some((label, token)) = label {
                     insert(
-                        &mut symbol_table, 
+                        &mut symbol_table,
                         label.into(),
                         (
                             Some(current_section.clone()),
@@ -890,25 +991,32 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
 
     let _ = {
         let mut visited = HashSet::new();
-        
+
         while !symbol_table.is_empty() {
             let (symbol, label_err) = {
-                let (symbol , (_, _, label_token)) = symbol_table.iter().next().unwrap();
-                (symbol.clone(), AssemblerError::from_token("".into(), label_token))
+                let (symbol, (_, _, label_token)) = symbol_table.iter().next().unwrap();
+                (
+                    symbol.clone(),
+                    AssemblerError::from_token("".into(), label_token),
+                )
             };
 
-            if let Err(err) =
-                resolve_label(&symbol, &mut symbol_table, &mut resolved_symbols, &mut visited).map_err(
-                    |e| if e.line_number == 0 {
-                        AssemblerError {
-                            error_message: e.error_message,
-                            ..label_err
-                        }
-                    } else {
-                        e
+            if let Err(err) = resolve_label(
+                &symbol,
+                &mut symbol_table,
+                &mut resolved_symbols,
+                &mut visited,
+            )
+            .map_err(|e| {
+                if e.line_number == 0 {
+                    AssemblerError {
+                        error_message: e.error_message,
+                        ..label_err
                     }
-                )
-            {
+                } else {
+                    e
+                }
+            }) {
                 errors.push(err);
             }
         }
@@ -1043,7 +1151,7 @@ fn resolve_label(
             return Err(AssemblerError {
                 error_message: format!("Recursive loop found while resolving {}", label),
                 line_number: 0,
-                column: 0,                
+                column: 0,
                 width: 0,
             });
         }
@@ -1057,8 +1165,16 @@ fn resolve_label(
             width: 0,
         })?;
 
-        let value = expression.evaluate(|name| resolve_label(name, labels, resolved_labels, visited) )?;
-        resolved_labels.insert(label.clone(), if let Some(section) = section { Address(section, value.1.clone() ) } else { value.clone() });
+        let value =
+            expression.evaluate(|name| resolve_label(name, labels, resolved_labels, visited))?;
+        resolved_labels.insert(
+            label.clone(),
+            if let Some(section) = section {
+                Address(section, value.1.clone())
+            } else {
+                value.clone()
+            },
+        );
 
         value
     })

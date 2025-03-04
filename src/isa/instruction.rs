@@ -369,7 +369,7 @@ impl Instruction {
 
     pub fn immediate(&self) -> Result<i32, ()> {
         // get format from instruction opcode, etc
-        let format: InstructionFormat = InstructionDefinition::from_instr(*self).unwrap().format;
+        let format: InstructionFormat = InstructionDefinition::from_instr(*self).ok_or(())?.format;
         match format {
             InstructionFormat::I => {
                 Ok((bits!(self.instr, 31) * bitmask!(31; 11) | bits!(self.instr,30;20)) as i32)
@@ -409,5 +409,9 @@ impl Instruction {
 
     pub fn funct7(&self) -> u8 {
         bits!(self.instr, 25, 7) as u8
+    }
+
+    pub fn is_valid(&self) -> bool {
+        InstructionDefinition::from_instr(*self).is_some()
     }
 }

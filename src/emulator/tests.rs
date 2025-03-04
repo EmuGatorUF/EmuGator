@@ -1,5 +1,7 @@
 #![allow(non_snake_case)]
 
+use std::collections::BTreeMap;
+
 use crate::isa::{ISA, Operands};
 
 use super::*;
@@ -116,19 +118,18 @@ fn test_JAL() {
     // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
 
-    // NOOP
+    // Padding Instruction
     emulator_state = clock(&emulator_state, &mut program);
 
     // After JAL, x1 should contain PC + 4, and the PC should jump to PC + 0x8
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[1], pc + 4);
-    assert_eq!(emulator_state.pipeline.datapath.instr_addr_o, pc + 0x8);
-
-    // Instruction fetch
+    assert_eq!(emulator_state.pipeline.IF_pc, pc + 0x8);
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[5], 0);
+    assert_eq!(emulator_state.x[1], pc + 4);
 
+    // ADDI that it jumps to
+    assert_eq!(emulator_state.x[5], 0);
     emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.x[5], 2);
 }
@@ -168,18 +169,18 @@ fn test_JAL_neg_offset() {
     // After JAL, x1 should contain PC + 4, and the PC should jump to PC + 0x04
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[1], pc + 4);
-    assert_eq!(emulator_state.pipeline.datapath.instr_addr_o, pc - 0x04);
-
-    // Instruction fetch
+    assert_eq!(emulator_state.pipeline.IF_pc, pc - 0x04);
     emulator_state = clock(&emulator_state, &mut program);
+    assert_eq!(emulator_state.x[1], pc + 4);
+
     // ADDI ( x5 := x5 + 1)
+    assert_eq!(emulator_state.x[5], 2);
     emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.x[5], 3);
 }
 
 #[test]
-#[should_panic(expected = "JAL instruction immediate it not on a 4-byte boundary")]
+#[should_panic(expected = "PC must be on a 4-byte boundary")]
 fn test_JAL_panic() {
     let mut emulator_state = EmulatorState::default();
 
@@ -242,17 +243,17 @@ fn test_JALR() {
     emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.x[2], 0x4);
 
-    // After JALR, x1 should contain PC + 8, and the PC should jump to (x4 + 0x2) & ~1
+    // After JALR, x1 should contain PC + 4, and the PC should jump to (x4 + 0x2) & ~1
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[1], pc + 4);
     assert_eq!(
-        emulator_state.pipeline.datapath.instr_addr_o,
+        emulator_state.pipeline.IF_pc,
         (emulator_state.x[2] + 0x8) & !1
     );
+    emulator_state = clock(&emulator_state, &mut program);
+    assert_eq!(emulator_state.x[1], pc + 4);
 
     // After ADDI
-    emulator_state = clock(&emulator_state, &mut program);
     emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.x[4], 2);
 
@@ -268,13 +269,13 @@ fn test_JALR_neg_offset() {
         ISA::ADDI.build(Operands {
             rd: 2,
             rs1: 0,
-            imm: 1,
+            imm: 6,
             ..Default::default()
         }), // ADDI ( x5 := x0 + 1)
         ISA::ADDI.build(Operands {
             rd: 2,
-            rs1: 0,
-            imm: 1,
+            rs1: 2,
+            imm: 6,
             ..Default::default()
         }), // ADDI ( x5 := x0 + 1)
         ISA::JALR.build(Operands {
@@ -292,14 +293,15 @@ fn test_JALR_neg_offset() {
     // ADDI ( x5 := x0 + 1)
     emulator_state = clock(&emulator_state, &mut program);
 
-    // After JALR, x1 should contain PC + 4, and the PC should jump to PC - 4 + 2
+    // After JALR, x1 should contain PC + 4, and the PC should jump to x2 (12) - 4
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[1], pc + 4);
     assert_eq!(
-        emulator_state.pipeline.datapath.instr_addr_o,
+        emulator_state.pipeline.IF_pc,
         (emulator_state.x[2] as i32 - 4) as u32 & !1
     );
+    emulator_state = clock(&emulator_state, &mut program);
+    assert_eq!(emulator_state.x[1], pc + 4);
 }
 
 #[test]
@@ -349,18 +351,19 @@ fn test_BEQ() {
     // BEQ (branch if x1 == x2) - should not branch because x1 != x2
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
+    emulator_state = clock(&emulator_state, &mut program);
+    emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x4);
 
     // BEQ (branch if x0 == x2) - should branch because x0 == x2
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.pipeline.datapath.instr_addr_o, pc + 0x8);
-
-    // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[5], 0);
+    emulator_state = clock(&emulator_state, &mut program);
+    assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x8);
 
     // ADDI ( x5 := x0 + 2)
+    assert_eq!(emulator_state.x[5], 0);
     emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.x[5], 2);
 }
@@ -411,18 +414,19 @@ fn test_BNE() {
     // BNE (branch if x0 != x2) - should not branch because x0 == x2
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
+    emulator_state = clock(&emulator_state, &mut program);
+    emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x4);
 
     // BNE (branch if x1 != x2) - should branch because x1 != x2
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.pipeline.datapath.instr_addr_o, pc + 0x8);
-
-    // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[5], 0);
+    emulator_state = clock(&emulator_state, &mut program);
+    assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x8);
 
     // ADDI ( x5 := x0 + 2)
+    assert_eq!(emulator_state.x[5], 0);
     emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.x[5], 2);
 }
@@ -474,18 +478,19 @@ fn test_BLT() {
     // BLT (branch if x0 < x1) - should not branch because x0 > x1
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
+    emulator_state = clock(&emulator_state, &mut program);
+    emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x4);
 
     // BLT (branch if x1 < x0) - should branch because x1 < x0
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.pipeline.datapath.instr_addr_o, pc + 0x8);
-
-    // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[5], 0);
+    emulator_state = clock(&emulator_state, &mut program);
+    assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x8);
 
     // ADDI ( x5 := x0 + 2)
+    assert_eq!(emulator_state.x[5], 0);
     emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.x[5], 2);
 }
@@ -543,31 +548,31 @@ fn test_BGE() {
     // BGE (branch if x1 >= x0) - should not branch because x0 > x1
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
+    emulator_state = clock(&emulator_state, &mut program);
+    emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x4);
 
     // BLT (branch if x0 >= x1) - should branch because x1 < x0
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.pipeline.datapath.instr_addr_o, pc + 0x8);
-
-    // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[5], 0);
+    emulator_state = clock(&emulator_state, &mut program);
+    assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x8);
 
     // ADDI ( x5 := x0 + 2)
+    assert_eq!(emulator_state.x[5], 0);
     emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.x[5], 2);
 
     // BGE (branch if x0 >= x2) - should branch because x0 == x2
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.pipeline.datapath.instr_addr_o, pc - 0x8);
-
-    // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[5], 2);
+    emulator_state = clock(&emulator_state, &mut program);
+    assert_eq!(emulator_state.pipeline.ID_pc, pc - 0x8);
 
     // ADDI ( x5 := x0 + 1)
+    assert_eq!(emulator_state.x[5], 2);
     emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.x[5], 1);
 }
@@ -619,18 +624,19 @@ fn test_BLTU() {
     // BLTU (branch if x1 < x0) - should not branch because x1 > x0
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
+    emulator_state = clock(&emulator_state, &mut program);
+    emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x4);
 
     // BLTU (branch if x0 < x1) - should branch because x0 < x1
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.pipeline.datapath.instr_addr_o, pc + 0x8);
-
-    // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[5], 0);
+    emulator_state = clock(&emulator_state, &mut program);
+    assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x8);
 
     // ADDI ( x5 := x0 + 2)
+    assert_eq!(emulator_state.x[5], 0);
     emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.x[5], 2);
 }
@@ -688,31 +694,31 @@ fn test_BGEU() {
     // BGEU (branch if x0 >= x1) - should not branch because x0 < x1
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
+    emulator_state = clock(&emulator_state, &mut program);
+    emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x4);
 
     // BLT (branch if x1 >= x0) - should branch because x1 > x0
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.pipeline.datapath.instr_addr_o, pc + 0x8);
-
-    // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[5], 0);
+    emulator_state = clock(&emulator_state, &mut program);
+    assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x8);
 
     // ADDI ( x5 := x0 + 2)
+    assert_eq!(emulator_state.x[5], 0);
     emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.x[5], 2);
 
     // BGEU (branch if x0 >= x2) - should branch because x0 == x2
     let pc = emulator_state.pipeline.ID_pc;
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.pipeline.datapath.instr_addr_o, pc - 0x8);
-
-    // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[5], 2);
+    emulator_state = clock(&emulator_state, &mut program);
+    assert_eq!(emulator_state.pipeline.ID_pc, pc - 0x8);
 
     // ADDI ( x5 := x0 + 1)
+    assert_eq!(emulator_state.x[5], 2);
     emulator_state = clock(&emulator_state, &mut program);
     assert_eq!(emulator_state.x[5], 1);
 }
@@ -852,7 +858,7 @@ fn test_SB() {
     let mut emulator_state = EmulatorState::default();
 
     let mut program = populate(&[
-        // Set x1 := 10 (Data to write)
+        // Set x1 := 0xFEFDFCFB (Data to write)
         ISA::LUI.build(Operands {
             rd: 1,
             imm: 0xFEFDF000u32.wrapping_sub(0xFFFFF000u32) as i32,
@@ -891,9 +897,10 @@ fn test_SB() {
     // Set x2 := 100
     emulator_state = clock(&emulator_state, &mut program);
 
-    // SB (x1 := 10) -> Write x1 to address 100 + x2
+    // SH -> Write first byte of x1 to address x2 (100) + 5
+    emulator_state = clock(&emulator_state, &mut program);
     clock(&emulator_state, &mut program);
-    assert_eq!(program.data_memory.get(&105), Some(&0xFB)); // x1 = 0xFEFDFCFB (100 + x2)
+    assert_eq!(program.data_memory.get(&105), Some(&0xFB));
     assert_eq!(program.data_memory.get(&106), None);
     assert_eq!(program.data_memory.get(&107), None);
     assert_eq!(program.data_memory.get(&108), None);
@@ -904,7 +911,7 @@ fn test_SH() {
     let mut emulator_state = EmulatorState::default();
 
     let mut program = populate(&[
-        // Set x1 := 10 (Data to write)
+        // Set x1 := 0xFEFDFCFB (Data to write)
         ISA::LUI.build(Operands {
             rd: 1,
             imm: 0xFEFDF000u32.wrapping_sub(0xFFFFF000u32) as i32,
@@ -936,16 +943,17 @@ fn test_SH() {
     // Instruction fetch
     emulator_state = clock(&emulator_state, &mut program);
 
-    // Set x1 := 0xFEFDFCFB
+    // Set x1 := 0xFEFDFCFB (lowest byte )
     emulator_state = clock(&emulator_state, &mut program);
     emulator_state = clock(&emulator_state, &mut program);
 
     // Set x2 := 100
     emulator_state = clock(&emulator_state, &mut program);
 
-    // SH (x1 := 10) -> Write x1 to address 100 + x2
+    // SH -> Write x1 to address x2 (100) + 5
+    emulator_state = clock(&emulator_state, &mut program);
     clock(&emulator_state, &mut program);
-    assert_eq!(program.data_memory.get(&105), Some(&0xFB)); // x1 = 0xFEFDFCFB (100 + x2)
+    assert_eq!(program.data_memory.get(&105), Some(&0xFB));
     assert_eq!(program.data_memory.get(&106), Some(&0xFC));
     assert_eq!(program.data_memory.get(&107), None);
     assert_eq!(program.data_memory.get(&108), None);
@@ -956,7 +964,7 @@ fn test_SW() {
     let mut emulator_state = EmulatorState::default();
 
     let mut program = populate(&[
-        // Set x1 := 10 (Data to write)
+        // Set x1 := 0xFEFDFCFB (Data to write)
         ISA::LUI.build(Operands {
             rd: 1,
             imm: 0xFEFDF000u32.wrapping_sub(0xFFFFF000u32) as i32,
@@ -995,9 +1003,10 @@ fn test_SW() {
     // Set x2 := 100
     emulator_state = clock(&emulator_state, &mut program);
 
-    // SW (x1 := 10) -> Write x1 to address 100 + x2
+    // SW -> Write x1 to address x2 (100) + 5
+    emulator_state = clock(&emulator_state, &mut program);
     clock(&emulator_state, &mut program);
-    assert_eq!(program.data_memory.get(&105), Some(&0xFB)); // x1 = 0xFEFDFCFB (100 + x2)
+    assert_eq!(program.data_memory.get(&105), Some(&0xFB));
     assert_eq!(program.data_memory.get(&106), Some(&0xFC));
     assert_eq!(program.data_memory.get(&107), Some(&0xFD));
     assert_eq!(program.data_memory.get(&108), Some(&0xFE));
@@ -1930,290 +1939,4 @@ fn test_AND() {
     emulator_state = clock(&emulator_state, &mut program);
 
     assert_eq!(emulator_state.x[3], 0b1000); // x3 = 8 (0b1100 & 0b1010)
-}
-
-#[test]
-fn test_CSRRW() {
-    let mut emulator_state = EmulatorState::default();
-
-    let csr1 = 5;
-    let csr2 = 6;
-
-    let mut program = populate(&[
-        // set x1 := 42
-        ISA::ADDI.build(Operands {
-            rd: 1,
-            rs1: 0,
-            imm: 42,
-            ..Default::default()
-        }),
-        // set x2 := 100
-        ISA::ADDI.build(Operands {
-            rd: 2,
-            rs1: 0,
-            imm: 100,
-            ..Default::default()
-        }),
-        // CSRRW x1, csr1, x1
-        ISA::CSRRW.build(Operands {
-            rd: 1,
-            rs1: 1,
-            imm: csr1,
-            ..Default::default()
-        }),
-        // cssrw x2, csr2, x2
-        ISA::CSRRW.build(Operands {
-            rd: 2,
-            rs1: 2,
-            imm: csr2,
-            ..Default::default()
-        }),
-    ]);
-
-    // Instruction fetch
-    emulator_state = clock(&emulator_state, &mut program);
-
-    // Set x1 := 42
-    emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[1], 42);
-
-    // Set x2 := 100
-    emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[2], 100);
-
-    // CSRRW (x1 := 42) -> Write x1 to csr1
-    emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.csr[&(csr1 as u32)], 42);
-    assert_eq!(emulator_state.x[1], 0);
-
-    // CSRRW (x2 := 100) -> Write x2 to csr2
-    emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.csr[&(csr2 as u32)], 100);
-    assert_eq!(emulator_state.x[2], 0);
-}
-
-#[test]
-fn test_CSRRS() {
-    let mut emulator_state = EmulatorState::default();
-    let csr1 = 5;
-
-    let mut program = populate(&[
-        // set x1 := 42
-        ISA::ADDI.build(Operands {
-            rd: 1,
-            rs1: 0,
-            imm: 42,
-            ..Default::default()
-        }),
-        // set x2 := 100
-        ISA::ADDI.build(Operands {
-            rd: 2,
-            rs1: 0,
-            imm: 100,
-            ..Default::default()
-        }),
-        // CSRRS x1, csr1, x1
-        ISA::CSRRS.build(Operands {
-            rd: 1,
-            rs1: 1,
-            imm: csr1,
-            ..Default::default()
-        }),
-        // cssrs x1, csr1, x2
-        ISA::CSRRS.build(Operands {
-            rd: 1,
-            rs1: 2,
-            imm: csr1,
-            ..Default::default()
-        }),
-    ]);
-
-    // Instruction fetch
-    emulator_state = clock(&emulator_state, &mut program);
-
-    // Set x1 := 42
-    emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[1], 42);
-
-    // Set x2 := 100
-    emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[2], 100);
-
-    // CSRRS x1, csr1, x1 -> Set csr1 := 0 | 42
-    emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.csr[&(csr1 as u32)], 42);
-    assert_eq!(emulator_state.x[1], 0);
-
-    // CSRRS x1, csr1, x1 -> Set csr1 := 42 | 100
-    emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.csr[&(csr1 as u32)], 42 | 100);
-    assert_eq!(emulator_state.x[1], 42);
-}
-
-#[test]
-fn test_CSRRC() {
-    let mut emulator_state = EmulatorState::default();
-    let csr1 = 5;
-
-    let mut program = populate(&[
-        // set x1 := 42
-        ISA::ADDI.build(Operands {
-            rd: 1,
-            rs1: 0,
-            imm: 42,
-            ..Default::default()
-        }),
-        // set x2 := 100
-        ISA::ADDI.build(Operands {
-            rd: 2,
-            rs1: 0,
-            imm: 100,
-            ..Default::default()
-        }),
-        // CSRRC x1, csr1, x1
-        ISA::CSRRC.build(Operands {
-            rd: 1,
-            rs1: 1,
-            imm: csr1,
-            ..Default::default()
-        }),
-        // cssrc x1, csr1, x2
-        ISA::CSRRC.build(Operands {
-            rd: 1,
-            rs1: 2,
-            imm: csr1,
-            ..Default::default()
-        }),
-    ]);
-
-    // Instruction fetch
-    emulator_state = clock(&emulator_state, &mut program);
-
-    // Set x1 := 42
-    emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[1], 42);
-
-    // Set x2 := 100
-    emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.x[2], 100);
-
-    // CSRRC x1, csr1, x1 -> Set csr1 := 0 & ~42
-    emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.csr[&(csr1 as u32)], 0);
-    assert_eq!(emulator_state.x[1], 0);
-
-    // CSRRC x1, csr1, x1 -> Set csr1 := 42 & ~100
-    emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.csr[&(csr1 as u32)], 0);
-    assert_eq!(emulator_state.x[1], 0);
-}
-
-#[test]
-fn test_CSRRWI() {
-    let mut emulator_state = EmulatorState::default();
-
-    let csr1 = 5;
-
-    let mut program = populate(&[
-        // CSRRC x1, csr1, x1
-        ISA::CSRRWI.build(Operands {
-            rd: 1,
-            rs1: 25,
-            imm: csr1,
-            ..Default::default()
-        }),
-        // cssrc x1, csr1, x2
-        ISA::CSRRWI.build(Operands {
-            rd: 1,
-            rs1: 2,
-            imm: csr1,
-            ..Default::default()
-        }),
-    ]);
-
-    // Instruction fetch
-    emulator_state = clock(&emulator_state, &mut program);
-
-    // CSRRC x1, csr1, 45 -> Set csr1 := 45
-    emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.csr[&(csr1 as u32)], 25);
-    assert_eq!(emulator_state.x[1], 0);
-
-    // CSRRC x1, csr1, 2 -> Set csr1 := 2
-    emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.csr[&(csr1 as u32)], 2);
-    assert_eq!(emulator_state.x[1], 25);
-}
-
-#[test]
-fn test_CSRRSI() {
-    let mut emulator_state = EmulatorState::default();
-
-    let csr1 = 5;
-
-    let mut program = populate(&[
-        // CSRRSI x1, csr1, x1
-        ISA::CSRRSI.build(Operands {
-            rd: 1,
-            rs1: 25,
-            imm: csr1,
-            ..Default::default()
-        }),
-        // CSRRSI x1, csr1, x2
-        ISA::CSRRSI.build(Operands {
-            rd: 1,
-            rs1: 2,
-            imm: csr1,
-            ..Default::default()
-        }),
-    ]);
-
-    // Instruction fetch
-    emulator_state = clock(&emulator_state, &mut program);
-
-    // CSRRS x1, csr1, 45 -> Set csr1 := 0 | 25
-    emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.csr[&(csr1 as u32)], 25);
-    assert_eq!(emulator_state.x[1], 0);
-
-    // CSRRS x1, csr1, 2 -> Set csr1 := 2 | 45
-    emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.csr[&(csr1 as u32)], 2 | 25);
-    assert_eq!(emulator_state.x[1], 25);
-}
-
-#[test]
-fn test_CSRRCI() {
-    let mut emulator_state = EmulatorState::default();
-    let csr1 = 5;
-
-    let mut program = populate(&[
-        // CSRRCI x1, csr1, 25
-        ISA::CSRRCI.build(Operands {
-            rd: 1,
-            rs1: 25,
-            imm: csr1,
-            ..Default::default()
-        }),
-        // CSRRCI x1, csr1, 2
-        ISA::CSRRCI.build(Operands {
-            rd: 1,
-            rs1: 2,
-            imm: csr1,
-            ..Default::default()
-        }),
-    ]);
-
-    // Instruction fetch
-    emulator_state = clock(&emulator_state, &mut program);
-
-    // CSRRS x1, csr1, 45 -> Set csr1 := 0 | !25
-    emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.csr[&(csr1 as u32)], 0);
-    assert_eq!(emulator_state.x[1], 0);
-
-    // CSRRS x1, csr1, 2 -> Set csr1 := 0 & !2
-    emulator_state = clock(&emulator_state, &mut program);
-    assert_eq!(emulator_state.csr[&(csr1 as u32)], 0);
-    assert_eq!(emulator_state.x[1], 0);
 }

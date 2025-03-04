@@ -6,8 +6,8 @@ mod highlight;
 mod monaco_editor;
 
 use monaco::sys::{
-    editor::{self, IEditorMinimapOptions, IMarkerData},
     MarkerSeverity,
+    editor::{self, IEditorMinimapOptions, IMarkerData},
 };
 use monaco_editor::MonacoEditor;
 

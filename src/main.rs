@@ -1,4 +1,3 @@
-#[allow(non_snake_case, unused)]
 mod assembler;
 mod code_editor;
 mod emulator;
@@ -8,7 +7,7 @@ mod uart;
 mod utils;
 
 use dioxus::prelude::*;
-use dioxus_logger::tracing::{info, Level};
+use dioxus_logger::tracing::{Level, info};
 use interface::App;
 
 fn main() {

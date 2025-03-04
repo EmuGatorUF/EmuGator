@@ -5,11 +5,11 @@ use dioxus::prelude::*;
 use monaco::{
     api::{CodeEditor as MonacoController, DisposableClosure, TextModel},
     sys::{
+        IRange, Range,
         editor::{
             IEditorMouseEvent, IModelDecorationOptions, IModelDeltaDecoration,
             IStandaloneEditorConstructionOptions, MouseTargetType,
         },
-        IRange, Range,
     },
 };
 use wasm_bindgen::{JsCast, JsValue};
