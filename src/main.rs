@@ -3,7 +3,6 @@ mod code_editor;
 mod emulator;
 mod interface;
 mod isa;
-mod uart;
 mod utils;
 
 use dioxus::prelude::*;

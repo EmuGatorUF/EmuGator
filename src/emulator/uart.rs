@@ -55,7 +55,7 @@ pub enum LineStatusRegisterBitMask {
     Error = 1 << 7, // Probably not used
 }
 
-pub fn trigger_uart(uart_module: Uart, data_memory: &mut BTreeMap<u32, u8>) -> Uart {
+pub fn trigger_uart(uart_module: &Uart, data_memory: &mut BTreeMap<u32, u8>) -> Uart {
     let mut next_uart = uart_module.clone();
 
     let the_receive_data = *data_memory.get(&next_uart.rx_buffer_address).unwrap();

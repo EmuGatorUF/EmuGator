@@ -2,6 +2,7 @@ mod controller;
 mod datapath;
 mod pipeline;
 mod register_file;
+pub mod uart;
 
 #[cfg(test)]
 mod tests;
@@ -10,7 +11,7 @@ use std::collections::BTreeSet;
 
 use crate::assembler::AssembledProgram;
 use crate::isa::Instruction;
-use crate::uart::{trigger_uart, Uart};
+use uart::{Uart, trigger_uart};
 
 use controller::get_control_signals;
 use pipeline::CVE2Pipeline;
@@ -26,14 +27,14 @@ pub fn clock_until_break(
     org_state: &EmulatorState,
     program: &mut AssembledProgram,
     breakpoints: &BTreeSet<usize>,
-    uart_module: Uart
+    uart_module: &Uart,
 ) -> (EmulatorState, Uart) {
     let mut state = org_state.clone();
-    let mut uart_module = uart_module;
+    let mut uart_module = uart_module.clone();
     let mut num_cycles = 0;
 
     loop {
-        state = clock(&state, program);
+        (state, uart_module) = clock(&state, program, &uart_module);
 
         let hit_breakpoint =
             if let Some(line_num) = program.source_map.get_by_left(&state.pipeline.IF_pc) {
@@ -47,12 +48,6 @@ pub fn clock_until_break(
             break;
         }
 
-        uart_module = trigger_uart(
-            uart_module,
-            &mut program.data_memory,
-        );
-
-
         // max 1000 cycles until we can move this to a web worker
         num_cycles += 1;
         if num_cycles > 1000 {
@@ -62,7 +57,11 @@ pub fn clock_until_break(
     (state, uart_module)
 }
 
-pub fn clock(org_state: &EmulatorState, program: &mut AssembledProgram) -> EmulatorState {
+pub fn clock(
+    org_state: &EmulatorState,
+    program: &mut AssembledProgram,
+    uart_module: &Uart,
+) -> (EmulatorState, Uart) {
     let mut next_state = org_state.clone();
 
     // Set control signals
@@ -109,5 +108,15 @@ pub fn clock(org_state: &EmulatorState, program: &mut AssembledProgram) -> Emula
     next_state.pipeline.run_pc_mux();
     next_state.pipeline.run_pc_reg();
 
-    return next_state;
+    // UART
+    let next_uart = trigger_uart(uart_module, &mut program.data_memory);
+
+    return (next_state, next_uart);
+}
+
+#[allow(dead_code)]
+pub fn clock_no_uart(org_state: &EmulatorState, program: &mut AssembledProgram) -> EmulatorState {
+    let temp_uart = Uart::default();
+    let (next_state, _) = clock(org_state, program, &temp_uart);
+    next_state
 }

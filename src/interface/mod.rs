@@ -18,9 +18,8 @@ use self::{
 use crate::{
     assembler::{AssembledProgram, AssemblerError},
     code_editor::{CodeEditor, LineHighlight},
-    emulator::EmulatorState,
+    emulator::{EmulatorState, uart::Uart},
     include_test_file,
-    uart::Uart,
 };
 
 #[component]
