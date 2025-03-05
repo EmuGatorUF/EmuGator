@@ -64,9 +64,9 @@ impl From<&str> for Section {
     }
 }
 
-impl Into<String> for Section {
-    fn into(self) -> String {
-        match self {
+impl From<Section> for String {
+    fn from(val: Section) -> Self {
+        match val {
             Section::Absolute => "absolute".to_string(),
             Section::Data => "data".to_string(),
             Section::Text => "text".to_string(),

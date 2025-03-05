@@ -1,7 +1,10 @@
+#[allow(clippy::upper_case_acronyms)]
 mod assembler;
 mod code_editor;
+#[allow(clippy::upper_case_acronyms)]
 mod emulator;
 mod interface;
+#[allow(clippy::upper_case_acronyms)]
 mod isa;
 mod utils;
 

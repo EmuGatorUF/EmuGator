@@ -99,7 +99,7 @@ pub struct RPN<'a> {
     pub token: Token<'a>,
 }
 
-impl<'a> Display for RPN<'a> {
+impl Display for RPN<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.kind {
             RPNKind::LParenthesis => write!(f, "("),

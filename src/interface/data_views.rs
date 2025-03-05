@@ -33,11 +33,8 @@ pub fn DataView(assembled_program: Signal<Option<AssembledProgram>>) -> Element 
                                     let base_addr = data_start + i * 8;
                                     {
                                         let mut dw_bytes: [u8; 8] = [0; 8];
-                                        for j in 0..8 {
-                                            dw_bytes[j] = data_memory
-                                                .get(&((base_addr + j) as u32))
-                                                .copied()
-                                                .unwrap_or(0) as u8;
+                                        for (j, b) in dw_bytes.iter_mut().enumerate() {
+                                            *b = data_memory.get(&((base_addr + j) as u32)).copied().unwrap_or(0);
                                         }
                                         let hex_string1 = format!(
                                             "{:02x} {:02x} {:02x} {:02x}",
@@ -53,9 +50,9 @@ pub fn DataView(assembled_program: Signal<Option<AssembledProgram>>) -> Element 
                                             dw_bytes[6],
                                             dw_bytes[7],
                                         );
-                                        for j in 0..8 {
-                                            if dw_bytes[j] < 0x21 || dw_bytes[j] > 0x7e {
-                                                dw_bytes[j] = b'.';
+                                        for b in &mut dw_bytes {
+                                            if *b < 0x21 || *b > 0x7e {
+                                                *b = b'.';
                                             }
                                         }
                                         let char_string = String::from_utf8_lossy(&dw_bytes[0..8]).to_string();

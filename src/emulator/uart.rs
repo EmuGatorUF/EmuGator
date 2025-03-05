@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt::Display};
 
 // UART Module for EmuGator
 
@@ -38,11 +38,11 @@ impl Uart {
     pub fn default() -> Self {
         Uart::new(vec![], 0xF0, 0xF4, 0xF8, 20, 0)
     }
+}
 
-    pub fn to_string(&self) -> String {
-        // Convert the output buffer to a string
-        String::from_utf8(self.uart_output_buffer.clone())
-            .unwrap_or_else(|_| "Invalid UTF-8".to_string())
+impl Display for Uart {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(std::str::from_utf8(&self.uart_output_buffer).unwrap_or("Invalid UTF-8"))
     }
 }
 
@@ -71,10 +71,10 @@ pub fn trigger_uart(uart_module: &Uart, data_memory: &mut BTreeMap<u32, u8>) -> 
     let new_lsr = (old_lsr
         & !(LineStatusRegisterBitMask::TransmitBusy as u8
             | LineStatusRegisterBitMask::ReceiveBusy as u8))
-        | ((old_lsr & LineStatusRegisterBitMask::TransmitBusy as u8) != 0) as u8
-            * (LineStatusRegisterBitMask::TransmitReady as u8)
-        | ((old_lsr & LineStatusRegisterBitMask::ReceiveBusy as u8) != 0) as u8
-            * (LineStatusRegisterBitMask::ReceiveReady as u8);
+        | (((old_lsr & LineStatusRegisterBitMask::TransmitBusy as u8) != 0) as u8
+            * (LineStatusRegisterBitMask::TransmitReady as u8))
+        | (((old_lsr & LineStatusRegisterBitMask::ReceiveBusy as u8) != 0) as u8
+            * (LineStatusRegisterBitMask::ReceiveReady as u8));
     data_memory.insert(next_uart.lsr_address, new_lsr);
 
     if the_transmit_data != 0 {

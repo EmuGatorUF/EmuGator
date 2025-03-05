@@ -63,7 +63,7 @@ pub fn RunButtons(
                         if let Some(mut program) = assembled_program.as_mut() {
                             let (new_state, new_uart) = emulator::clock(
                                 emulator_state.read().deref(),
-                                &mut *program,
+                                &mut program,
                                 Some(uart_module.read().deref()),
                             );
                             *(emulator_state.write()) = new_state;
@@ -78,7 +78,7 @@ pub fn RunButtons(
                         if let Some(mut program) = assembled_program.as_mut() {
                             let (new_state, new_uart) = emulator::clock_until_break(
                                 emulator_state.read().deref(),
-                                &mut *program,
+                                &mut program,
                                 breakpoints.read().deref(),
                                 uart_module.read().deref(),
                             );

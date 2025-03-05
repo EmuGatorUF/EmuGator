@@ -184,7 +184,7 @@ impl CVE2Pipeline {
 
     pub fn run_cmp_reg(&mut self) {
         if self.control.cmp_set {
-            self.datapath.cmp_result = self.datapath.alu_out.map_or(false, |x| x != 0);
+            self.datapath.cmp_result = self.datapath.alu_out.is_some_and(|x| x != 0);
         }
     }
 
@@ -245,8 +245,8 @@ fn rw_memory(
     });
 
     if success {
-        return Ok(u32::from_le_bytes(rdata_bytes));
+        Ok(u32::from_le_bytes(rdata_bytes))
     } else {
-        return Err(());
+        Err(())
     }
 }

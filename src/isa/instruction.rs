@@ -24,7 +24,7 @@ pub enum InstructionBuildErrorType {
 }
 
 impl Instruction {
-    #[allow(dead_code)]
+    #[allow(dead_code, clippy::too_many_arguments)]
     pub fn new(
         format: InstructionFormat,
         opcode: u32,
@@ -39,6 +39,7 @@ impl Instruction {
             .expect("Invalid instruction")
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn try_build(
         format: InstructionFormat,
         opcode: u32,
@@ -244,7 +245,7 @@ impl Instruction {
         rs2: u32,
         funct7: u32,
     ) -> Result<u32, InstructionBuildError> {
-        Ok(funct7 << 25 | rs2 << 20 | rs1 << 15 | funct3 << 12 | rd << 7 | opcode << 0)
+        Ok((funct7 << 25) | (rs2 << 20) | (rs1 << 15) | (funct3 << 12) | (rd << 7) | opcode)
     }
 
     fn encode_i(
@@ -263,7 +264,7 @@ impl Instruction {
             })
         } else {
             let imm: u32 = imm as u32;
-            Ok(imm << 20 | rs1 << 15 | funct3 << 12 | rd << 7 | opcode << 0)
+            Ok((imm << 20) | (rs1 << 15) | (funct3 << 12) | (rd << 7) | opcode)
         }
     }
 
@@ -283,12 +284,12 @@ impl Instruction {
             })
         } else {
             let imm: u32 = imm as u32;
-            Ok(bits!(imm,11;5) << 25
-                | rs2 << 20
-                | rs1 << 15
-                | funct3 << 12
-                | bits!(imm,4;0) << 7
-                | opcode << 0)
+            Ok((bits!(imm,11;5) << 25)
+                | (rs2 << 20)
+                | (rs1 << 15)
+                | (funct3 << 12)
+                | (bits!(imm,4;0) << 7)
+                | opcode)
         }
     }
 
@@ -308,14 +309,14 @@ impl Instruction {
             })
         } else {
             let imm: u32 = imm as u32;
-            Ok(bits!(imm, 12) << 31
-                | bits!(imm,10;5) << 25
-                | rs2 << 20
-                | rs1 << 15
-                | funct3 << 12
-                | bits!(imm,4;1) << 8
-                | bits!(imm, 11) << 7
-                | opcode << 0)
+            Ok((bits!(imm, 12) << 31)
+                | (bits!(imm,10;5) << 25)
+                | (rs2 << 20)
+                | (rs1 << 15)
+                | (funct3 << 12)
+                | (bits!(imm,4;1) << 8)
+                | (bits!(imm, 11) << 7)
+                | opcode)
         }
     }
 
@@ -329,20 +330,15 @@ impl Instruction {
             })
         } else {
             let imm: u32 = imm as u32;
-            Ok(bits!(imm,31;12) << 12 | rd << 7 | opcode << 0)
+            Ok((bits!(imm,31;12) << 12) | (rd << 7) | opcode)
         }
     }
 
     fn encode_j(opcode: u32, rd: u32, imm: i32) -> Result<u32, InstructionBuildError> {
         let _shifted = bits!(imm, 20;1) << 1;
-        if imm >= 0 && imm != bits!(imm,20;1) << 1 {
-            Err(InstructionBuildError {
-                error_message: format!(
-                    "Immediate {imm:#05x} is out of range for J type instruction."
-                ),
-                error_type: InstructionBuildErrorType::InvalidImm,
-            })
-        } else if imm < 0 && bits!(imm, 20, 12) != bitmask!(12) {
+        if (imm >= 0 && imm != bits!(imm,20;1) << 1)
+            || (imm < 0 && bits!(imm, 20, 12) != bitmask!(12))
+        {
             Err(InstructionBuildError {
                 error_message: format!(
                     "Immediate {imm:#05x} is out of range for J type instruction."
@@ -351,12 +347,12 @@ impl Instruction {
             })
         } else {
             let imm: u32 = imm as u32;
-            Ok(bits!(imm, 20) << 31
-                | bits!(imm,10;1) << 21
-                | bits!(imm, 11) << 20
-                | bits!(imm,19;12) << 12
-                | rd << 7
-                | opcode << 0)
+            Ok((bits!(imm, 20) << 31)
+                | (bits!(imm,10;1) << 21)
+                | (bits!(imm, 11) << 20)
+                | (bits!(imm,19;12) << 12)
+                | (rd << 7)
+                | opcode)
         }
     }
 
@@ -373,21 +369,21 @@ impl Instruction {
         let format: InstructionFormat = InstructionDefinition::from_instr(*self).ok_or(())?.format;
         match format {
             InstructionFormat::I => {
-                Ok((bits!(self.instr, 31) * bitmask!(31; 11) | bits!(self.instr,30;20)) as i32)
+                Ok(((bits!(self.instr, 31) * bitmask!(31; 11)) | bits!(self.instr,30;20)) as i32)
             }
-            InstructionFormat::S => Ok((bits!(self.instr, 31) * bitmask!(31; 11)
-                | bits!(self.instr,30;25) << 5
+            InstructionFormat::S => Ok(((bits!(self.instr, 31) * bitmask!(31; 11))
+                | (bits!(self.instr,30;25) << 5)
                 | bits!(self.instr,11;7 )) as i32),
-            InstructionFormat::B => Ok((bits!(self.instr, 31) * bitmask!(31; 12)
-                | bits!(self.instr, 7) << 11
-                | bits!(self.instr,30;25) << 5
-                | bits!(self.instr,11;8 ) << 1) as i32),
+            InstructionFormat::B => Ok(((bits!(self.instr, 31) * bitmask!(31; 12))
+                | (bits!(self.instr, 7) << 11)
+                | (bits!(self.instr,30;25) << 5)
+                | (bits!(self.instr,11;8 ) << 1)) as i32),
             InstructionFormat::U => Ok((bits!(self.instr,31;12) << 12) as i32),
-            InstructionFormat::J => Ok((bits!(self.instr, 31) * bitmask!(31; 20)
-                | bits!(self.instr,19;12) << 12
-                | bits!(self.instr, 20) << 11
-                | bits!(self.instr,30;25) << 5
-                | bits!(self.instr,24;21) << 1) as i32),
+            InstructionFormat::J => Ok(((bits!(self.instr, 31) * bitmask!(31; 20))
+                | (bits!(self.instr,19;12) << 12)
+                | (bits!(self.instr, 20) << 11)
+                | (bits!(self.instr,30;25) << 5)
+                | (bits!(self.instr,24;21) << 1)) as i32),
             _ => Err(()),
         }
     }

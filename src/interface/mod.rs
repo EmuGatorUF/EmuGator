@@ -27,10 +27,10 @@ use crate::{
 pub fn App() -> Element {
     let source = use_signal(|| include_test_file!("prototype-demo.s").to_string());
     let assembled_program: Signal<Option<AssembledProgram>> = use_signal(|| None);
-    let assembler_errors: Signal<Vec<AssemblerError>> = use_signal(|| Vec::new());
-    let emulator_state: Signal<EmulatorState> = use_signal(|| EmulatorState::default());
-    let breakpoints: Signal<BTreeSet<usize>> = use_signal(|| BTreeSet::new());
-    let uart_module: Signal<Uart> = use_signal(|| Uart::default());
+    let assembler_errors: Signal<Vec<AssemblerError>> = use_signal(Vec::new);
+    let emulator_state: Signal<EmulatorState> = use_signal(EmulatorState::default);
+    let breakpoints: Signal<BTreeSet<usize>> = use_signal(BTreeSet::new);
+    let uart_module: Signal<Uart> = use_signal(Uart::default);
 
     let minimize_console: Signal<bool> = use_signal(|| false);
 
@@ -39,7 +39,7 @@ pub fn App() -> Element {
         // TODO: Get diagnostics
     });
 
-    let mut line_highlights = use_signal(|| Vec::<LineHighlight>::new());
+    let mut line_highlights = use_signal(Vec::<LineHighlight>::new);
     use_effect(move || {
         line_highlights.write().clear();
 
@@ -50,8 +50,7 @@ pub fn App() -> Element {
             assembled_program
                 .read()
                 .as_ref()
-                .map(|p| p.source_map.get_by_left(&pc).copied())
-                .flatten()
+                .and_then(|p| p.source_map.get_by_left(&pc).copied())
         }
 
         if let Some(line) = get_pc_line(emulator_state.read().pipeline.ID_pc, &assembled_program) {

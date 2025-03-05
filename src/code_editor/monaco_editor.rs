@@ -14,6 +14,8 @@ use monaco::{
 };
 use wasm_bindgen::{JsCast, JsValue};
 
+type MouseEventHandler = DisposableClosure<dyn FnMut(IEditorMouseEvent)>;
+
 #[derive(Clone, PartialEq, Debug)]
 pub struct LineHighlight {
     pub line: usize,
@@ -32,10 +34,9 @@ pub fn MonacoEditor(
     let mut editor = use_signal::<Option<MonacoController>>(|| None);
     let element_id = "monaco-editor";
 
-    let mut curr_decorations = use_signal(|| js_sys::Array::new());
+    let mut curr_decorations = use_signal(js_sys::Array::new);
 
-    let mut mouse_handlers: Signal<Vec<DisposableClosure<dyn FnMut(IEditorMouseEvent)>>> =
-        use_signal(|| vec![]);
+    let mut mouse_handlers: Signal<Vec<MouseEventHandler>> = use_signal(std::vec::Vec::new);
 
     let breakpoint_hover_line: Signal<Option<usize>> = use_signal(|| None);
 
@@ -149,7 +150,7 @@ fn line_decoration(line_number: usize, class: &'static str) -> IModelDeltaDecora
 
     decoration.set_options(&options);
 
-    decoration.into()
+    decoration
 }
 
 fn breakpoint_decoration(line_number: usize, class: &'static str) -> IModelDeltaDecoration {
@@ -162,5 +163,5 @@ fn breakpoint_decoration(line_number: usize, class: &'static str) -> IModelDelta
 
     decoration.set_options(&options);
 
-    decoration.into()
+    decoration
 }

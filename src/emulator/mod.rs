@@ -109,10 +109,8 @@ pub fn clock(
     next_state.pipeline.run_pc_reg();
 
     // UART
-    let next_uart = uart_module.map_or_else(
-        || Uart::default(),
-        |u| trigger_uart(u, &mut program.data_memory),
-    );
+    let next_uart =
+        uart_module.map_or_else(Uart::default, |u| trigger_uart(u, &mut program.data_memory));
 
     (next_state, next_uart)
 }
