@@ -64,7 +64,7 @@ pub fn RunButtons(
                             let (new_state, new_uart) = emulator::clock(
                                 emulator_state.read().deref(),
                                 &mut *program,
-                                uart_module.read().deref(),
+                                Some(uart_module.read().deref()),
                             );
                             *(emulator_state.write()) = new_state;
                             *(uart_module.write()) = new_uart;

@@ -34,7 +34,7 @@ pub fn clock_until_break(
     let mut num_cycles = 0;
 
     loop {
-        (state, uart_module) = clock(&state, program, &uart_module);
+        (state, uart_module) = clock(&state, program, Some(&uart_module));
 
         let hit_breakpoint =
             if let Some(line_num) = program.source_map.get_by_left(&state.pipeline.IF_pc) {
@@ -60,7 +60,7 @@ pub fn clock_until_break(
 pub fn clock(
     org_state: &EmulatorState,
     program: &mut AssembledProgram,
-    uart_module: &Uart,
+    uart_module: Option<&Uart>,
 ) -> (EmulatorState, Uart) {
     let mut next_state = org_state.clone();
 
@@ -109,14 +109,15 @@ pub fn clock(
     next_state.pipeline.run_pc_reg();
 
     // UART
-    let next_uart = trigger_uart(uart_module, &mut program.data_memory);
+    let next_uart = uart_module.map_or_else(
+        || Uart::default(),
+        |u| trigger_uart(u, &mut program.data_memory),
+    );
 
-    return (next_state, next_uart);
+    (next_state, next_uart)
 }
 
 #[allow(dead_code)]
 pub fn clock_no_uart(org_state: &EmulatorState, program: &mut AssembledProgram) -> EmulatorState {
-    let temp_uart = Uart::default();
-    let (next_state, _) = clock(org_state, program, &temp_uart);
-    next_state
+    clock(org_state, program, None).0
 }
