@@ -18,7 +18,7 @@ pub fn DatapathVisualization(emulator_state: Signal<EmulatorState>) -> Element {
     let mut scale = use_signal(|| 1.0);
 
     rsx! {
-        div { class: "w-full h-full bg-white overflow-hidden relative",
+        div { class: "w-full h-full rounded bg-white overflow-hidden relative",
             button {
                 class: "absolute top-2 left-2 bg-gray-200 hover:bg-gray-300 p-1 rounded z-10",
                 onclick: move |_| {
