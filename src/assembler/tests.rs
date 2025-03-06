@@ -5,13 +5,8 @@ use std::collections::BTreeMap;
 use bimap::BiBTreeMap;
 use ibig::IBig;
 
-use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use crate::assembler::lexer::Lexer;
 
-use crate::assembler;
-use crate::assembler::lexer::{Lexer, TokenKind};
-
-use super::rpn::Expression;
 use super::{assemble, parse_expression};
 use crate::include_test_file;
 
@@ -20,7 +15,7 @@ use crate::include_test_file;
 fn print_lexer() {
     let source = include_test_file!("syntax-check.s");
 
-    let mut lexer = Lexer::new(source).peekable();
+    let lexer = Lexer::new(source).peekable();
     let tokens: Vec<_> = lexer.map(|token_result| token_result.unwrap()).collect();
 
     for token in tokens {
@@ -103,7 +98,8 @@ fn test_randomized_instructions() {
                         error.line_number,
                         error.column,
                         error.error_message
-                    );
+                    )
+                    .unwrap();
                 }
             }
         }
@@ -202,7 +198,7 @@ fn test_randomized_branches() {
         let labels: Vec<String> = (0..num_labels).map(|i| format!("label_{}", i)).collect();
 
         let num_instructions = rng.random_range(10..30);
-        for instr_idx in 0..num_instructions {
+        for _instr_idx in 0..num_instructions {
             if rng.random_bool(0.3) {
                 let label_idx = rng.random_range(0..labels.len());
                 writeln!(program, "{}:", labels[label_idx]).unwrap();
@@ -1869,54 +1865,54 @@ fn assembler_all_instructions() {
 
     // Verify instruction source map
     let expected_source_map: BiBTreeMap<u32, usize> = [
-        (0x00000000, 10),
-        (0x00000004, 11),
-        (0x00000008, 12),
-        (0x0000000C, 13),
-        (0x00000010, 14),
-        (0x00000014, 15),
-        (0x00000018, 16),
-        (0x0000001C, 17),
-        (0x00000020, 18),
-        (0x00000024, 21),
-        (0x00000028, 22),
-        (0x0000002C, 25),
-        (0x00000030, 26),
-        (0x00000034, 27),
-        (0x00000038, 28),
-        (0x0000003C, 29),
-        (0x00000040, 30),
-        (0x00000044, 31),
-        (0x00000048, 32),
-        (0x0000004C, 33),
-        (0x00000050, 34),
-        (0x00000054, 37),
-        (0x00000058, 40),
-        (0x0000005C, 43),
-        (0x00000060, 44),
-        (0x00000064, 45),
-        (0x00000068, 46),
-        (0x0000006C, 47),
-        (0x00000070, 48),
-        (0x00000074, 51),
-        (0x00000078, 52),
-        (0x0000007C, 53),
-        (0x00000080, 54),
-        (0x00000084, 55),
-        (0x00000088, 58),
-        (0x0000008C, 59),
-        (0x00000090, 60),
-        (0x00000094, 63),
-        (0x00000098, 64),
-        (0x0000009C, 65),
-        (0x000000A0, 68),
-        (0x000000A4, 71),
-        (0x000000A8, 74),
-        (0x000000AC, 77),
-        (0x000000B0, 80),
-        (0x000000B4, 83),
-        (0x000000B8, 86),
-        (0x000000BC, 89),
+        (0x00000000, 11),
+        (0x00000004, 12),
+        (0x00000008, 13),
+        (0x0000000C, 14),
+        (0x00000010, 15),
+        (0x00000014, 16),
+        (0x00000018, 17),
+        (0x0000001C, 18),
+        (0x00000020, 19),
+        (0x00000024, 22),
+        (0x00000028, 23),
+        (0x0000002C, 26),
+        (0x00000030, 27),
+        (0x00000034, 28),
+        (0x00000038, 29),
+        (0x0000003C, 30),
+        (0x00000040, 31),
+        (0x00000044, 32),
+        (0x00000048, 33),
+        (0x0000004C, 34),
+        (0x00000050, 35),
+        (0x00000054, 38),
+        (0x00000058, 41),
+        (0x0000005C, 44),
+        (0x00000060, 45),
+        (0x00000064, 46),
+        (0x00000068, 47),
+        (0x0000006C, 48),
+        (0x00000070, 49),
+        (0x00000074, 52),
+        (0x00000078, 53),
+        (0x0000007C, 54),
+        (0x00000080, 55),
+        (0x00000084, 56),
+        (0x00000088, 59),
+        (0x0000008C, 60),
+        (0x00000090, 61),
+        (0x00000094, 64),
+        (0x00000098, 65),
+        (0x0000009C, 66),
+        (0x000000A0, 69),
+        (0x000000A4, 72),
+        (0x000000A8, 75),
+        (0x000000AC, 78),
+        (0x000000B0, 81),
+        (0x000000B4, 84),
+        (0x000000B8, 87),
+        (0x000000BC, 90),
     ]
     .iter()
     .cloned()
@@ -1930,29 +1926,29 @@ fn assembler_all_instructions() {
         (0x00000003, 0x74),
         (0x00000004, 0x0A),
         (0x00000005, 0x00),
-        (0x00000006, 0x01),
-        (0x00000007, 0x00),
-        (0x00000008, 0x00),
+        (0x00000008, 0x01),
         (0x00000009, 0x00),
-        (0x0000000A, 0x02),
-        (0x0000000B, 0x00),
-        (0x0000000C, 0x00),
+        (0x0000000a, 0x00),
+        (0x0000000b, 0x00),
+        (0x0000000C, 0x02),
         (0x0000000D, 0x00),
-        (0x0000000E, 0x03),
+        (0x0000000E, 0x00),
         (0x0000000F, 0x00),
-        (0x00000010, 0x00),
+        (0x00000010, 0x03),
         (0x00000011, 0x00),
-        (0x00000012, 0x04),
+        (0x00000012, 0x00),
         (0x00000013, 0x00),
-        (0x00000014, 0x00),
+        (0x00000014, 0x04),
         (0x00000015, 0x00),
-        (0x00000016, 0xFF),
-        (0x00000017, 0x42),
-        (0x00000018, 0x33),
-        (0x00000019, 0x74),
-        (0x0000001A, 0x65),
-        (0x0000001B, 0x73),
-        (0x0000001C, 0x74),
+        (0x00000016, 0x00),
+        (0x00000017, 0x00),
+        (0x00000018, 0xFF),
+        (0x00000019, 0x42),
+        (0x0000001a, 0x33),
+        (0x0000001b, 0x74),
+        (0x0000001C, 0x65),
+        (0x0000001D, 0x73),
+        (0x0000001E, 0x74),
     ]
     .iter()
     .cloned()

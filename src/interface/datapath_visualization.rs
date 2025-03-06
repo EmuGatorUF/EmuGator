@@ -79,8 +79,8 @@ pub fn DatapathVisualization(emulator_state: Signal<EmulatorState>) -> Element {
                         let (view_x, view_y, _, _) = *view_box.read();
                         start_pan
                             .set((
-                                e.client_coordinates().x as f64,
-                                e.client_coordinates().y as f64,
+                                e.client_coordinates().x,
+                                e.client_coordinates().y,
                                 view_x,
                                 view_y,
                             ));
@@ -90,8 +90,8 @@ pub fn DatapathVisualization(emulator_state: Signal<EmulatorState>) -> Element {
                     if *is_panning.read() {
                         let (start_x, start_y, initial_x, initial_y) = *start_pan.read();
                         let (_, _, width, height) = *view_box.read();
-                        let dx = (e.client_coordinates().x as f64 - start_x) * width / 200.0;
-                        let dy = (e.client_coordinates().y as f64 - start_y) * height / 100.0;
+                        let dx = (e.client_coordinates().x - start_x) * width / 200.0;
+                        let dy = (e.client_coordinates().y - start_y) * height / 100.0;
                         view_box.set((initial_x - dx, initial_y - dy, width, height));
                     }
                 },

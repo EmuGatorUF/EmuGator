@@ -1,11 +1,9 @@
 use std::{collections::VecDeque, fmt::Display, ops::Deref};
 
-use dioxus::html::b;
 use ibig::IBig;
 
 use super::{
-    Section,
-    assembled_program::Address,
+    Address, Section,
     assembler_error::AssemblerError,
     lexer::{Token, TokenKind},
 };
@@ -101,7 +99,7 @@ pub struct RPN<'a> {
     pub token: Token<'a>,
 }
 
-impl<'a> Display for RPN<'a> {
+impl Display for RPN<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.kind {
             RPNKind::LParenthesis => write!(f, "("),

@@ -285,6 +285,7 @@ impl LSUDataType {
     }
 }
 
+#[allow(clippy::unusual_byte_groupings)]
 pub fn get_control_signals(instr: Instruction, instr_cycle: u32) -> Option<CVE2Control> {
     match instr.opcode() {
         0b0110111 => Some(CVE2Control::immediate(ALUOp::SELB)), // LUI

@@ -9,11 +9,7 @@ impl Index<usize> for RegisterFile {
     type Output = u32;
 
     fn index(&self, index: usize) -> &Self::Output {
-        if index == 0 {
-            return &0;
-        } else {
-            &self.x[index]
-        }
+        if index == 0 { &0 } else { &self.x[index] }
     }
 }
 

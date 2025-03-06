@@ -1,6 +1,8 @@
 use crate::assembler::{self, AssembledProgram, AssemblerError, Section};
-use crate::emulator::{self, EmulatorState};
-use crate::uart::{LineStatusRegisterBitMask, Uart, trigger_uart};
+use crate::emulator::{
+    self, EmulatorState,
+    uart::{LineStatusRegisterBitMask, Uart},
+};
 
 use dioxus::prelude::*;
 use dioxus_logger::tracing::info;
@@ -59,15 +61,12 @@ pub fn RunButtons(
                     class: "bg-purple-500 hover:bg-purple-600 text-s text-white font-bold py-1 px-2 rounded",
                     onclick: move |_| {
                         if let Some(mut program) = assembled_program.as_mut() {
-                            let new_state = emulator::clock(
+                            let (new_state, new_uart) = emulator::clock(
                                 emulator_state.read().deref(),
-                                &mut *program,
+                                &mut program,
+                                Some(uart_module.read().deref()),
                             );
                             *(emulator_state.write()) = new_state;
-                            let new_uart = trigger_uart(
-                                uart_module.read().deref().clone(),
-                                &mut program.data_memory,
-                            );
                             *(uart_module.write()) = new_uart;
                         }
                     },
@@ -77,16 +76,13 @@ pub fn RunButtons(
                     class: "bg-purple-500 hover:bg-purple-600 text-s text-white font-bold py-1 px-2 rounded",
                     onclick: move |_| {
                         if let Some(mut program) = assembled_program.as_mut() {
-                            let new_state = emulator::clock_until_break(
+                            let (new_state, new_uart) = emulator::clock_until_break(
                                 emulator_state.read().deref(),
-                                &mut *program,
+                                &mut program,
                                 breakpoints.read().deref(),
+                                uart_module.read().deref(),
                             );
                             *(emulator_state.write()) = new_state;
-                            let new_uart = trigger_uart(
-                                uart_module.read().deref().clone(),
-                                &mut program.data_memory,
-                            );
                             *(uart_module.write()) = new_uart;
                         }
                     },

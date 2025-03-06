@@ -6,33 +6,37 @@ use std::{
     str::FromStr,
 };
 
-use assembled_program::Address;
 use bimap::BiBTreeMap;
-use dioxus::html::symbol;
 use ibig::IBig;
 use lexer::{Lexer, Token, TokenKind};
 use peeking_take_while::PeekableExt;
 use rpn::{Expression, RPN, RPNKind};
 
 use crate::{
-    bits,
+    bitmask, bits,
     isa::{
-        ISA, Instruction, InstructionBuildError, InstructionBuildErrorType, InstructionDefinition,
-        InstructionFormat, Operands,
+        ISA, Instruction, InstructionBuildErrorType, InstructionDefinition, InstructionFormat,
+        Operands,
     },
     utils::IBigLittleEndianIterator,
 };
 
+pub use address::Address;
 pub use assembled_program::{AssembledProgram, Section};
 pub use assembler_error::AssemblerError;
 
 #[cfg(test)]
 mod tests;
 
+mod address;
 mod assembled_program;
 mod assembler_error;
 mod lexer;
 mod rpn;
+
+fn aligned(value: u32, alignment: u32) -> u32 {
+    (value + bitmask!(alignment)) & !bitmask!(alignment)
+}
 
 fn consume_line<'a>(
     token: &mut Token<'a>,
@@ -149,7 +153,7 @@ fn parse_directive<'a>(
                     } else {
                         return Err(AssemblerError::from_token(
                             "Expected symbol after '.equ' directive.".into(),
-                            &token,
+                            token,
                         ));
                     }
                 }
@@ -171,7 +175,7 @@ fn parse_directive<'a>(
                         } else {
                             return Err(AssemblerError::from_token(
                                 "Expected section name after '.section' directive.".into(),
-                                &token,
+                                token,
                             ));
                         }
                     } else {
@@ -192,15 +196,35 @@ fn parse_directive<'a>(
 
                     Directive::Section(section_str.into(), (expression, token.clone()))
                 }
+                "align" => {
+                    let expression = parse_expression(lexer)?;
+
+                    let expression_err = AssemblerError::from_expression("".into(), &expression);
+                    let alignment: u32 = expression
+                        .evaluate(|_| {
+                            Err(AssemblerError {
+                                error_message: "Cannot use symbols in '.align' directive.".into(),
+                                ..expression_err.clone()
+                            })
+                        })?
+                        .1
+                        .try_into()
+                        .map_err(|_| AssemblerError {
+                            error_message: "Alignment is too large.".into(),
+                            ..expression_err
+                        })?;
+
+                    Directive::Alignment(alignment)
+                }
                 "byte" | "2byte" | "4byte" | "8byte" | "half" | "word" | "dword" => {
                     let (width, alignment) = match directive_str {
-                        "byte" => (1, 1),
-                        "2byte" => (2, 1),
-                        "4byte" => (4, 1),
-                        "8byte" => (8, 1),
-                        "half" => (2, 2),
-                        "word" => (4, 4),
-                        "dword" => (8, 8),
+                        "byte" => (1, 0),
+                        "2byte" => (2, 0),
+                        "4byte" => (4, 0),
+                        "8byte" => (8, 0),
+                        "half" => (2, 0),
+                        "word" => (4, 0),
+                        "dword" => (8, 0),
                         _ => unreachable!(),
                     };
                     let mut data = vec![];
@@ -272,7 +296,7 @@ fn parse_directive<'a>(
                     };
 
                     // Return bytes
-                    Directive::Data(data, 1)
+                    Directive::Data(data, alignment)
                 }
                 "ascii" | "asciz" | "string" => {
                     let mut data = vec![];
@@ -285,7 +309,7 @@ fn parse_directive<'a>(
 
                         if let TokenKind::StrLiteral(_, c) = string.kind {
                             // Safe to unwrap because Vec::write() is infallible
-                            data.write(c.as_bytes()).unwrap();
+                            data.write_all(c.as_bytes()).unwrap();
                             if matches!(directive_str, "asciz" | "string") {
                                 data.push(0u8);
                             }
@@ -308,7 +332,7 @@ fn parse_directive<'a>(
                     }
 
                     // Return string length
-                    Directive::Data(data, 1)
+                    Directive::Data(data, 0)
                 }
                 _ => {
                     return Err(AssemblerError::from_token(
@@ -320,14 +344,14 @@ fn parse_directive<'a>(
 
             *token = lexer.next().ok_or(AssemblerError::from_token(
                 "Unexpected EOF after directive, expected newline.".into(),
-                &token,
+                token,
             ))??;
 
             Ok(Some(output))
         } else {
             Err(AssemblerError::from_token(
                 "Invalid token, expected directive after '.'".into(),
-                &token,
+                token,
             ))
         }
     } else {
@@ -347,8 +371,8 @@ fn parse_instruction<'a>(
 
         // Parse instruction
         let def = ISA::from_str(&instr.to_uppercase())
-            .map_err(|e| {
-                AssemblerError::from_token(format!("Invalid instruction {}", instr), &token)
+            .map_err(|_| {
+                AssemblerError::from_token(format!("Invalid instruction {}", instr), token)
             })?
             .definition();
 
@@ -406,9 +430,9 @@ fn parse_instruction<'a>(
                     || def.opcode == ISA::SB.definition().opcode =>
                 {
                     let other = parse_register(other)
-                        .map_err(|e| AssemblerError::from_token(e, &other_token))?;
+                        .map_err(|e| AssemblerError::from_token(e, other_token))?;
                     let rs1 = parse_register(rs1)
-                        .map_err(|e| AssemblerError::from_token(e, &rs1_token))?;
+                        .map_err(|e| AssemblerError::from_token(e, rs1_token))?;
                     let imm = parse_immediate(imm_expression, &def, symbol_table, current_address)?;
 
                     if def.format == InstructionFormat::S {
@@ -473,11 +497,11 @@ fn parse_instruction<'a>(
                     ],
                 ) => {
                     let rd =
-                        parse_register(rd).map_err(|e| AssemblerError::from_token(e, &rd_token))?;
+                        parse_register(rd).map_err(|e| AssemblerError::from_token(e, rd_token))?;
                     let rs1 = parse_register(rs1)
-                        .map_err(|e| AssemblerError::from_token(e, &rs1_token))?;
+                        .map_err(|e| AssemblerError::from_token(e, rs1_token))?;
                     let rs2 = parse_register(rs2)
-                        .map_err(|e| AssemblerError::from_token(e, &rs2_token))?;
+                        .map_err(|e| AssemblerError::from_token(e, rs2_token))?;
 
                     (
                         Operands {
@@ -514,9 +538,9 @@ fn parse_instruction<'a>(
                     ],
                 ) => {
                     let rs1 = parse_register(rs1)
-                        .map_err(|e| AssemblerError::from_token(e, &rs1_token))?;
+                        .map_err(|e| AssemblerError::from_token(e, rs1_token))?;
                     let rs2 = parse_register(rs2)
-                        .map_err(|e| AssemblerError::from_token(e, &rs2_token))?;
+                        .map_err(|e| AssemblerError::from_token(e, rs2_token))?;
                     let imm = parse_immediate(imm_expression, &def, symbol_table, current_address)?;
 
                     (
@@ -554,9 +578,9 @@ fn parse_instruction<'a>(
                     ],
                 ) => {
                     let rd =
-                        parse_register(rd).map_err(|e| AssemblerError::from_token(e, &rd_token))?;
+                        parse_register(rd).map_err(|e| AssemblerError::from_token(e, rd_token))?;
                     let rs1 = parse_register(rs1)
-                        .map_err(|e| AssemblerError::from_token(e, &rs1_token))?;
+                        .map_err(|e| AssemblerError::from_token(e, rs1_token))?;
                     let imm = parse_immediate(imm_expression, &def, symbol_table, current_address)?;
 
                     (
@@ -588,7 +612,7 @@ fn parse_instruction<'a>(
                     || def.opcode == ISA::SB.definition().opcode =>
                 {
                     let other = parse_register(other)
-                        .map_err(|e| AssemblerError::from_token(e, &other_token))?;
+                        .map_err(|e| AssemblerError::from_token(e, other_token))?;
                     let rs1 = 0;
                     let imm = parse_immediate(imm_expression, &def, symbol_table, current_address)?;
 
@@ -634,7 +658,7 @@ fn parse_instruction<'a>(
                     ],
                 ) => {
                     let rd =
-                        parse_register(rd).map_err(|e| AssemblerError::from_token(e, &rd_token))?;
+                        parse_register(rd).map_err(|e| AssemblerError::from_token(e, rd_token))?;
                     let imm = parse_immediate(imm_expression, &def, symbol_table, current_address)?;
 
                     (
@@ -649,7 +673,7 @@ fn parse_instruction<'a>(
                 _ => {
                     return Err(AssemblerError::from_token(
                         format!("Invalid operands for instruction {}", instr),
-                        &token,
+                        token,
                     ));
                 }
             };
@@ -724,14 +748,14 @@ fn parse_immediate(
         })?
         .1
         .try_into()
-        .map_err(|e| AssemblerError {
-            error_message: format!("Invalid immediate value."),
+        .map_err(|_| AssemblerError {
+            error_message: "Invalid immediate value.".to_string(),
             ..expression_err
         })?;
 
     match def.format {
         InstructionFormat::I | InstructionFormat::S => {
-            if imm > 2047 || imm < -2048 {
+            if !(-2048..=2047).contains(&imm) {
                 Err(AssemblerError {
                     error_message: format!(
                         "Immediate value {} is out of range (-2048 to 2047)",
@@ -765,7 +789,7 @@ fn parse_immediate(
                     error_message: format!("Jump offset {} must be 2-byte aligned.", offset),
                     ..expression_err
                 })
-            } else if offset > 0xFFFFF || offset < -0x100000 {
+            } else if !(-0x100000..=0xFFFFF).contains(&offset) {
                 Err(AssemblerError {
                     error_message: format!(
                         "Jump target is too far ({} bytes), must be within -1048576 to +1048575 bytes",
@@ -785,7 +809,7 @@ fn parse_immediate(
                     error_message: format!("Branch offset {} must be 2-byte aligned.", offset),
                     ..expression_err
                 })
-            } else if offset > 0xFFF || offset < -0x1000 {
+            } else if !(-0x1000..=0xFFF).contains(&offset) {
                 Err(AssemblerError {
                     error_message: format!(
                         "Branch target is too far ({} bytes), must be within -4096 to +4095 bytes",
@@ -809,7 +833,7 @@ fn run_pass<
     mut pass: T,
 ) -> Vec<AssemblerError> {
     let mut errors = Vec::new();
-    while let Some(mut token) = lexer.next() {
+    while let Some(token) = lexer.next() {
         match token {
             Ok(mut token) => {
                 let err = pass(&mut token, lexer);
@@ -869,7 +893,7 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
 
     let mut symbol_table: HashMap<String, (Option<Section>, Expression<'a>, Token<'a>)> =
         std::collections::HashMap::new();
-    let first_org: &str = ".section(0,0)".into();
+    let first_org: &str = ".section(0,0)";
     insert(
         &mut symbol_table,
         first_org.into(),
@@ -896,7 +920,7 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
     .expect("There should be no errors inserting the initial section.");
 
     // First Pass
-    let _ = {
+    {
         let mut lexer = Lexer::new(source).peekable();
         let mut current_section = Section::Text;
         let mut current_org: String = first_org.into();
@@ -910,7 +934,7 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
             let directive = parse_directive(token, lexer, None)?;
 
             // Handle section directive and label (must be handled together)
-            if let Some(Directive::Section(section, (mut expression, token))) = directive {
+            if let Some(Directive::Section(section, (expression, token))) = directive {
                 offset = 0;
                 current_section = section.clone();
 
@@ -925,6 +949,11 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
                 current_org = org;
                 insert(&mut symbol_table, current_org.clone(), entry)?;
             } else {
+                // Perform alignment before assigning label
+                if let Some(Directive::Data(_, alignment)) = &directive {
+                    offset = aligned(offset, *alignment);
+                }
+
                 if let Some((label, token)) = label {
                     insert(
                         &mut symbol_table,
@@ -955,16 +984,16 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
                 if let Some(directive) = directive {
                     match directive {
                         Directive::Alignment(alignment) => {
-                            offset = (offset + alignment - 1) & !(alignment - 1);
+                            offset = aligned(offset, alignment);
                         }
                         Directive::Data(data, alignment) => {
-                            offset = (offset + alignment - 1) & !(alignment - 1);
+                            offset = aligned(offset, alignment);
                             offset += data.len() as u32;
                         }
                         Directive::Symbol(symbol, entry) => {
                             insert(&mut symbol_table, symbol, (None, entry.0, entry.1))?;
                         }
-                        Directive::Section(section, _) => unreachable!(), // Section directives are handled above
+                        Directive::Section(_, _) => unreachable!(), // Section directives are handled above
                     }
                 }
             }
@@ -972,13 +1001,14 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
             // Check for instruction
             if let TokenKind::Symbol(instr) = token.kind {
                 // Parse instruction
-                ISA::from_str(&instr.to_uppercase()).map_err(|e| {
+                ISA::from_str(&instr.to_uppercase()).map_err(|_| {
                     AssemblerError::from_token(format!("Invalid instruction {}", instr), token)
                 })?;
 
                 consume_line(token, lexer)?;
 
-                // Instructions are 4 bytes
+                // Instructions are 4 bytes and must be aligned
+                offset = aligned(offset, 2);
                 offset += 4;
             }
 
@@ -989,7 +1019,7 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
     // Resolve text labels
     let mut resolved_symbols = HashMap::new();
 
-    let _ = {
+    {
         let mut visited = HashSet::new();
 
         while !symbol_table.is_empty() {
@@ -1029,7 +1059,7 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
     let mut source_map = BiBTreeMap::new();
 
     // Second Pass
-    let _ = {
+    {
         let mut lexer = Lexer::new(source).peekable();
         let mut current_section = Section::Text;
         let mut address: u32 = 0;
@@ -1065,14 +1095,19 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
                 address = symbol_table.get(&org).ok_or(AssemblerError::from_token(
                     format!("Symbol {} not defined.", org),
                     &token,
-                ))?.1.clone().try_into().map_err(|e| {
-                            AssemblerError::from_token(format!("Invalid address."), &token)
+                ))?.1.clone().try_into().map_err(|_| {
+                            AssemblerError::from_token("Invalid address.".to_string(), &token)
                         })?;
             } else {
+                // Perform alignment before assigning label
+                if let Some(Directive::Data(_, alignment)) = &directive {
+                    address = aligned(address, *alignment);
+                }
+
                 if let Some((label, label_token)) = label {
                     if IBig::from(address) != symbol_table[label].1 {
                         return Err(AssemblerError::from_token(
-                            format!("Invalid address. Expected {}, got {}. This is probably due to a misaligned .data directive.", symbol_table[label], address),
+                            format!("Invalid address. Expected {}, got {}. This is probably due to a directive or error causing misalignment.", symbol_table[label], address),
                             &label_token,
                         ));
                     }
@@ -1082,11 +1117,9 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
                 if let Some(directive) = directive {
                     match directive {
                         Directive::Alignment(alignment) => {
-                            address = (address + alignment - 1) & !(alignment - 1);
+                            address = aligned(address, alignment);
                         }
-                        Directive::Data(data, alignment) => {
-                            address = (address + alignment - 1) & !(alignment - 1);
-
+                        Directive::Data(data, _) => {
                             for (i, data) in data.iter().enumerate() {
                                 match memory.insert(address + u32::try_from(i).map_err(|_| AssemblerError::from_token("Data too large to fit in memory.".into(), token))?, *data) {
                                     Some(_) => Err(AssemblerError::from_token("Memory collision.".into(), token)),
@@ -1096,8 +1129,8 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
 
                             address += data.len() as u32;
                         }
-                        Directive::Symbol(symbol, entry) => {} // Symbols are already resolved
-                        Directive::Section(section, _) => unreachable!(), // Section directives are handled above
+                        Directive::Symbol(_, _) => {} // Symbols are already resolved
+                        Directive::Section(_, _) => unreachable!(), // Section directives are handled above
                     }
                 }
             }
@@ -1106,9 +1139,9 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
             let instruction = parse_instruction(token, lexer, &symbol_table, address)?;
 
             if let Some((instruction, instruction_token)) = instruction {
-                
+
                 let data = instruction.raw().to_le_bytes();
-                
+
                 for (i, data) in data.iter().enumerate() {
                     // Safe to unwrap because we know i < 4 
                     match memory.insert(address + u32::try_from(i).unwrap(), *data) {
@@ -1117,8 +1150,9 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
                     }?
                 }
                 source_map.insert(address, instruction_token.line);
-                
+
                 // Instructions are 4 bytes
+                address = (address + 4 - 1) & !(4 - 1);
                 address += 4;
             }
 
@@ -1126,7 +1160,7 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
         }));
     };
 
-    if errors.len() > 0 {
+    if !errors.is_empty() {
         Err(errors)
     } else {
         Ok(AssembledProgram {
@@ -1158,7 +1192,7 @@ fn resolve_label(
 
         visited.insert(label.clone());
 
-        let (section, expression, token) = labels.remove(label).ok_or(AssemblerError {
+        let (section, expression, _) = labels.remove(label).ok_or(AssemblerError {
             error_message: format!("Label {} not found.", label),
             line_number: 0,
             column: 0,

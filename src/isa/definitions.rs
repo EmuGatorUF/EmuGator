@@ -36,7 +36,6 @@ pub enum InstructionFormat {
 }
 
 #[derive(EnumString, Debug)]
-#[allow(non_camel_case_types)]
 pub enum ISA {
     ADD,
     SUB,
@@ -445,6 +444,7 @@ impl ISA {
         }
     }
 
+    #[allow(clippy::unusual_byte_groupings)]
     pub fn instr_to_isa(instr: Instruction) -> Option<ISA> {
         use ISA::*;
         match (instr.opcode(), instr.funct3(), instr.funct7()) {

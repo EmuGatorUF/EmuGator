@@ -2,6 +2,7 @@ mod controller;
 mod datapath;
 mod pipeline;
 mod register_file;
+pub mod uart;
 
 #[cfg(test)]
 mod tests;
@@ -10,6 +11,7 @@ use std::collections::BTreeSet;
 
 use crate::assembler::AssembledProgram;
 use crate::isa::Instruction;
+use uart::{Uart, trigger_uart};
 
 use controller::get_control_signals;
 use pipeline::CVE2Pipeline;
@@ -25,12 +27,14 @@ pub fn clock_until_break(
     org_state: &EmulatorState,
     program: &mut AssembledProgram,
     breakpoints: &BTreeSet<usize>,
-) -> EmulatorState {
+    uart_module: &Uart,
+) -> (EmulatorState, Uart) {
     let mut state = org_state.clone();
+    let mut uart_module = uart_module.clone();
     let mut num_cycles = 0;
 
     loop {
-        state = clock(&state, program);
+        (state, uart_module) = clock(&state, program, Some(&uart_module));
 
         let hit_breakpoint =
             if let Some(line_num) = program.source_map.get_by_left(&state.pipeline.IF_pc) {
@@ -50,10 +54,14 @@ pub fn clock_until_break(
             break;
         }
     }
-    state
+    (state, uart_module)
 }
 
-pub fn clock(org_state: &EmulatorState, program: &mut AssembledProgram) -> EmulatorState {
+pub fn clock(
+    org_state: &EmulatorState,
+    program: &mut AssembledProgram,
+    uart_module: Option<&Uart>,
+) -> (EmulatorState, Uart) {
     let mut next_state = org_state.clone();
 
     // Set control signals
@@ -100,5 +108,14 @@ pub fn clock(org_state: &EmulatorState, program: &mut AssembledProgram) -> Emula
     next_state.pipeline.run_pc_mux();
     next_state.pipeline.run_pc_reg();
 
-    return next_state;
+    // UART
+    let next_uart =
+        uart_module.map_or_else(Uart::default, |u| trigger_uart(u, &mut program.data_memory));
+
+    (next_state, next_uart)
+}
+
+#[allow(dead_code)]
+pub fn clock_no_uart(org_state: &EmulatorState, program: &mut AssembledProgram) -> EmulatorState {
+    clock(org_state, program, None).0
 }

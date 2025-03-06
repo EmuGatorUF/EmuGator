@@ -1,5 +1,6 @@
 .data
 message: .string "test\n"
+.align 2
 numbers: .word 1, 2, 3, 4
 bytes: .byte 0xFF, 0x42, 0x33
 array: .ascii "test"
