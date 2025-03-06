@@ -1,7 +1,6 @@
 use dioxus::prelude::*;
 use dioxus::{prelude::component, signals::Signal};
-
-use crate::emulator::uart::Uart;
+use emugator_core::emulator::uart::Uart;
 
 #[component]
 #[allow(non_snake_case)]

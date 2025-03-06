@@ -30,7 +30,7 @@ macro_rules! include_test_file {
     ($file_name:literal) => {
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/test-files/",
+            "/../test-files/",
             $file_name
         ))
     };

@@ -1,0 +1,8 @@
+[package]
+name = "emugator-cli"
+version = "0.1.0"
+authors = ["Liam Rosenfeld <me@liamrosenfeld.com>"]
+edition = "2024"
+
+[dependencies]
+emugator-core = { path = "../emugator_core" }

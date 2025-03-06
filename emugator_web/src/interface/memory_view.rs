@@ -1,8 +1,8 @@
 use super::data_views::DataView;
 use super::instruction_views::InstructionView;
-use crate::assembler::AssembledProgram;
-use crate::emulator::EmulatorState;
 use dioxus::prelude::*;
+use emugator_core::assembler::AssembledProgram;
+use emugator_core::emulator::EmulatorState;
 
 #[derive(PartialEq, Clone, Copy)]
 pub enum MemoryViewType {
@@ -40,16 +40,11 @@ pub fn MemoryView(
             div { class: "flex-grow overflow-hidden",
                 match *view_type.read() {
                     MemoryViewType::Instruction => rsx! {
-                        InstructionView {
-                            assembled_program: assembled_program,
-                            emulator_state: emulator_state
-                        }
+                        InstructionView { assembled_program, emulator_state }
                     },
                     MemoryViewType::Data => rsx! {
-                        DataView {
-                            assembled_program: assembled_program
-                        }
-                    }
+                        DataView { assembled_program }
+                    },
                 }
             }
         }

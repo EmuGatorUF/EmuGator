@@ -1,5 +1,5 @@
-use crate::assembler::{self, AssembledProgram, AssemblerError, Section};
-use crate::emulator::{
+use emugator_core::assembler::{self, AssembledProgram, AssemblerError, Section};
+use emugator_core::emulator::{
     self, EmulatorState,
     uart::{LineStatusRegisterBitMask, Uart},
 };

@@ -1,6 +1,5 @@
 use dioxus::prelude::*;
-
-use crate::emulator::EmulatorState;
+use emugator_core::emulator::EmulatorState;
 
 #[component]
 #[allow(non_snake_case)]

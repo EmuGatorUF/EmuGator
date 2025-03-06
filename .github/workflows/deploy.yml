@@ -22,9 +22,11 @@ jobs:
           node-version: '20'
           
       - name: Install Node Dependencies
+        working-directory: ./emugator_web
         run: npm install
         
       - name: Build Tailwind CSS
+        working-directory: ./emugator_web
         run: npm run tailwind
         
       - name: Install Rust
@@ -34,6 +36,7 @@ jobs:
         run: cargo install dioxus-cli --force
         
       - name: Build
+        working-directory: ./emugator_web
         run: dx build --release
         
       - name: Debug directory

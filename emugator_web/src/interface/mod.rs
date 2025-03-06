@@ -15,9 +15,9 @@ use self::{
     datapath_visualization::DatapathVisualization, memory_view::MemoryView,
     register_view::RegisterView, run_buttons::RunButtons, uart_view::UartView,
 };
-use crate::{
+use crate::code_editor::{CodeEditor, LineHighlight};
+use emugator_core::{
     assembler::{AssembledProgram, AssemblerError},
-    code_editor::{CodeEditor, LineHighlight},
     emulator::{EmulatorState, uart::Uart},
     include_test_file,
 };

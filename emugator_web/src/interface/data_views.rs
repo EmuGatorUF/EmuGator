@@ -1,5 +1,5 @@
-use crate::assembler::{AssembledProgram, Section};
 use dioxus::prelude::*;
+use emugator_core::assembler::{AssembledProgram, Section};
 
 #[component]
 #[allow(non_snake_case)]

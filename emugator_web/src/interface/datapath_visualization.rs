@@ -1,7 +1,7 @@
-use crate::emulator::EmulatorState;
 use dioxus::prelude::*;
 use dioxus_elements::geometry::WheelDelta;
 use dioxus_elements::input_data::MouseButton;
+use emugator_core::emulator::EmulatorState;
 
 fn format_pc(pc: u32) -> String {
     format!("0x{:08X}", pc)

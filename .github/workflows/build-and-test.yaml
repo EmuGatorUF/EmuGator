@@ -13,8 +13,10 @@ jobs:
         with:
           node-version: '20'
       - name: Install Node Dependencies
+        working-directory: ./emugator_web
         run: npm install
       - name: Build Tailwind CSS
+        working-directory: ./emugator_web
         run: npm run tailwind
       - uses: actions-rs/toolchain@v1
         with:

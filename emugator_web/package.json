@@ -5,8 +5,8 @@
     "tailwind": "npx @tailwindcss/cli -i ./input.css -o ./tailwind.css"
   },
   "devDependencies": {
-    "@tailwindcss/cli": "^4.0.9",
-    "tailwindcss": "^4.0.9"
+    "@tailwindcss/cli": "^4.0.11",
+    "tailwindcss": "^4.0.11"
   },
   "name": "emugator",
   "version": "1.0.0",

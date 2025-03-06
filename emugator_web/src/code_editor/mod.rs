@@ -5,17 +5,16 @@ use dioxus::prelude::*;
 mod highlight;
 mod monaco_editor;
 
+use emugator_core::assembler::AssemblerError;
 use monaco::sys::{
     MarkerSeverity,
     editor::{self, IEditorMinimapOptions, IMarkerData},
 };
 use monaco_editor::MonacoEditor;
+use wasm_bindgen::JsValue;
 
 pub use highlight::register_riscv_language;
 pub use monaco_editor::LineHighlight;
-use wasm_bindgen::JsValue;
-
-use crate::assembler::AssemblerError;
 
 /// A wrapper around the Monaco editor with our expected functionality
 #[component]
