@@ -1261,7 +1261,7 @@ pub fn DatapathVisualization(emulator_state: Signal<EmulatorState>) -> Element {
                     id: "controller",
                     x: "1",
                     y: "581",
-                    width: "1255",
+                    width: "1381",
                     height: "78",
                     stroke: "black",
                     "stroke-width": "2",
@@ -1269,7 +1269,7 @@ pub fn DatapathVisualization(emulator_state: Signal<EmulatorState>) -> Element {
                 }
                 text {
                     id: "controller_label",
-                    x: "628",
+                    x: "691",
                     y: "620",
                     "text-anchor": "middle",
                     "dominant-baseline": "middle",
