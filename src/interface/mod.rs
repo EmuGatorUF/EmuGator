@@ -25,7 +25,7 @@ use crate::{
 #[component]
 #[allow(non_snake_case)]
 pub fn App() -> Element {
-    let source = use_signal(|| include_test_file!("prototype-demo.s").to_string());
+    let source = use_signal(|| include_test_file!("beta-demo.s").to_string());
     let assembled_program: Signal<Option<AssembledProgram>> = use_signal(|| None);
     let assembler_errors: Signal<Vec<AssemblerError>> = use_signal(Vec::new);
     let emulator_state: Signal<EmulatorState> = use_signal(EmulatorState::default);
