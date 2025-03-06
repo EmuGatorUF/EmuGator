@@ -54,7 +54,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './target/dx/emu-gator/release/web/public'
+          path: './target/dx/emugator-web/release/web/public'
 
   deploy:
     needs: build
