@@ -23,7 +23,7 @@ main:
 
     # J-type instruction
     JAL x20, print              # jump to function, storing return address in x20
-    XOR x3, x3, x3              # will not be executed
+    XOR x3, x3, x3              # will not be executed until after return
     SW x1, 4(x9)                # store value in x1 to address x9 + 4 
 loop_forever:
     BNE x3, x2, loop_forever
