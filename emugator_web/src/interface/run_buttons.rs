@@ -1,13 +1,12 @@
 use emugator_core::assembler::{self, AssembledProgram, AssemblerError, Section};
-use emugator_core::emulator::{
-    self, EmulatorState,
-    uart::{LineStatusRegisterBitMask, Uart},
-};
+use emugator_core::emulator::{self, EmulatorState, uart::{LineStatusRegisterBitMask, Uart},};
 
 use dioxus::prelude::*;
 use dioxus_logger::tracing::info;
 use std::collections::BTreeSet;
 use std::ops::Deref;
+use web_sys::Window;
+use js_sys::Function;
 
 #[component]
 #[allow(non_snake_case)]
@@ -56,6 +55,33 @@ pub fn RunButtons(
                 },
                 "Assemble"
             }
+
+            button {
+                class: "bg-purple-500 hover:bg-purple-600 text-s text-white font-bold py-1 px-2 rounded",
+                onclick: move |_| {
+                    /*
+                    let myFunction = js_sys::Function::new_no_args("
+                        function idleTask(){
+                            console.log(\"Hello, it's me!\")
+                        }
+                        idleTask;
+                    ");
+                    */
+
+                    /*
+                    let myFunction = js_sys::Function::new_no_args("
+                        console.log(\"Hello, it's me!\");
+                        call(this);
+                    ");
+                    */
+                    
+                    let myFunction = js_sys::Function::new_no_args("console.log(\"Hello, it's me!\");");
+                    let myWindow = web_sys::window().unwrap();
+                    myWindow.request_idle_callback(&myFunction);
+                },
+                "Pause"
+            }
+
             if assembled_program.read().is_some() {
                 button {
                     class: "bg-purple-500 hover:bg-purple-600 text-s text-white font-bold py-1 px-2 rounded",
