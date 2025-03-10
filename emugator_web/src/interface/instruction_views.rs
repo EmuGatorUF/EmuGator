@@ -45,6 +45,21 @@ pub fn InstructionView(
                                     div { class: "flex-1",
                                         div { class: "flex justify-between",
                                             div { class: "font-mono text-gray-500 text-xs", "0x{base_addr:04x}:" }
+                                            {
+                                                let instruction = (instruction_memory
+                                                    .get(&(base_addr as u32))
+                                                    .copied()
+                                                    .unwrap_or(0) as u32)
+                                                    | ((instruction_memory.get(&((base_addr + 1) as u32)).copied().unwrap_or(0)
+                                                        as u32) << 8)
+                                                    | ((instruction_memory.get(&((base_addr + 2) as u32)).copied().unwrap_or(0)
+                                                        as u32) << 16)
+                                                    | ((instruction_memory.get(&((base_addr + 3) as u32)).copied().unwrap_or(0)
+                                                        as u32) << 24);
+                                                rsx! {
+                                                    span { class: if base_addr == current_pc { "font-mono font-bold text-orange-500" } else { "font-mono font-bold" }, "{instruction:032b}" }
+                                                }
+                                            }
                                             if let Some(line) = program.source_map.get_by_left(&(base_addr as u32)) {
                                                 span { class: "text-xs text-gray-500", "Line {line}" }
                                             }
@@ -62,7 +77,7 @@ pub fn InstructionView(
                                                     | ((instruction_memory.get(&((base_addr + 3) as u32)).copied().unwrap_or(0)
                                                         as u32) << 24);
                                                 rsx! {
-                                                    span { class: if base_addr == current_pc { "text-orange-500" } else { "" }, "0x{instruction:08x}" }
+                                                    span { class: if base_addr == current_pc { "text-orange-500" } else { "" }, "{instruction:032b}" }
                                                 }
                                             }
                                         }
