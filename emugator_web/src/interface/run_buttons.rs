@@ -59,23 +59,14 @@ pub fn RunButtons(
             button {
                 class: "bg-purple-500 hover:bg-purple-600 text-s text-white font-bold py-1 px-2 rounded",
                 onclick: move |_| {
-                    /*
                     let myFunction = js_sys::Function::new_no_args("
                         function idleTask(){
-                            console.log(\"Hello, it's me!\")
-                        }
-                        idleTask;
+                            console.log(\"Hello, it's me!\");
+                        };
+                        window.requestIdleCallback(idleTask);
+                        console.log(\"Someone help me!\")
                     ");
-                    */
 
-                    /*
-                    let myFunction = js_sys::Function::new_no_args("
-                        console.log(\"Hello, it's me!\");
-                        call(this);
-                    ");
-                    */
-                    
-                    let myFunction = js_sys::Function::new_no_args("console.log(\"Hello, it's me!\");");
                     let myWindow = web_sys::window().unwrap();
                     myWindow.request_idle_callback(&myFunction);
                 },
