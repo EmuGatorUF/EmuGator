@@ -107,7 +107,7 @@ pub fn InstructionView(
                                         // displays information about which colors correspond to which part of the instruction
                                         if base_addr == current_pc{
                                             div{ class: "flex justify-center",
-                                                div { class: "font-mono text-xs text-gray-500",
+                                                div { class: "font-mono font-bold text-xs text-gray-500",
                                                     {
                                                         rsx! {
                                                             if instr_frmt == InstructionFormat::R {
