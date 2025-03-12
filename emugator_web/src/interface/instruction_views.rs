@@ -1,12 +1,12 @@
 use dioxus::prelude::*;
 use emugator_core::assembler::{AssembledProgram, Section};
-use emugator_core::emulator::EmulatorState;
+use emugator_core::emulator::AnyEmulatorState;
 
 #[component]
 #[allow(non_snake_case)]
 pub fn InstructionView(
     assembled_program: Signal<Option<AssembledProgram>>,
-    emulator_state: Signal<EmulatorState>,
+    emulator_state: Signal<AnyEmulatorState>,
 ) -> Element {
     let program = assembled_program.read();
 
@@ -22,7 +22,10 @@ pub fn InstructionView(
     let program = program.as_ref().unwrap();
     let instruction_memory = &program.instruction_memory;
     let text_start = program.get_section_start(Section::Text) as usize;
-    let current_pc = emulator_state.read().pipeline.ID_pc as usize;
+    let current_pc = match &*emulator_state.read() {
+        AnyEmulatorState::CVE2(state) => state.pipeline.ID_pc as usize,
+        AnyEmulatorState::FiveStage(_state) => todo!(),
+    };
 
     let total_instructions = instruction_memory.len() / 4; // Since each instruction is 4 bytes
 

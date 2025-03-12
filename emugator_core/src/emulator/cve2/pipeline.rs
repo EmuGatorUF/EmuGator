@@ -1,11 +1,15 @@
 use std::collections::BTreeMap;
 
-use crate::{assembler::AssembledProgram, bitmask, bits, isa::Instruction};
+use crate::{
+    assembler::AssembledProgram,
+    bitmask, bits,
+    emulator::{Pipeline, RegisterFile},
+    isa::Instruction,
+};
 
 use super::{
-    controller::{ALUOp, CVE2Control, DataDestSel, OpASel, OpBSel},
+    controller::{ALUOp, CVE2Control, DataDestSel, OpASel, OpBSel, get_control_signals},
     datapath::{CVE2Datapath, PCSel},
-    register_file::RegisterFile,
 };
 
 #[allow(non_snake_case)]
@@ -20,8 +24,61 @@ pub struct CVE2Pipeline {
     pub control: CVE2Control,
 }
 
+impl Pipeline for CVE2Pipeline {
+    fn clock(&mut self, program: &mut AssembledProgram, registers: &mut RegisterFile) {
+        // Set control signals
+        let instr = Instruction::from_raw(self.ID_inst);
+        self.control = get_control_signals(instr, self.instr_cycle).unwrap_or_default();
+
+        // Run data memory
+        // (Do this with last cycle's LSU signals to represent it taking a clock cycle to access)
+        self.run_data_memory(&mut program.data_memory);
+
+        // Run the instruction fetch stage
+        self.run_instruction_fetch(program);
+
+        // Decode the instruction
+        self.run_decode(instr);
+
+        // Read from register file
+        self.run_read_registers(registers);
+
+        // Operand muxes
+        self.run_operand_muxes();
+
+        // Run ALU
+        self.run_alu();
+
+        // Run LSU
+        // (needs to go after ALU to get the address)
+        self.run_lsu();
+
+        // Write data mux
+        self.run_write_data_mux();
+
+        // Write to register file
+        self.run_write_register(registers);
+
+        // Pipeline buffer
+        self.run_pipeline_buffer_registers();
+
+        // Find the next PC
+        self.run_cmp_reg();
+        self.run_pc_mux();
+        self.run_pc_reg();
+    }
+
+    fn requesting_debug(&mut self) -> bool {
+        self.control.debug_req
+    }
+
+    fn current_pc(&self) -> u32 {
+        self.IF_pc
+    }
+}
+
 impl CVE2Pipeline {
-    pub fn run_instruction_fetch(&mut self, program: &mut AssembledProgram) {
+    fn run_instruction_fetch(&mut self, program: &mut AssembledProgram) {
         // Load the fetched instruction into the instr_rdata lines
         if self.control.instr_req {
             // Read the next instruction into the instruction fetch register
@@ -47,19 +104,19 @@ impl CVE2Pipeline {
         }
     }
 
-    pub fn run_decode(&mut self, instr: Instruction) {
+    fn run_decode(&mut self, instr: Instruction) {
         self.datapath.reg_s1 = instr.rs1();
         self.datapath.reg_s2 = instr.rs2();
         self.datapath.reg_d = instr.rd();
         self.datapath.imm = instr.immediate().ok().map(|x| x as u32); // FIXME: signed support
     }
 
-    pub fn run_read_registers(&mut self, register_file: &RegisterFile) {
+    fn run_read_registers(&mut self, register_file: &RegisterFile) {
         self.datapath.data_s1 = register_file[self.datapath.reg_s1 as usize];
         self.datapath.data_s2 = register_file[self.datapath.reg_s2 as usize];
     }
 
-    pub fn run_operand_muxes(&mut self) {
+    fn run_operand_muxes(&mut self) {
         self.datapath.alu_op_a = match self.control.alu_op_a_sel {
             Some(OpASel::PC) => Some(self.ID_pc),
             Some(OpASel::RF) => Some(self.datapath.data_s1),
@@ -73,7 +130,7 @@ impl CVE2Pipeline {
         };
     }
 
-    pub fn run_alu(&mut self) {
+    fn run_alu(&mut self) {
         let Some(op) = self.control.alu_op else {
             return;
         };
@@ -103,7 +160,7 @@ impl CVE2Pipeline {
         });
     }
 
-    pub fn run_lsu(&mut self) {
+    fn run_lsu(&mut self) {
         // pass through data memory output
         self.datapath.lsu_out = if self.datapath.data_rvalid_i {
             let data = self.datapath.data_rdata_i;
@@ -135,7 +192,7 @@ impl CVE2Pipeline {
         self.datapath.data_wdata_o = self.datapath.data_s2;
     }
 
-    pub fn run_write_data_mux(&mut self) {
+    fn run_write_data_mux(&mut self) {
         self.datapath.reg_write_data = match self.control.data_dest_sel {
             Some(DataDestSel::ALU) => self.datapath.alu_out,
             Some(DataDestSel::LSU) => self.datapath.lsu_out,
@@ -143,7 +200,7 @@ impl CVE2Pipeline {
         };
     }
 
-    pub fn run_data_memory(&mut self, data_memory: &mut BTreeMap<u32, u8>) {
+    fn run_data_memory(&mut self, data_memory: &mut BTreeMap<u32, u8>) {
         // Perform any requested memory read/write
         if self.datapath.data_req_o {
             match rw_memory(
@@ -174,7 +231,7 @@ impl CVE2Pipeline {
         }
     }
 
-    pub fn run_write_register(&mut self, register_file: &mut RegisterFile) {
+    fn run_write_register(&mut self, register_file: &mut RegisterFile) {
         if self.control.reg_write {
             if let Some(data) = self.datapath.reg_write_data {
                 register_file[self.datapath.reg_d as usize] = data;
@@ -182,13 +239,13 @@ impl CVE2Pipeline {
         }
     }
 
-    pub fn run_cmp_reg(&mut self) {
+    fn run_cmp_reg(&mut self) {
         if self.control.cmp_set {
             self.datapath.cmp_result = self.datapath.alu_out.is_some_and(|x| x != 0);
         }
     }
 
-    pub fn run_pc_mux(&mut self) {
+    fn run_pc_mux(&mut self) {
         self.datapath.should_cond_jump = self.control.jump_cond && self.datapath.cmp_result;
         let should_jump = self.control.jump_uncond || self.datapath.should_cond_jump;
         self.datapath.next_pc_sel = if should_jump { PCSel::ALU } else { PCSel::PC4 };
@@ -198,7 +255,7 @@ impl CVE2Pipeline {
         }
     }
 
-    pub fn run_pc_reg(&mut self) {
+    fn run_pc_reg(&mut self) {
         if self.control.pc_set {
             if let Some(next_pc) = self.datapath.next_pc {
                 if next_pc & 0x00000003 != 0x00 {
@@ -209,7 +266,7 @@ impl CVE2Pipeline {
         }
     }
 
-    pub fn run_pipeline_buffer_registers(&mut self) {
+    fn run_pipeline_buffer_registers(&mut self) {
         // Move the pipeline forward
         if self.control.id_in_ready {
             self.ID_pc = self.IF_pc;

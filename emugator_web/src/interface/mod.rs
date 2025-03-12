@@ -1,7 +1,7 @@
 mod data_views;
-mod datapath_visualization;
 mod instruction_views;
 mod memory_view;
+mod pipeline_visualization;
 mod register_view;
 mod run_buttons;
 mod uart_view;
@@ -12,13 +12,13 @@ use dioxus::prelude::*;
 use dioxus_logger::tracing::info;
 
 use self::{
-    datapath_visualization::DatapathVisualization, memory_view::MemoryView,
+    memory_view::MemoryView, pipeline_visualization::PipelineVisualization,
     register_view::RegisterView, run_buttons::RunButtons, uart_view::UartView,
 };
 use crate::code_editor::{CodeEditor, LineHighlight};
 use emugator_core::{
     assembler::{AssembledProgram, AssemblerError},
-    emulator::{EmulatorState, uart::Uart},
+    emulator::{AnyEmulatorState, uart::Uart},
     include_test_file,
 };
 
@@ -28,7 +28,7 @@ pub fn App() -> Element {
     let source = use_signal(|| include_test_file!("beta-demo.s").to_string());
     let assembled_program: Signal<Option<AssembledProgram>> = use_signal(|| None);
     let assembler_errors: Signal<Vec<AssemblerError>> = use_signal(Vec::new);
-    let emulator_state: Signal<EmulatorState> = use_signal(EmulatorState::default);
+    let emulator_state: Signal<AnyEmulatorState> = use_signal(AnyEmulatorState::default);
     let breakpoints: Signal<BTreeSet<usize>> = use_signal(BTreeSet::new);
     let uart_module: Signal<Uart> = use_signal(Uart::default);
 
@@ -53,18 +53,23 @@ pub fn App() -> Element {
                 .and_then(|p| p.source_map.get_by_left(&pc).copied())
         }
 
-        if let Some(line) = get_pc_line(emulator_state.read().pipeline.ID_pc, &assembled_program) {
-            line_highlights.write().push(LineHighlight {
-                line,
-                css_class: "id-pc-decoration",
-            });
-        }
+        match &*emulator_state.read() {
+            AnyEmulatorState::CVE2(state) => {
+                if let Some(line) = get_pc_line(state.pipeline.ID_pc, &assembled_program) {
+                    line_highlights.write().push(LineHighlight {
+                        line,
+                        css_class: "id-pc-decoration",
+                    });
+                }
 
-        if let Some(line) = get_pc_line(emulator_state.read().pipeline.IF_pc, &assembled_program) {
-            line_highlights.write().push(LineHighlight {
-                line,
-                css_class: "if-pc-decoration",
-            });
+                if let Some(line) = get_pc_line(state.pipeline.IF_pc, &assembled_program) {
+                    line_highlights.write().push(LineHighlight {
+                        line,
+                        css_class: "if-pc-decoration",
+                    });
+                }
+            }
+            AnyEmulatorState::FiveStage(_) => todo!(),
         }
     });
 
@@ -108,7 +113,7 @@ pub fn App() -> Element {
             }
             div { class: "w-1/2 flex flex-col",
                 div { class: "h-1/3 bg-gray-200 p-4",
-                    DatapathVisualization { emulator_state }
+                    PipelineVisualization { emulator_state }
                 }
                 div { class: "h-1/3 bg-gray-300 p-4",
                     RegisterView { emulator_state }

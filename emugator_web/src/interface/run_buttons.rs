@@ -1,6 +1,8 @@
 use emugator_core::assembler::{self, AssembledProgram, AssemblerError, Section};
+use emugator_core::emulator::AnyEmulatorState;
+use emugator_core::emulator::cve2::CVE2Pipeline;
 use emugator_core::emulator::{
-    self, EmulatorState,
+    EmulatorState,
     uart::{LineStatusRegisterBitMask, Uart},
 };
 
@@ -15,7 +17,7 @@ pub fn RunButtons(
     source: Signal<String>,
     assembled_program: Signal<Option<AssembledProgram>>,
     assembler_errors: Signal<Vec<AssemblerError>>,
-    emulator_state: Signal<EmulatorState>,
+    emulator_state: Signal<AnyEmulatorState>,
     uart_module: Signal<Uart>,
     breakpoints: ReadOnlySignal<BTreeSet<usize>>,
 ) -> Element {
@@ -29,10 +31,10 @@ pub fn RunButtons(
                     match assembler::assemble(&source.read()) {
                         Ok(assembled) => {
                             info!("Assembly succeeded.");
-                            let mut new_state = EmulatorState::default();
+                            let mut new_state = EmulatorState::<CVE2Pipeline>::default();
                             let start_addr = assembled.get_section_start(Section::Text);
                             new_state.pipeline.IF_pc = start_addr;
-                            emulator_state.set(new_state);
+                            emulator_state.set(AnyEmulatorState::CVE2(new_state));
                             *uart_module.write() = Uart::default();
                             let mut assembled = assembled;
                             assembled.data_memory.insert(uart_module.read().rx_buffer_address, 0);
@@ -61,11 +63,9 @@ pub fn RunButtons(
                     class: "bg-purple-500 hover:bg-purple-600 text-s text-white font-bold py-1 px-2 rounded",
                     onclick: move |_| {
                         if let Some(mut program) = assembled_program.as_mut() {
-                            let (new_state, new_uart) = emulator::clock(
-                                emulator_state.read().deref(),
-                                &mut program,
-                                Some(uart_module.read().deref()),
-                            );
+                            let (new_state, new_uart) = emulator_state
+                                .read()
+                                .clock(&mut program, uart_module.read().deref());
                             *(emulator_state.write()) = new_state;
                             *(uart_module.write()) = new_uart;
                         }
@@ -76,12 +76,13 @@ pub fn RunButtons(
                     class: "bg-purple-500 hover:bg-purple-600 text-s text-white font-bold py-1 px-2 rounded",
                     onclick: move |_| {
                         if let Some(mut program) = assembled_program.as_mut() {
-                            let (new_state, new_uart) = emulator::clock_until_break(
-                                emulator_state.read().deref(),
-                                &mut program,
-                                breakpoints.read().deref(),
-                                uart_module.read().deref(),
-                            );
+                            let (new_state, new_uart) = emulator_state
+                                .read()
+                                .clock_until_break(
+                                    &mut program,
+                                    breakpoints.read().deref(),
+                                    uart_module.read().deref(),
+                                );
                             *(emulator_state.write()) = new_state;
                             *(uart_module.write()) = new_uart;
                         }

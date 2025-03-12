@@ -2,7 +2,7 @@ use super::data_views::DataView;
 use super::instruction_views::InstructionView;
 use dioxus::prelude::*;
 use emugator_core::assembler::AssembledProgram;
-use emugator_core::emulator::EmulatorState;
+use emugator_core::emulator::AnyEmulatorState;
 
 #[derive(PartialEq, Clone, Copy)]
 pub enum MemoryViewType {
@@ -14,7 +14,7 @@ pub enum MemoryViewType {
 #[allow(non_snake_case)]
 pub fn MemoryView(
     assembled_program: Signal<Option<AssembledProgram>>,
-    emulator_state: Signal<EmulatorState>,
+    emulator_state: Signal<AnyEmulatorState>,
 ) -> Element {
     let mut view_type = use_signal(|| MemoryViewType::Instruction);
 

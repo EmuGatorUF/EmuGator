@@ -1,16 +1,20 @@
 use dioxus::prelude::*;
-use emugator_core::emulator::EmulatorState;
+use emugator_core::emulator::AnyEmulatorState;
 
 #[component]
 #[allow(non_snake_case)]
-pub fn RegisterView(emulator_state: Signal<EmulatorState>) -> Element {
+pub fn RegisterView(emulator_state: Signal<AnyEmulatorState>) -> Element {
     let abi_names = &[
         "zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", "s0/fp", "s1", "a0", "a1", "a2", "a3",
         "a4", "a5", "a6", "a7", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "t3",
         "t4", "t5", "t6",
     ];
-    let register_vals = &emulator_state.read().x.x;
-    let pc = emulator_state.read().pipeline.ID_pc;
+    let emulator_state = &*emulator_state.read();
+    let register_vals = emulator_state.registers();
+    let pc = match emulator_state {
+        AnyEmulatorState::CVE2(state) => state.pipeline.ID_pc,
+        AnyEmulatorState::FiveStage(_state) => todo!(),
+    };
     rsx! {
         div { class: "flex flex-col h-full",
             div { class: "flex justify-between items-center mb-2",
