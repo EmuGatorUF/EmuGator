@@ -108,7 +108,7 @@ impl CVE2Pipeline {
         self.datapath.reg_s1 = instr.rs1();
         self.datapath.reg_s2 = instr.rs2();
         self.datapath.reg_d = instr.rd();
-        self.datapath.imm = instr.immediate().ok().map(|x| x as u32); // FIXME: signed support
+        self.datapath.imm = instr.immediate().ok().map(|x| x as u32);
     }
 
     fn run_read_registers(&mut self, register_file: &RegisterFile) {

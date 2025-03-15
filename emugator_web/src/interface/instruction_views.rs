@@ -66,14 +66,14 @@ pub fn InstructionView(
                                                     if instr_frmt == InstructionFormat::R {
                                                         span { class: "text-red-700", "{instr.funct7():07b}" }
                                                     } else if instr_frmt == InstructionFormat::I {
-                                                        span { class: "text-red-700", "{instr.immediate().unwrap():012b}"}
+                                                        span { class: "text-red-700", "{bits!(instr.immediate().unwrap(), 11;0):012b}"}
                                                     } else if instr_frmt == InstructionFormat::S {
-                                                        span {class: "text-red-700", "{bits!(instr.immediate().unwrap(),11;5):07b}"}
+                                                        span {class: "text-red-700", "{bits!(instr.immediate().unwrap(), 11;5):07b}"}
                                                     } else if instr_frmt == InstructionFormat::B {
                                                         span { class: "text-black", "{bits!(instr.immediate().unwrap(),12):01b}" }
                                                         span { class: "text-red-700", "{bits!(instr.immediate().unwrap(),10;5):06b}" }
                                                     } else if instr_frmt == InstructionFormat::U {
-                                                        span {class: "text-red-700", "{bits!(instr.immediate().unwrap(),31;12):020b}"}
+                                                        span {class: "text-red-700", "{bits!(instr.immediate().unwrap(), 31;12):020b}"}
                                                     } else if instr_frmt == InstructionFormat::J {
                                                         span { class: "text-red-700", "{bits!(instr.immediate().unwrap(),20):01b}" }
                                                         span { class: "text-orange-500", "{bits!(instr.immediate().unwrap(),10;1):010b}" }
@@ -90,9 +90,9 @@ pub fn InstructionView(
                                                     }
 
                                                     if instr_frmt == InstructionFormat::S {
-                                                        span { class: "text-blue-500", "{instr.immediate().unwrap():05b}" }
+                                                        span { class: "text-red-700", "{bits!(instr.immediate().unwrap(), 4;0):05b}" }
                                                     } else if instr_frmt == InstructionFormat::B {
-                                                        span { class: "text-blue-500", "{bits!(instr.immediate().unwrap(),4;1):04b}" }
+                                                        span { class: "text-blue-500", "{bits!(instr.immediate().unwrap(), 4;1):04b}" }
                                                         span { class: "text-gray-500", "{bits!(instr.immediate().unwrap(), 11):01b}" }
                                                     }else {
                                                         span { class: "text-blue-500", "{instr.rd():05b}" }
