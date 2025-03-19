@@ -63,6 +63,17 @@ pub fn InstructionView(
                                             div { class: "font-mono font-bold text-xs",
                                                 // if instruction is current instruction, color each piece 
                                                 if base_addr == current_pc {
+                                                    div { class: "invisible",
+                                                        onmounted: move |ctx| async move {
+                                                            // RS - I know some people don't like
+                                                            // when things auto-move on websites
+                                                            // (Me included),
+                                                            // but I think this is an ok instance.
+                                                            // Feel free to delete it
+                                                            let scroll = ctx.data();
+                                                            scroll.scroll_to(ScrollBehavior::Instant).await.unwrap();
+                                                        }
+                                                    } 
                                                     if instr_frmt == InstructionFormat::R {
                                                         span { class: "text-red-700", "{instr.funct7():07b}" }
                                                     } else if instr_frmt == InstructionFormat::I {
