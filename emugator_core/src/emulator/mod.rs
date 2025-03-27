@@ -25,6 +25,7 @@ impl Default for AnyEmulatorState {
     fn default() -> Self {
         AnyEmulatorState::CVE2(EmulatorState {
             x: RegisterFile::default(),
+            uart: Uart::default(),
             pipeline: CVE2Pipeline::default(),
         })
     }
@@ -35,32 +36,22 @@ impl AnyEmulatorState {
         &self,
         program: &mut AssembledProgram,
         breakpoints: &BTreeSet<usize>,
-        uart_module: &Uart,
-    ) -> (Self, Uart) {
+        max_cycles: usize,
+    ) -> Self {
         match self {
             AnyEmulatorState::CVE2(state) => {
-                let (next_state, next_uart) =
-                    state.clock_until_break(program, breakpoints, uart_module);
-                (AnyEmulatorState::CVE2(next_state), next_uart)
+                AnyEmulatorState::CVE2(state.clock_until_break(program, breakpoints, max_cycles))
             }
-            AnyEmulatorState::FiveStage(state) => {
-                let (next_state, next_uart) =
-                    state.clock_until_break(program, breakpoints, uart_module);
-                (AnyEmulatorState::FiveStage(next_state), next_uart)
-            }
+            AnyEmulatorState::FiveStage(state) => AnyEmulatorState::FiveStage(
+                state.clock_until_break(program, breakpoints, max_cycles),
+            ),
         }
     }
 
-    pub fn clock(&self, program: &mut AssembledProgram, uart_module: &Uart) -> (Self, Uart) {
+    pub fn clock(&self, program: &mut AssembledProgram) -> Self {
         match self {
-            AnyEmulatorState::CVE2(state) => {
-                let (next_state, next_uart) = state.clock(program, uart_module);
-                (AnyEmulatorState::CVE2(next_state), next_uart)
-            }
-            AnyEmulatorState::FiveStage(state) => {
-                let (next_state, next_uart) = state.clock(program, uart_module);
-                (AnyEmulatorState::FiveStage(next_state), next_uart)
-            }
+            AnyEmulatorState::CVE2(state) => AnyEmulatorState::CVE2(state.clock(program)),
+            AnyEmulatorState::FiveStage(state) => AnyEmulatorState::FiveStage(state.clock(program)),
         }
     }
 
@@ -70,11 +61,19 @@ impl AnyEmulatorState {
             AnyEmulatorState::FiveStage(state) => &state.x,
         }
     }
+
+    pub fn uart(&self) -> &Uart {
+        match self {
+            AnyEmulatorState::CVE2(state) => &state.uart,
+            AnyEmulatorState::FiveStage(state) => &state.uart,
+        }
+    }
 }
 
 #[derive(Clone, Default, Debug)]
 pub struct EmulatorState<P: Pipeline> {
     pub x: RegisterFile,
+    pub uart: Uart,
     pub pipeline: P,
 }
 
@@ -83,14 +82,13 @@ impl<P: Pipeline + Clone> EmulatorState<P> {
         &self,
         program: &mut AssembledProgram,
         breakpoints: &BTreeSet<usize>,
-        uart_module: &Uart,
-    ) -> (Self, Uart) {
+        max_clocks: usize,
+    ) -> Self {
         let mut state = self.clone();
-        let mut uart_module = uart_module.clone();
         let mut num_cycles = 0;
 
         loop {
-            (state, uart_module) = state.clock(program, &uart_module);
+            state = state.clock(program);
 
             let hit_breakpoint = if let Some(line_num) =
                 program.source_map.get_by_left(&state.pipeline.current_pc())
@@ -105,27 +103,19 @@ impl<P: Pipeline + Clone> EmulatorState<P> {
                 break;
             }
 
-            // max 1000 cycles until we can move this to a web worker
+            // max cycles until we can move this to a web worker
             num_cycles += 1;
-            if num_cycles > 1000 {
+            if num_cycles > max_clocks {
                 break;
             }
         }
-        (state, uart_module)
+        state
     }
 
-    pub fn clock(&self, program: &mut AssembledProgram, uart_module: &Uart) -> (Self, Uart) {
+    pub fn clock(&self, program: &mut AssembledProgram) -> Self {
         let mut next_state = self.clone();
         next_state.pipeline.clock(program, &mut next_state.x);
-        let next_uart = trigger_uart(uart_module, &mut program.data_memory);
-
-        (next_state, next_uart)
-    }
-
-    #[allow(dead_code)]
-    pub fn clock_no_uart(&mut self, program: &mut AssembledProgram) -> Self {
-        let mut next_state = self.clone();
-        next_state.pipeline.clock(program, &mut next_state.x);
+        next_state.uart = trigger_uart(&self.uart, &mut program.data_memory);
         next_state
     }
 }

@@ -1,4 +1,6 @@
-use super::Address;
+use crate::emulator::uart::Uart;
+use crate::{assembler::Address, emulator::uart::LineStatusRegisterBitMask};
+
 use bimap::BiBTreeMap;
 use std::collections::{BTreeMap, HashMap};
 
@@ -14,7 +16,6 @@ pub struct AssembledProgram {
     pub source_map: BiBTreeMap<u32, usize>,
 
     /// Map of instruction labels to addresses
-    #[allow(dead_code)]
     pub symbol_table: HashMap<String, Address>,
 }
 
@@ -25,6 +26,16 @@ impl AssembledProgram {
             Section::Data => self.data_memory.keys().next().copied().unwrap_or(0),
             _ => todo!(), // TODO: Add support for other sections and user-defined sections
         }
+    }
+
+    pub fn init_uart_data_memory(&mut self, uart: &Uart) {
+        self.data_memory.insert(uart.rx_buffer_address, 0);
+        self.data_memory.insert(uart.tx_buffer_address, 0);
+        self.data_memory.insert(
+            uart.lsr_address,
+            LineStatusRegisterBitMask::TransmitReady as u8
+                | LineStatusRegisterBitMask::ReceiveReady as u8,
+        );
     }
 
     #[cfg(test)]

@@ -1,10 +1,7 @@
 use emugator_core::assembler::{self, AssembledProgram, AssemblerError, Section};
 use emugator_core::emulator::AnyEmulatorState;
+use emugator_core::emulator::EmulatorState;
 use emugator_core::emulator::cve2::CVE2Pipeline;
-use emugator_core::emulator::{
-    EmulatorState,
-    uart::{LineStatusRegisterBitMask, Uart},
-};
 
 use dioxus::prelude::*;
 use dioxus_logger::tracing::info;
@@ -18,7 +15,6 @@ pub fn RunButtons(
     assembled_program: Signal<Option<AssembledProgram>>,
     assembler_errors: Signal<Vec<AssemblerError>>,
     emulator_state: Signal<AnyEmulatorState>,
-    uart_module: Signal<Uart>,
     breakpoints: ReadOnlySignal<BTreeSet<usize>>,
 ) -> Element {
     rsx! {
@@ -29,23 +25,13 @@ pub fn RunButtons(
                 onclick: move |_| {
                     info!("Assembler clicked");
                     match assembler::assemble(&source.read()) {
-                        Ok(assembled) => {
+                        Ok(mut assembled) => {
                             info!("Assembly succeeded.");
                             let mut new_state = EmulatorState::<CVE2Pipeline>::default();
                             let start_addr = assembled.get_section_start(Section::Text);
                             new_state.pipeline.IF_pc = start_addr;
+                            assembled.init_uart_data_memory(&new_state.uart);
                             emulator_state.set(AnyEmulatorState::CVE2(new_state));
-                            *uart_module.write() = Uart::default();
-                            let mut assembled = assembled;
-                            assembled.data_memory.insert(uart_module.read().rx_buffer_address, 0);
-                            assembled.data_memory.insert(uart_module.read().tx_buffer_address, 0);
-                            assembled
-                                .data_memory
-                                .insert(
-                                    uart_module.read().lsr_address,
-                                    LineStatusRegisterBitMask::TransmitReady as u8
-                                        | LineStatusRegisterBitMask::ReceiveReady as u8,
-                                );
                             assembled_program.set(Some(assembled));
                             assembler_errors.set(Vec::new());
                         }
@@ -63,11 +49,8 @@ pub fn RunButtons(
                     class: "bg-purple-500 hover:bg-purple-600 text-s text-white font-bold py-1 px-2 rounded",
                     onclick: move |_| {
                         if let Some(mut program) = assembled_program.as_mut() {
-                            let (new_state, new_uart) = emulator_state
-                                .read()
-                                .clock(&mut program, uart_module.read().deref());
-                            *(emulator_state.write()) = new_state;
-                            *(uart_module.write()) = new_uart;
+                            let new_state = emulator_state.read().clock(&mut program);
+                            emulator_state.set(new_state);
                         }
                     },
                     "Next Clock"
@@ -76,15 +59,10 @@ pub fn RunButtons(
                     class: "bg-purple-500 hover:bg-purple-600 text-s text-white font-bold py-1 px-2 rounded",
                     onclick: move |_| {
                         if let Some(mut program) = assembled_program.as_mut() {
-                            let (new_state, new_uart) = emulator_state
+                            let new_state = emulator_state
                                 .read()
-                                .clock_until_break(
-                                    &mut program,
-                                    breakpoints.read().deref(),
-                                    uart_module.read().deref(),
-                                );
-                            *(emulator_state.write()) = new_state;
-                            *(uart_module.write()) = new_uart;
+                                .clock_until_break(&mut program, breakpoints.read().deref(), 10_000);
+                            emulator_state.set(new_state);
                         }
                     },
                     "Run to Break"

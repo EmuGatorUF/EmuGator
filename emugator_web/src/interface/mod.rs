@@ -18,7 +18,7 @@ use self::{
 use crate::code_editor::{CodeEditor, LineHighlight};
 use emugator_core::{
     assembler::{AssembledProgram, AssemblerError},
-    emulator::{AnyEmulatorState, uart::Uart},
+    emulator::AnyEmulatorState,
     include_test_file,
 };
 
@@ -30,7 +30,6 @@ pub fn App() -> Element {
     let assembler_errors: Signal<Vec<AssemblerError>> = use_signal(Vec::new);
     let emulator_state: Signal<AnyEmulatorState> = use_signal(AnyEmulatorState::default);
     let breakpoints: Signal<BTreeSet<usize>> = use_signal(BTreeSet::new);
-    let uart_module: Signal<Uart> = use_signal(Uart::default);
 
     let minimize_console: Signal<bool> = use_signal(|| false);
 
@@ -83,7 +82,6 @@ pub fn App() -> Element {
                     assembled_program,
                     assembler_errors,
                     emulator_state,
-                    uart_module,
                     breakpoints,
                 }
                 if assembled_program.read().is_some() {
@@ -98,7 +96,10 @@ pub fn App() -> Element {
                     div {
                         class: "transition-all duration-300 ease-in-out ".to_owned()
                             + { if *minimize_console.read() { "h-min" } else { "h-4/10" } },
-                        UartView { uart_module, minimize_console }
+                        UartView {
+                            uart_module: emulator_state.map(|s| s.uart()),
+                            minimize_console,
+                        }
                     }
                 } else {
                     div { class: "flex-col h-screen",

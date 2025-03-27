@@ -4,7 +4,7 @@ use emugator_core::emulator::uart::Uart;
 
 #[component]
 #[allow(non_snake_case)]
-pub fn UartView(uart_module: Signal<Uart>, minimize_console: Signal<bool>) -> Element {
+pub fn UartView(uart_module: MappedSignal<Uart>, minimize_console: Signal<bool>) -> Element {
     rsx! {
         div { class: "flex-col bg-inherit text-gray-200 font-mono border-t-[0.450px] border-gray-600",
             div {

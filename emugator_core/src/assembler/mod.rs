@@ -22,16 +22,16 @@ use crate::{
 };
 
 pub use address::Address;
-pub use assembled_program::{AssembledProgram, Section};
 pub use assembler_error::AssemblerError;
+pub use program::{AssembledProgram, Section};
 
 #[cfg(test)]
 mod tests;
 
 mod address;
-mod assembled_program;
 mod assembler_error;
 mod lexer;
+mod program;
 mod rpn;
 
 fn aligned(value: u32, alignment: u32) -> u32 {

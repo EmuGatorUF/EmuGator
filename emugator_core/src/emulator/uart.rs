@@ -34,8 +34,10 @@ impl Uart {
             lsr_address,
         }
     }
+}
 
-    pub fn default() -> Self {
+impl Default for Uart {
+    fn default() -> Self {
         Uart::new(vec![], 0xF0, 0xF4, 0xF8, 20, 0)
     }
 }
