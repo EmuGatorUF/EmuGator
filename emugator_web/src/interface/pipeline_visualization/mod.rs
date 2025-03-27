@@ -3,8 +3,11 @@ use dioxus::prelude::*;
 use dioxus_elements::geometry::WheelDelta;
 use dioxus_elements::input_data::MouseButton;
 use emugator_core::emulator::AnyEmulatorState;
+use emugator_core::emulator::five_stage::FiveStagePipeline;
+use five_stage_visualization::FiveStageVisualization;
 
 mod cve2_visualization;
+mod five_stage_visualization;
 
 fn format_pc(pc: u32) -> String {
     format!("0x{:08X}", pc)
@@ -110,10 +113,12 @@ pub fn PipelineVisualization(emulator_state: Signal<AnyEmulatorState>) -> Elemen
                 {
                     match *emulator_state.read() {
                         AnyEmulatorState::CVE2(_) => rsx! {
+                            // FiveStageVisualization { emulator_state, tooltip_text }
+                            // UNCOMMENT THE LINE ABOVE AND COMMENT THE LINE BELOW FOR 5 STAGE VISUALIZATION TESTING
                             CVE2Visualization { emulator_state, tooltip_text }
                         },
                         AnyEmulatorState::FiveStage(_) => rsx! {
-                            div { "Unsupported pipeline visualization" }
+                            FiveStageVisualization { emulator_state, tooltip_text }
                         },
                     }
                 }
