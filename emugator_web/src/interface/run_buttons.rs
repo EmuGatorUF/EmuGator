@@ -1,7 +1,5 @@
-use emugator_core::assembler::{self, AssembledProgram, AssemblerError, Section};
+use emugator_core::assembler::{self, AssembledProgram, AssemblerError};
 use emugator_core::emulator::AnyEmulatorState;
-use emugator_core::emulator::EmulatorState;
-use emugator_core::emulator::cve2::CVE2Pipeline;
 
 use dioxus::prelude::*;
 use dioxus_logger::tracing::info;
@@ -25,13 +23,9 @@ pub fn RunButtons(
                 onclick: move |_| {
                     info!("Assembler clicked");
                     match assembler::assemble(&source.read()) {
-                        Ok(mut assembled) => {
+                        Ok(assembled) => {
                             info!("Assembly succeeded.");
-                            let mut new_state = EmulatorState::<CVE2Pipeline>::default();
-                            let start_addr = assembled.get_section_start(Section::Text);
-                            new_state.pipeline.IF_pc = start_addr;
-                            assembled.init_uart_data_memory(&new_state.uart);
-                            emulator_state.set(AnyEmulatorState::CVE2(new_state));
+                            emulator_state.set(AnyEmulatorState::new_cve2(&assembled));
                             assembled_program.set(Some(assembled));
                             assembler_errors.set(Vec::new());
                         }

@@ -1055,7 +1055,7 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
     let symbol_table = resolved_symbols;
 
     let mut instruction_memory = BTreeMap::new();
-    let mut data_memory = BTreeMap::new();
+    let mut initial_data_memory = BTreeMap::new();
     let mut source_map = BiBTreeMap::new();
 
     // Second Pass
@@ -1067,7 +1067,7 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
         errors.append(&mut run_pass(&mut lexer, |token, lexer| {
             let mut memory = match current_section {
                 Section::Text => &mut instruction_memory,
-                Section::Data => &mut data_memory,
+                Section::Data => &mut initial_data_memory,
                 _ => todo!(), // TODO: Add support for other sections and user-defined sections
             };
 
@@ -1088,7 +1088,7 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
                 current_section = section;
                 memory = match current_section {
                     Section::Text => &mut instruction_memory,
-                    Section::Data => &mut data_memory,
+                    Section::Data => &mut initial_data_memory,
                     _ => todo!(), // TODO: Add support for other sections and user-defined sections
                 };
 
@@ -1165,7 +1165,7 @@ pub fn assemble<'a>(source: &'a str) -> Result<AssembledProgram, Vec<AssemblerEr
     } else {
         Ok(AssembledProgram {
             instruction_memory,
-            data_memory,
+            initial_data_memory,
             source_map,
             symbol_table,
         })

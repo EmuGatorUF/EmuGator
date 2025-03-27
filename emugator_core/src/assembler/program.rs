@@ -1,5 +1,4 @@
-use crate::emulator::uart::Uart;
-use crate::{assembler::Address, emulator::uart::LineStatusRegisterBitMask};
+use crate::assembler::Address;
 
 use bimap::BiBTreeMap;
 use std::collections::{BTreeMap, HashMap};
@@ -9,8 +8,8 @@ pub struct AssembledProgram {
     /// Map of instruction memory addresses to instruction bytes
     pub instruction_memory: BTreeMap<u32, u8>,
 
-    /// Map of data memory addresses to data bytes
-    pub data_memory: BTreeMap<u32, u8>,
+    /// Map of initial data memory addresses to data bytes
+    pub initial_data_memory: BTreeMap<u32, u8>,
 
     /// Map of instruction addresses (left) to line numbers (right)
     pub source_map: BiBTreeMap<u32, usize>,
@@ -23,19 +22,18 @@ impl AssembledProgram {
     pub fn get_section_start(&self, section: Section) -> u32 {
         match section {
             Section::Text => self.source_map.left_values().next().copied().unwrap_or(0),
-            Section::Data => self.data_memory.keys().next().copied().unwrap_or(0),
+            Section::Data => self.initial_data_memory.keys().next().copied().unwrap_or(0),
             _ => todo!(), // TODO: Add support for other sections and user-defined sections
         }
     }
 
-    pub fn init_uart_data_memory(&mut self, uart: &Uart) {
-        self.data_memory.insert(uart.rx_buffer_address, 0);
-        self.data_memory.insert(uart.tx_buffer_address, 0);
-        self.data_memory.insert(
-            uart.lsr_address,
-            LineStatusRegisterBitMask::TransmitReady as u8
-                | LineStatusRegisterBitMask::ReceiveReady as u8,
-        );
+    pub fn empty() -> Self {
+        AssembledProgram {
+            instruction_memory: BTreeMap::new(),
+            initial_data_memory: BTreeMap::new(),
+            source_map: BiBTreeMap::new(),
+            symbol_table: HashMap::new(),
+        }
     }
 
     #[cfg(test)]
@@ -49,7 +47,7 @@ impl AssembledProgram {
         (
             &self.instruction_memory,
             &self.source_map,
-            &self.data_memory,
+            &self.initial_data_memory,
         )
     }
 }

@@ -1,22 +1,27 @@
 use dioxus::prelude::*;
-use emugator_core::assembler::{AssembledProgram, Section};
+use emugator_core::{
+    assembler::{AssembledProgram, Section},
+    emulator::AnyEmulatorState,
+};
 
 #[component]
 #[allow(non_snake_case)]
-pub fn DataView(assembled_program: Signal<Option<AssembledProgram>>) -> Element {
-    let program = assembled_program.read();
-
+pub fn DataView(
+    assembled_program: ReadOnlySignal<Option<AssembledProgram>>,
+    emulator_state: ReadOnlySignal<AnyEmulatorState>,
+) -> Element {
     // Early return if no program is assembled
-    if program.is_none() {
+    let assembled_program = assembled_program.read();
+    let Some(program) = assembled_program.as_ref() else {
         return rsx! {
             div { class: "flex justify-center items-center h-full",
                 span { class: "text-gray-500 font-mono", "No program loaded" }
             }
         };
-    }
+    };
 
-    let program = program.as_ref().unwrap();
-    let data_memory = &program.data_memory;
+    let emulator_state = emulator_state.read();
+    let data_memory = emulator_state.data_memory();
     let data_start = program.get_section_start(Section::Data) as usize;
 
     // changed this to fix a bug where partial words did not show in data view
@@ -34,7 +39,7 @@ pub fn DataView(assembled_program: Signal<Option<AssembledProgram>>) -> Element 
                                     {
                                         let mut dw_bytes: [u8; 8] = [0; 8];
                                         for (j, b) in dw_bytes.iter_mut().enumerate() {
-                                            *b = data_memory.get(&((base_addr + j) as u32)).copied().unwrap_or(0);
+                                            *b = data_memory.get((base_addr + j) as u32);
                                         }
                                         let hex_string1 = format!(
                                             "{:02x} {:02x} {:02x} {:02x}",

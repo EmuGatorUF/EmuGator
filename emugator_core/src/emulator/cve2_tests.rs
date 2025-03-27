@@ -36,7 +36,7 @@ fn populate_with_offset(instructions: &[Instruction], offset: u32) -> AssembledP
 
     AssembledProgram {
         instruction_memory,
-        data_memory: BTreeMap::new(),
+        initial_data_memory: BTreeMap::new(),
         source_map: BiBTreeMap::new(),
         symbol_table: HashMap::new(),
     }
@@ -44,10 +44,8 @@ fn populate_with_offset(instructions: &[Instruction], offset: u32) -> AssembledP
 
 #[test]
 fn test_LUI() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
     // LUI ( x1 := 0x12345000)
-    let mut program = populate(&[
+    let program = populate(&[
         ISA::LUI.build(Operands {
             rd: 1,
             imm: 0x12345000,
@@ -60,42 +58,42 @@ fn test_LUI() {
         }),
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // After LUI, x1 should be loaded with the upper 20 bits of the immediate
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1], 0x12345000);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[0], 0x0);
+    state = state.clock(&program);
+    assert_eq!(state.x[1], 0x12345000);
+    state = state.clock(&program);
+    assert_eq!(state.x[0], 0x0);
 }
 
 #[test]
 fn test_AUIPC() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
     // AUIPC ( x1 := PC + 0x12345000)
-    let mut program = populate(&[ISA::AUIPC.build(Operands {
+    let program = populate(&[ISA::AUIPC.build(Operands {
         rd: 1,
         imm: 0x12345000,
         ..Default::default()
     })]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // After AUIPC, x1 should hold the value (PC + 0x12345000)
-    let pc = emulator_state.pipeline.ID_pc;
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1], pc + 0x12345000);
+    let pc = state.pipeline.ID_pc;
+    state = state.clock(&program);
+    assert_eq!(state.x[1], pc + 0x12345000);
 }
 
 #[test]
 fn test_JAL() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
     // JAL ( x1 := PC + 4, jump to PC + 0x100)
-    let mut program = populate(&[
+    let program = populate(&[
         ISA::ADDI.build(Operands {
             rd: 0,
             rs1: 0,
@@ -121,31 +119,31 @@ fn test_JAL() {
         }),
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // Padding Instruction
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // After JAL, x1 should contain PC + 4, and the PC should jump to PC + 0x8
-    let pc = emulator_state.pipeline.ID_pc;
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.pipeline.IF_pc, pc + 0x8);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1], pc + 4);
+    let pc = state.pipeline.ID_pc;
+    state = state.clock(&program);
+    assert_eq!(state.pipeline.IF_pc, pc + 0x8);
+    state = state.clock(&program);
+    assert_eq!(state.x[1], pc + 4);
 
     // ADDI that it jumps to
-    assert_eq!(emulator_state.x[5], 0);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[5], 2);
+    assert_eq!(state.x[5], 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[5], 2);
 }
 
 #[test]
 fn test_JAL_neg_offset() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
     // JAL ( x1 := PC + 4, jump to PC - 4)
-    let mut program = populate(&[
+    let program = populate(&[
         ISA::ADDI.build(Operands {
             rd: 5,
             rs1: 0,
@@ -165,51 +163,51 @@ fn test_JAL_neg_offset() {
         }), // JAL (pc = pc - 4)
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
     // ADDI ( x5 := x0 + 1)
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
     // ADDI ( x5 := x5 + 1)
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // After JAL, x1 should contain PC + 4, and the PC should jump to PC + 0x04
-    let pc = emulator_state.pipeline.ID_pc;
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.pipeline.IF_pc, pc - 0x04);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1], pc + 4);
+    let pc = state.pipeline.ID_pc;
+    state = state.clock(&program);
+    assert_eq!(state.pipeline.IF_pc, pc - 0x04);
+    state = state.clock(&program);
+    assert_eq!(state.x[1], pc + 4);
 
     // ADDI ( x5 := x5 + 1)
-    assert_eq!(emulator_state.x[5], 2);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[5], 3);
+    assert_eq!(state.x[5], 2);
+    state = state.clock(&program);
+    assert_eq!(state.x[5], 3);
 }
 
 #[test]
 #[should_panic(expected = "PC must be on a 4-byte boundary")]
 fn test_JAL_panic() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
     // JAL ( x1 := PC + 4, jump to PC + 0x122)
-    let mut program = populate(&[ISA::JAL.build(Operands {
+    let program = populate(&[ISA::JAL.build(Operands {
         rd: 1,
         imm: 0x122,
         ..Default::default()
     })]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // Should panic because the immediate is not on a 4-byte boundary
-    emulator_state.clock(&mut program);
+    state.clock(&program);
 }
 
 #[test]
 fn test_JALR() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
     // JALR ( x1 := PC + 4, jump to (x2 + 0x4) & ~1)
-    let mut program = populate(&[
+    let program = populate(&[
         ISA::ADDI.build(Operands {
             rd: 2,
             rs1: 0,
@@ -242,36 +240,33 @@ fn test_JALR() {
         }),
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // After ADDI, x2 should be loaded with 0b100
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[2], 0x4);
+    state = state.clock(&program);
+    assert_eq!(state.x[2], 0x4);
 
     // After JALR, x1 should contain PC + 4, and the PC should jump to (x4 + 0x2) & ~1
-    let pc = emulator_state.pipeline.ID_pc;
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(
-        emulator_state.pipeline.IF_pc,
-        (emulator_state.x[2] + 0x8) & !1
-    );
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1], pc + 4);
+    let pc = state.pipeline.ID_pc;
+    state = state.clock(&program);
+    assert_eq!(state.pipeline.IF_pc, (state.x[2] + 0x8) & !1);
+    state = state.clock(&program);
+    assert_eq!(state.x[1], pc + 4);
 
     // After ADDI
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[4], 2);
+    state = state.clock(&program);
+    assert_eq!(state.x[4], 2);
 
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[5], 7);
+    state = state.clock(&program);
+    assert_eq!(state.x[5], 7);
 }
 
 #[test]
 fn test_JALR_neg_offset() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         ISA::ADDI.build(Operands {
             rd: 2,
             rs1: 0,
@@ -292,29 +287,26 @@ fn test_JALR_neg_offset() {
         }), // JALR ( x1 := PC + 4, jump to (x2 - 4) & ~1)
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
     // ADDI ( x5 := x0 + 1)
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
     // ADDI ( x5 := x0 + 1)
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // After JALR, x1 should contain PC + 4, and the PC should jump to x2 (12) - 4
-    let pc = emulator_state.pipeline.ID_pc;
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(
-        emulator_state.pipeline.IF_pc,
-        (emulator_state.x[2] as i32 - 4) as u32 & !1
-    );
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1], pc + 4);
+    let pc = state.pipeline.ID_pc;
+    state = state.clock(&program);
+    assert_eq!(state.pipeline.IF_pc, (state.x[2] as i32 - 4) as u32 & !1);
+    state = state.clock(&program);
+    assert_eq!(state.x[1], pc + 4);
 }
 
 #[test]
 fn test_BEQ() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         ISA::ADDI.build(Operands {
             rd: 1,
             rs1: 0,
@@ -347,38 +339,38 @@ fn test_BEQ() {
         }),
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // ADDI ( x1 := x0 + 1)
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1], 1);
+    state = state.clock(&program);
+    assert_eq!(state.x[1], 1);
 
     // BEQ (branch if x1 == x2) - should not branch because x1 != x2
-    let pc = emulator_state.pipeline.ID_pc;
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x4);
+    let pc = state.pipeline.ID_pc;
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.pipeline.ID_pc, pc + 0x4);
 
     // BEQ (branch if x0 == x2) - should branch because x0 == x2
-    let pc = emulator_state.pipeline.ID_pc;
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x8);
+    let pc = state.pipeline.ID_pc;
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.pipeline.ID_pc, pc + 0x8);
 
     // ADDI ( x5 := x0 + 2)
-    assert_eq!(emulator_state.x[5], 0);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[5], 2);
+    assert_eq!(state.x[5], 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[5], 2);
 }
 
 #[test]
 fn test_BNE() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         ISA::ADDI.build(Operands {
             rd: 1,
             rs1: 0,
@@ -411,37 +403,37 @@ fn test_BNE() {
         }),
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // ADDI ( x1 := x0 + 1)
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // BNE (branch if x0 != x2) - should not branch because x0 == x2
-    let pc = emulator_state.pipeline.ID_pc;
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x4);
+    let pc = state.pipeline.ID_pc;
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.pipeline.ID_pc, pc + 0x4);
 
     // BNE (branch if x1 != x2) - should branch because x1 != x2
-    let pc = emulator_state.pipeline.ID_pc;
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x8);
+    let pc = state.pipeline.ID_pc;
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.pipeline.ID_pc, pc + 0x8);
 
     // ADDI ( x5 := x0 + 2)
-    assert_eq!(emulator_state.x[5], 0);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[5], 2);
+    assert_eq!(state.x[5], 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[5], 2);
 }
 
 #[test]
 fn test_BLT() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         ISA::ADDI.build(Operands {
             rd: 1,
             rs1: 0,
@@ -474,38 +466,38 @@ fn test_BLT() {
         }), // ADDI ( x5 := x0 + 2)
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // ADDI ( x1 := x0 - 1)
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1], u32::MAX);
+    state = state.clock(&program);
+    assert_eq!(state.x[1], u32::MAX);
 
     // BLT (branch if x0 < x1) - should not branch because x0 > x1
-    let pc = emulator_state.pipeline.ID_pc;
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x4);
+    let pc = state.pipeline.ID_pc;
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.pipeline.ID_pc, pc + 0x4);
 
     // BLT (branch if x1 < x0) - should branch because x1 < x0
-    let pc = emulator_state.pipeline.ID_pc;
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x8);
+    let pc = state.pipeline.ID_pc;
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.pipeline.ID_pc, pc + 0x8);
 
     // ADDI ( x5 := x0 + 2)
-    assert_eq!(emulator_state.x[5], 0);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[5], 2);
+    assert_eq!(state.x[5], 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[5], 2);
 }
 
 #[test]
 fn test_BGE() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         ISA::ADDI.build(Operands {
             rd: 1,
             rs1: 0,
@@ -544,50 +536,50 @@ fn test_BGE() {
         }), // BGE (branch if x0 >= x2)
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // ADDI ( x1 := x0 - 1)
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1], u32::MAX);
+    state = state.clock(&program);
+    assert_eq!(state.x[1], u32::MAX);
 
     // BGE (branch if x1 >= x0) - should not branch because x0 > x1
-    let pc = emulator_state.pipeline.ID_pc;
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x4);
+    let pc = state.pipeline.ID_pc;
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.pipeline.ID_pc, pc + 0x4);
 
     // BLT (branch if x0 >= x1) - should branch because x1 < x0
-    let pc = emulator_state.pipeline.ID_pc;
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x8);
+    let pc = state.pipeline.ID_pc;
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.pipeline.ID_pc, pc + 0x8);
 
     // ADDI ( x5 := x0 + 2)
-    assert_eq!(emulator_state.x[5], 0);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[5], 2);
+    assert_eq!(state.x[5], 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[5], 2);
 
     // BGE (branch if x0 >= x2) - should branch because x0 == x2
-    let pc = emulator_state.pipeline.ID_pc;
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.pipeline.ID_pc, pc - 0x8);
+    let pc = state.pipeline.ID_pc;
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.pipeline.ID_pc, pc - 0x8);
 
     // ADDI ( x5 := x0 + 1)
-    assert_eq!(emulator_state.x[5], 2);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[5], 1);
+    assert_eq!(state.x[5], 2);
+    state = state.clock(&program);
+    assert_eq!(state.x[5], 1);
 }
 
 #[test]
 fn test_BLTU() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         ISA::ADDI.build(Operands {
             rd: 1,
             rs1: 0,
@@ -620,38 +612,38 @@ fn test_BLTU() {
         }), // ADDI ( x5 := x0 + 2)
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // ADDI ( x1 := x0 - 1)
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1], u32::MAX);
+    state = state.clock(&program);
+    assert_eq!(state.x[1], u32::MAX);
 
     // BLTU (branch if x1 < x0) - should not branch because x1 > x0
-    let pc = emulator_state.pipeline.ID_pc;
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x4);
+    let pc = state.pipeline.ID_pc;
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.pipeline.ID_pc, pc + 0x4);
 
     // BLTU (branch if x0 < x1) - should branch because x0 < x1
-    let pc = emulator_state.pipeline.ID_pc;
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x8);
+    let pc = state.pipeline.ID_pc;
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.pipeline.ID_pc, pc + 0x8);
 
     // ADDI ( x5 := x0 + 2)
-    assert_eq!(emulator_state.x[5], 0);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[5], 2);
+    assert_eq!(state.x[5], 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[5], 2);
 }
 
 #[test]
 fn test_BGEU() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         ISA::ADDI.build(Operands {
             rd: 1,
             rs1: 0,
@@ -690,50 +682,50 @@ fn test_BGEU() {
         }), // BGEU (branch if x0 >= x2)
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // ADDI ( x1 := x0 - 1)
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1], u32::MAX);
+    state = state.clock(&program);
+    assert_eq!(state.x[1], u32::MAX);
 
     // BGEU (branch if x0 >= x1) - should not branch because x0 < x1
-    let pc = emulator_state.pipeline.ID_pc;
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x4);
+    let pc = state.pipeline.ID_pc;
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.pipeline.ID_pc, pc + 0x4);
 
     // BLT (branch if x1 >= x0) - should branch because x1 > x0
-    let pc = emulator_state.pipeline.ID_pc;
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.pipeline.ID_pc, pc + 0x8);
+    let pc = state.pipeline.ID_pc;
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.pipeline.ID_pc, pc + 0x8);
 
     // ADDI ( x5 := x0 + 2)
-    assert_eq!(emulator_state.x[5], 0);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[5], 2);
+    assert_eq!(state.x[5], 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[5], 2);
 
     // BGEU (branch if x0 >= x2) - should branch because x0 == x2
-    let pc = emulator_state.pipeline.ID_pc;
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.pipeline.ID_pc, pc - 0x8);
+    let pc = state.pipeline.ID_pc;
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.pipeline.ID_pc, pc - 0x8);
 
     // ADDI ( x5 := x0 + 1)
-    assert_eq!(emulator_state.x[5], 2);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[5], 1);
+    assert_eq!(state.x[5], 2);
+    state = state.clock(&program);
+    assert_eq!(state.x[5], 1);
 }
 
 #[test]
 fn test_LB() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         ISA::ADDI.build(Operands {
             rd: 1,
             rs1: 0,
@@ -754,33 +746,33 @@ fn test_LB() {
         }),
     ]);
 
-    program.data_memory.insert(0x10, 0xFB);
-    program.data_memory.insert(0x11, 0xFC);
-    program.data_memory.insert(0x12, 0x7D);
-    program.data_memory.insert(0x13, 0x7E);
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
+    state.data_memory.set(0x10, 0xFB);
+    state.data_memory.set(0x11, 0xFC);
+    state.data_memory.set(0x12, 0x7D);
+    state.data_memory.set(0x13, 0x7E);
 
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // ADDI ( x1 := x0 + 0x8)
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // LB ( x5 := MEM[x1 + 0x8])
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[5], 0xFFFFFFFB);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.x[5], 0xFFFFFFFB);
 
     // LB ( x5 := MEM[x1 + 0xA])
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[5], 0x0000007D);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.x[5], 0x0000007D);
 }
 
 #[test]
 fn test_LH() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         ISA::ADDI.build(Operands {
             rd: 1,
             rs1: 0,
@@ -801,33 +793,33 @@ fn test_LH() {
         }),
     ]);
 
-    program.data_memory.insert(0x10, 0xFB);
-    program.data_memory.insert(0x11, 0xFC);
-    program.data_memory.insert(0x12, 0x7D);
-    program.data_memory.insert(0x13, 0x7E);
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
+    state.data_memory.set(0x10, 0xFB);
+    state.data_memory.set(0x11, 0xFC);
+    state.data_memory.set(0x12, 0x7D);
+    state.data_memory.set(0x13, 0x7E);
 
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // ADDI ( x1 := x0 + 0x8)
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // LB ( x5 := MEM[x1 + 0x8])
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[5], 0xFFFFFCFB);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.x[5], 0xFFFFFCFB);
 
     // LB ( x5 := MEM[x1 + 0xA])
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[5], 0x00007E7D);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.x[5], 0x00007E7D);
 }
 
 #[test]
 fn test_LW() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         ISA::ADDI.build(Operands {
             rd: 1,
             rs1: 0,
@@ -842,28 +834,28 @@ fn test_LW() {
         }),
     ]);
 
-    program.data_memory.insert(0x10, 0xFB);
-    program.data_memory.insert(0x11, 0xFC);
-    program.data_memory.insert(0x12, 0x7D);
-    program.data_memory.insert(0x13, 0x7E);
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
+    state.data_memory.set(0x10, 0xFB);
+    state.data_memory.set(0x11, 0xFC);
+    state.data_memory.set(0x12, 0x7D);
+    state.data_memory.set(0x13, 0x7E);
 
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // ADDI ( x1 := x0 + 0x8)
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // LB ( x5 := MEM[x1 + 0x8])
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[5], 0x7E7DFCFB);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.x[5], 0x7E7DFCFB);
 }
 
 #[test]
 fn test_SB() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         // Set x1 := 0xFEFDFCFB (Data to write)
         ISA::LUI.build(Operands {
             rd: 1,
@@ -893,30 +885,30 @@ fn test_SB() {
         }),
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // Set x1 := 0xFEFDFCFB
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
+    state = state.clock(&program);
 
     // Set x2 := 100
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // SH -> Write first byte of x1 to address x2 (100) + 5
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state.clock(&mut program);
-    assert_eq!(program.data_memory.get(&105), Some(&0xFB));
-    assert_eq!(program.data_memory.get(&106), None);
-    assert_eq!(program.data_memory.get(&107), None);
-    assert_eq!(program.data_memory.get(&108), None);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.data_memory.get(105), 0xFB);
+    assert_eq!(state.data_memory.get(106), 0x00);
+    assert_eq!(state.data_memory.get(107), 0x00);
+    assert_eq!(state.data_memory.get(108), 0x00);
 }
 
 #[test]
 fn test_SH() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         // Set x1 := 0xFEFDFCFB (Data to write)
         ISA::LUI.build(Operands {
             rd: 1,
@@ -946,30 +938,30 @@ fn test_SH() {
         }),
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // Set x1 := 0xFEFDFCFB (lowest byte )
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
+    state = state.clock(&program);
 
     // Set x2 := 100
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // SH -> Write x1 to address x2 (100) + 5
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state.clock(&mut program);
-    assert_eq!(program.data_memory.get(&105), Some(&0xFB));
-    assert_eq!(program.data_memory.get(&106), Some(&0xFC));
-    assert_eq!(program.data_memory.get(&107), None);
-    assert_eq!(program.data_memory.get(&108), None);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.data_memory.get(105), 0xFB);
+    assert_eq!(state.data_memory.get(106), 0xFC);
+    assert_eq!(state.data_memory.get(107), 0x00);
+    assert_eq!(state.data_memory.get(108), 0x00);
 }
 
 #[test]
 fn test_SW() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         // Set x1 := 0xFEFDFCFB (Data to write)
         ISA::LUI.build(Operands {
             rd: 1,
@@ -999,33 +991,33 @@ fn test_SW() {
         }),
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // Set x1 := 0xFEFDFCFB
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
+    state = state.clock(&program);
 
     // Set x2 := 100
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // SW -> Write x1 to address x2 (100) + 5
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state.clock(&mut program);
-    assert_eq!(program.data_memory.get(&105), Some(&0xFB));
-    assert_eq!(program.data_memory.get(&106), Some(&0xFC));
-    assert_eq!(program.data_memory.get(&107), Some(&0xFD));
-    assert_eq!(program.data_memory.get(&108), Some(&0xFE));
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.data_memory.get(105), 0xFB);
+    assert_eq!(state.data_memory.get(106), 0xFC);
+    assert_eq!(state.data_memory.get(107), 0xFD);
+    assert_eq!(state.data_memory.get(108), 0xFE);
 }
 
 #[test]
 fn test_ADDI() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
     // ADDI ( x1 := x0 + 1)
     // ADDI ( x1 := x1 + (-1))
     // ADDI ( x0 := x0 + 1 )
-    let mut program = populate(&[
+    let program = populate(&[
         ISA::ADDI.build(Operands {
             rd: 1,
             rs1: 0,
@@ -1046,29 +1038,28 @@ fn test_ADDI() {
         }),
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // ADDI ( x1 := x0 + 1)
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1], 1);
+    state = state.clock(&program);
+    assert_eq!(state.x[1], 1);
     // ADDI ( x1 := x1 + 1)
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1], 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[1], 0);
     // ADDI ( x0 := x0 + 1) <= special case should be a noop
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[0], 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[0], 0);
 }
 
 #[test]
 fn test_SLTI() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
     // SLTI ( x1 := x0 < 1)
     // SLTI ( x1 := x1 < (-1))
     // SLTI ( x0 := x0 < 1 )
-
-    let mut program = populate(&[
+    let program = populate(&[
         ISA::SLTI.build(Operands {
             rd: 1,
             rs1: 0,
@@ -1089,29 +1080,28 @@ fn test_SLTI() {
         }),
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // SLTI ( x1 := x0 < 1)
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1], 1);
+    state = state.clock(&program);
+    assert_eq!(state.x[1], 1);
     // SLTI ( x1 := x1 < (-1))
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1], 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[1], 0);
     // SLTI ( x0 := x0 < 1 ) <= Should not change x0
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[0], 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[0], 0);
 }
 
 #[test]
 fn test_SLTIU() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
     // SLTIU ( x1 := x0 < 1)
     // SLTIU ( x1 := x1 < (-1))
     // SLTIU ( x0 := x0 < 1 )
-
-    let mut program = populate(&[
+    let program = populate(&[
         ISA::SLTIU.build(Operands {
             rd: 1,
             rs1: 0,
@@ -1132,29 +1122,28 @@ fn test_SLTIU() {
         }),
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // SLTI ( x1 := x0 < 1)
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1], 1);
+    state = state.clock(&program);
+    assert_eq!(state.x[1], 1);
     // SLTI ( x1 := x1 < (-1))
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1], 1);
+    state = state.clock(&program);
+    assert_eq!(state.x[1], 1);
     // SLTI ( x0 := x0 < 1 ) <= Should not change x0
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[0], 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[0], 0);
 }
 
 #[test]
 fn test_XORI() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
     // XORI ( x1 := x0 ^ 4)
     // XORI ( x1 := x1 ^ (-1))
     // XORI ( x0 := x0 ^ 100 )
-
-    let mut program = populate(&[
+    let program = populate(&[
         ISA::XORI.build(Operands {
             rd: 1,
             rs1: 0,
@@ -1175,29 +1164,28 @@ fn test_XORI() {
         }),
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // XORI ( x1 := x0 ^ 4)
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1], 4);
+    state = state.clock(&program);
+    assert_eq!(state.x[1], 4);
     // XORI ( x1 := x1 ^ (-1))
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1] as i32, -5);
+    state = state.clock(&program);
+    assert_eq!(state.x[1] as i32, -5);
     // XORI ( x0 := x0 ^ 100 ) <= Should not change x0
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[0], 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[0], 0);
 }
 
 #[test]
 fn test_ORI() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
     // ORI ( x1 := x0 | 12)
     // ORI ( x1 := x1 | (-1))
     // ORI ( x0 := x0 | 100 )
-
-    let mut program = populate(&[
+    let program = populate(&[
         ISA::ORI.build(Operands {
             rd: 1,
             rs1: 0,
@@ -1218,25 +1206,25 @@ fn test_ORI() {
         }),
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // ORI ( x1 := x0 | 12)
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1], 12);
+    state = state.clock(&program);
+    assert_eq!(state.x[1], 12);
     // ORI ( x1 := x1 ^ (-10))
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1] as i32, -2);
+    state = state.clock(&program);
+    assert_eq!(state.x[1] as i32, -2);
     // ORI ( x0 := x0 ^ 100 ) <= Should not change x0
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[0], 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[0], 0);
 }
 
 #[test]
 fn test_ANDI() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         ISA::ADDI.build(Operands {
             rd: 1,
             rs1: 0,
@@ -1263,31 +1251,31 @@ fn test_ANDI() {
         }),
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // Set x1 := 37
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1], 37);
+    state = state.clock(&program);
+    assert_eq!(state.x[1], 37);
 
     // ANDI ( x1 := x1 & 5)
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1], 5);
+    state = state.clock(&program);
+    assert_eq!(state.x[1], 5);
 
     // ANDI ( x1 := x1 & (-10))
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1], 4);
+    state = state.clock(&program);
+    assert_eq!(state.x[1], 4);
 
     // ANDI ( x0 := x0 & 100 ) <= Should not change x0
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[0], 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[0], 0);
 }
 
 #[test]
 fn test_SLLI() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         ISA::ADDI.build(Operands {
             rd: 1,
             rs1: 0,
@@ -1314,31 +1302,31 @@ fn test_SLLI() {
         }),
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // Set x1 := 10
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1], 10);
+    state = state.clock(&program);
+    assert_eq!(state.x[1], 10);
 
     // SLLI ( x2 := x1 << 4)
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[2], 160);
+    state = state.clock(&program);
+    assert_eq!(state.x[2], 160);
 
     // SLLI ( x3 := x1 << 0b1000001) Should only shift 1 time since we only look at last 5 bits
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[3], 20);
+    state = state.clock(&program);
+    assert_eq!(state.x[3], 20);
 
     // SLLI ( x0 := x1 << 3 ) <= Should not change x0
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[0], 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[0], 0);
 }
 
 #[test]
 fn test_SRLI() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         ISA::ADDI.build(Operands {
             rd: 1,
             rs1: 0,
@@ -1365,31 +1353,31 @@ fn test_SRLI() {
         }),
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // Set x1 := 10
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1], 10);
+    state = state.clock(&program);
+    assert_eq!(state.x[1], 10);
 
     // SRLI ( x2 := x1 >> 1)
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[2], 5);
+    state = state.clock(&program);
+    assert_eq!(state.x[2], 5);
 
     // SRLI ( x3 := x1 >> 0b1000010) Should only shift 1 time since we only look at last 5 bits
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[3], 2);
+    state = state.clock(&program);
+    assert_eq!(state.x[3], 2);
 
     // SRLI ( x0 := x1 << 3 ) <= Should not change x0
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[0], 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[0], 0);
 }
 
 #[test]
 fn test_SRAI() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         ISA::ADDI.build(Operands {
             rd: 1,
             rs1: 0,
@@ -1416,31 +1404,31 @@ fn test_SRAI() {
         }),
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // Set x1 := -10
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1] as i32, -10);
+    state = state.clock(&program);
+    assert_eq!(state.x[1] as i32, -10);
 
     // SRAI ( x2 := x1 >> -1)
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[2] as i32, -1);
+    state = state.clock(&program);
+    assert_eq!(state.x[2] as i32, -1);
 
     // SRAI ( x3 := x1 >> 0b1000001) Should only shift 1 time since we only look at last 5 bits
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[3] as i32, -5);
+    state = state.clock(&program);
+    assert_eq!(state.x[3] as i32, -5);
 
     // SRAI ( x0 := x1 << 3 ) <= Should not change x0
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[0], 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[0], 0);
 }
 
 #[test]
 fn test_ADD() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         // ADDI x1, x0, 15 -> Set x1 := 15
         ISA::ADDI.build(Operands {
             rd: 1,
@@ -1478,35 +1466,35 @@ fn test_ADD() {
         }),
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // Set x1 := 15
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1] as i32, 15);
+    state = state.clock(&program);
+    assert_eq!(state.x[1] as i32, 15);
 
     // Set x2 := -10
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[2] as i32, -10);
+    state = state.clock(&program);
+    assert_eq!(state.x[2] as i32, -10);
 
     // ADD (x3 := x1 + x2)
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[3] as i32, 5);
+    state = state.clock(&program);
+    assert_eq!(state.x[3] as i32, 5);
 
     // ADD (x4 := x1 + x1)
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[4] as i32, 30);
+    state = state.clock(&program);
+    assert_eq!(state.x[4] as i32, 30);
 
     // ADD (x0 := x1 + x2) - No change to x0
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[0], 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[0], 0);
 }
 
 #[test]
 fn test_SUB() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         // ADDI x1, x0, 20 -> Set x1 := 20
         ISA::ADDI.build(Operands {
             rd: 1,
@@ -1551,39 +1539,39 @@ fn test_SUB() {
         }),
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // Set x1 := 20
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1] as i32, 20);
+    state = state.clock(&program);
+    assert_eq!(state.x[1] as i32, 20);
 
     // Set x2 := 5
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[2] as i32, 5);
+    state = state.clock(&program);
+    assert_eq!(state.x[2] as i32, 5);
 
     // SUB (x3 := x1 - x2)
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[3] as i32, 15);
+    state = state.clock(&program);
+    assert_eq!(state.x[3] as i32, 15);
 
     // SUB (x4 := x2 - x1)
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[4] as i32, -15);
+    state = state.clock(&program);
+    assert_eq!(state.x[4] as i32, -15);
 
     // SUB (x5 := x1 - x1)
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[5] as i32, 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[5] as i32, 0);
 
     // SUB (x0 := x1 - x2) - No change to x0
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[0], 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[0], 0);
 }
 
 #[test]
 fn test_SLL() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         // ADDI x1, x0, 1 -> Set x1 := 1
         ISA::ADDI.build(Operands {
             rd: 1,
@@ -1635,42 +1623,42 @@ fn test_SLL() {
         }),
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Instruction fetch
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // Set x1 := 1
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[1] as i32, 1);
+    state = state.clock(&program);
+    assert_eq!(state.x[1] as i32, 1);
 
     // Set x2 := 2
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[2] as i32, 2);
+    state = state.clock(&program);
+    assert_eq!(state.x[2] as i32, 2);
 
     // SLL (x3 := x1 << x2)
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[3] as i32, 4);
+    state = state.clock(&program);
+    assert_eq!(state.x[3] as i32, 4);
 
     // Set x2 := 0b100000 (masked to 0)
-    emulator_state = emulator_state.clock(&mut program);
+    state = state.clock(&program);
 
     // SLL (x4 := x1 << x2, with x2 effectively 0)
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[4] as i32, 1);
+    state = state.clock(&program);
+    assert_eq!(state.x[4] as i32, 1);
 
     // SLL (x5 := x2 << x2)
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[5] as i32, 32);
+    state = state.clock(&program);
+    assert_eq!(state.x[5] as i32, 32);
 
     // SLL (x0 := x1 << x2) - Ensure no change to x0
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[0], 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[0], 0);
 }
 
 #[test]
 fn test_SLT() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         // ADDI x1, x0, 5 -> Set x1 := 5
         ISA::ADDI.build(Operands {
             rd: 1,
@@ -1708,25 +1696,25 @@ fn test_SLT() {
         }),
     ]);
 
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
+
     // Execute each instruction and validate
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program); // Set x1 = 5
-    emulator_state = emulator_state.clock(&mut program); // Set x2 = 10
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[3], 1); // x3 = 1 (5 < 10)
+    state = state.clock(&program);
+    state = state.clock(&program); // Set x1 = 5
+    state = state.clock(&program); // Set x2 = 10
+    state = state.clock(&program);
+    assert_eq!(state.x[3], 1); // x3 = 1 (5 < 10)
 
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[4], 0); // x4 = 0 (10 < 5 false)
+    state = state.clock(&program);
+    assert_eq!(state.x[4], 0); // x4 = 0 (10 < 5 false)
 
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[5], 0); // x5 = 0 (5 < 5 false)
+    state = state.clock(&program);
+    assert_eq!(state.x[5], 0); // x5 = 0 (5 < 5 false)
 }
 
 #[test]
 fn test_SLTU() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         // ADDI x1, x0, -1 -> Set x1 := -1 (interpreted as 0xFFFFFFFF unsigned)
         ISA::ADDI.build(Operands {
             rd: 1,
@@ -1757,21 +1745,21 @@ fn test_SLTU() {
         }),
     ]);
 
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program); // Set x1 = -1 (0xFFFFFFFF unsigned)
-    emulator_state = emulator_state.clock(&mut program); // Set x2 = 1
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[3], 1); // x3 = 1 (1 < 0xFFFFFFFF true)
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
 
-    emulator_state = emulator_state.clock(&mut program);
-    assert_eq!(emulator_state.x[4], 0); // x4 = 0 (0xFFFFFFFF < 1 false)
+    state = state.clock(&program);
+    state = state.clock(&program); // Set x1 = -1 (0xFFFFFFFF unsigned)
+    state = state.clock(&program); // Set x2 = 1
+    state = state.clock(&program);
+    assert_eq!(state.x[3], 1); // x3 = 1 (1 < 0xFFFFFFFF true)
+
+    state = state.clock(&program);
+    assert_eq!(state.x[4], 0); // x4 = 0 (0xFFFFFFFF < 1 false)
 }
 
 #[test]
 fn test_XOR() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         // ADDI x1, x0, 0b1100 -> Set x1 := 12
         ISA::ADDI.build(Operands {
             rd: 1,
@@ -1795,19 +1783,19 @@ fn test_XOR() {
         }),
     ]);
 
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
 
-    assert_eq!(emulator_state.x[3], 0b0110); // x3 = 6 (0b1100 ^ 0b1010)
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+
+    assert_eq!(state.x[3], 0b0110); // x3 = 6 (0b1100 ^ 0b1010)
 }
 
 #[test]
 fn test_SRL() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         // ADDI x1, x0, 16 -> Set x1 := 16 (0b10000)
         ISA::ADDI.build(Operands {
             rd: 1,
@@ -1831,19 +1819,19 @@ fn test_SRL() {
         }),
     ]);
 
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
 
-    assert_eq!(emulator_state.x[3], 4); // x3 = 4 (16 >> 2)
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+
+    assert_eq!(state.x[3], 4); // x3 = 4 (16 >> 2)
 }
 
 #[test]
 fn test_SRA() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         // ADDI x1, x0, -16 -> Set x1 := -16
         ISA::ADDI.build(Operands {
             rd: 1,
@@ -1867,19 +1855,19 @@ fn test_SRA() {
         }),
     ]);
 
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
 
-    assert_eq!(emulator_state.x[3] as i32, -4); // x3 = -4 (-16 >> 2, arithmetic)
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+
+    assert_eq!(state.x[3] as i32, -4); // x3 = -4 (-16 >> 2, arithmetic)
 }
 
 #[test]
 fn test_OR() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         // ADDI x1, x0, 0b1100 -> Set x1 := 12
         ISA::ADDI.build(Operands {
             rd: 1,
@@ -1903,19 +1891,19 @@ fn test_OR() {
         }),
     ]);
 
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
 
-    assert_eq!(emulator_state.x[3], 0b1110); // x3 = 14 (0b1100 | 0b1010)
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+
+    assert_eq!(state.x[3], 0b1110); // x3 = 14 (0b1100 | 0b1010)
 }
 
 #[test]
 fn test_AND() {
-    let mut emulator_state = EmulatorState::<CVE2Pipeline>::default();
-
-    let mut program = populate(&[
+    let program = populate(&[
         // ADDI x1, x0, 0b1100 -> Set x1 := 12
         ISA::ADDI.build(Operands {
             rd: 1,
@@ -1939,10 +1927,12 @@ fn test_AND() {
         }),
     ]);
 
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
-    emulator_state = emulator_state.clock(&mut program);
+    let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
 
-    assert_eq!(emulator_state.x[3], 0b1000); // x3 = 8 (0b1100 & 0b1010)
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+
+    assert_eq!(state.x[3], 0b1000); // x3 = 8 (0b1100 & 0b1010)
 }

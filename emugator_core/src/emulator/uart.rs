@@ -1,4 +1,6 @@
-use std::{collections::BTreeMap, fmt::Display};
+use std::fmt::Display;
+
+use super::data_memory::DataMemory;
 
 // UART Module for EmuGator
 
@@ -57,11 +59,11 @@ pub enum LineStatusRegisterBitMask {
     Error = 1 << 7, // Probably not used
 }
 
-pub fn trigger_uart(uart_module: &Uart, data_memory: &mut BTreeMap<u32, u8>) -> Uart {
+pub fn trigger_uart(uart_module: &Uart, data_memory: &mut DataMemory) -> Uart {
     let mut next_uart = uart_module.clone();
 
-    let the_receive_data = *data_memory.get(&next_uart.rx_buffer_address).unwrap();
-    let the_transmit_data = *data_memory.get(&next_uart.tx_buffer_address).unwrap();
+    let the_receive_data = data_memory.get(next_uart.rx_buffer_address);
+    let the_transmit_data = data_memory.get(next_uart.tx_buffer_address);
 
     if next_uart.uart_cycle_count > 0 {
         next_uart.uart_cycle_count -= 1;
@@ -69,7 +71,7 @@ pub fn trigger_uart(uart_module: &Uart, data_memory: &mut BTreeMap<u32, u8>) -> 
     }
 
     // Clear the busy bits and set the corresponding ready bits
-    let old_lsr: u8 = *data_memory.get(&next_uart.lsr_address).unwrap();
+    let old_lsr: u8 = data_memory.get(next_uart.lsr_address);
     let new_lsr = (old_lsr
         & !(LineStatusRegisterBitMask::TransmitBusy as u8
             | LineStatusRegisterBitMask::ReceiveBusy as u8))
@@ -77,14 +79,14 @@ pub fn trigger_uart(uart_module: &Uart, data_memory: &mut BTreeMap<u32, u8>) -> 
             * (LineStatusRegisterBitMask::TransmitReady as u8))
         | (((old_lsr & LineStatusRegisterBitMask::ReceiveBusy as u8) != 0) as u8
             * (LineStatusRegisterBitMask::ReceiveReady as u8));
-    data_memory.insert(next_uart.lsr_address, new_lsr);
+    data_memory.set(next_uart.lsr_address, new_lsr);
 
     if the_transmit_data != 0 {
         // Set Tx buffer to empty
-        data_memory.insert(next_uart.tx_buffer_address, 0);
+        data_memory.set(next_uart.tx_buffer_address, 0);
 
         // Set TransmitBusy bit in LSR
-        data_memory.insert(
+        data_memory.set(
             next_uart.lsr_address,
             LineStatusRegisterBitMask::TransmitBusy as u8,
         );

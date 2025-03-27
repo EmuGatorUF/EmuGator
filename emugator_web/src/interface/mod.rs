@@ -28,7 +28,8 @@ pub fn App() -> Element {
     let source = use_signal(|| include_test_file!("beta-demo.s").to_string());
     let assembled_program: Signal<Option<AssembledProgram>> = use_signal(|| None);
     let assembler_errors: Signal<Vec<AssemblerError>> = use_signal(Vec::new);
-    let emulator_state: Signal<AnyEmulatorState> = use_signal(AnyEmulatorState::default);
+    let emulator_state: Signal<AnyEmulatorState> =
+        use_signal(|| AnyEmulatorState::new_cve2(&AssembledProgram::empty()));
     let breakpoints: Signal<BTreeSet<usize>> = use_signal(BTreeSet::new);
 
     let minimize_console: Signal<bool> = use_signal(|| false);

@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use crate::{
     assembler::AssembledProgram,
     bitmask, bits,
-    emulator::{Pipeline, RegisterFile},
+    emulator::{Pipeline, RegisterFile, data_memory::DataMemory},
     isa::Instruction,
 };
 
@@ -25,14 +25,19 @@ pub struct CVE2Pipeline {
 }
 
 impl Pipeline for CVE2Pipeline {
-    fn clock(&mut self, program: &mut AssembledProgram, registers: &mut RegisterFile) {
+    fn clock(
+        &mut self,
+        program: &AssembledProgram,
+        registers: &mut RegisterFile,
+        data_memory: &mut DataMemory,
+    ) {
         // Set control signals
         let instr = Instruction::from_raw(self.ID_inst);
         self.control = get_control_signals(instr, self.instr_cycle).unwrap_or_default();
 
         // Run data memory
         // (Do this with last cycle's LSU signals to represent it taking a clock cycle to access)
-        self.run_data_memory(&mut program.data_memory);
+        self.run_data_memory(data_memory);
 
         // Run the instruction fetch stage
         self.run_instruction_fetch(program);
@@ -72,23 +77,17 @@ impl Pipeline for CVE2Pipeline {
         self.control.debug_req
     }
 
-    fn current_pc(&self) -> u32 {
-        self.IF_pc
+    fn if_pc(&mut self) -> &mut u32 {
+        &mut self.IF_pc
     }
 }
 
 impl CVE2Pipeline {
-    fn run_instruction_fetch(&mut self, program: &mut AssembledProgram) {
+    fn run_instruction_fetch(&mut self, program: &AssembledProgram) {
         // Load the fetched instruction into the instr_rdata lines
         if self.control.instr_req {
             // Read the next instruction into the instruction fetch register
-            match rw_memory(
-                &mut program.instruction_memory,
-                self.IF_pc,
-                [true; 4],
-                false,
-                0,
-            ) {
+            match r_memory(&program.instruction_memory, self.IF_pc) {
                 Ok(instr_data) => {
                     self.IF_inst = instr_data;
                     self.datapath.instr_gnt_i = true;
@@ -200,7 +199,7 @@ impl CVE2Pipeline {
         };
     }
 
-    fn run_data_memory(&mut self, data_memory: &mut BTreeMap<u32, u8>) {
+    fn run_data_memory(&mut self, data_memory: &mut DataMemory) {
         // Perform any requested memory read/write
         if self.datapath.data_req_o {
             match rw_memory(
@@ -278,8 +277,23 @@ impl CVE2Pipeline {
     }
 }
 
+fn r_memory(memory: &BTreeMap<u32, u8>, address: u32) -> Result<u32, ()> {
+    let mut rdata_bytes: [u8; 4] = [0; 4];
+    let success = (0usize..4usize).all(|i| {
+        let addr = address + i as u32;
+        rdata_bytes[i] = memory.get(&addr).copied().unwrap_or_default();
+        true
+    });
+
+    if success {
+        Ok(u32::from_le_bytes(rdata_bytes))
+    } else {
+        Err(())
+    }
+}
+
 fn rw_memory(
-    memory: &mut BTreeMap<u32, u8>,
+    memory: &mut DataMemory,
     address: u32,
     byte_enable: [bool; 4],
     wenable: bool,
@@ -290,10 +304,10 @@ fn rw_memory(
     let success = (0usize..4usize).all(|i| {
         if byte_enable[i] {
             let addr = address + i as u32;
-            rdata_bytes[i] = if wenable {
-                memory.insert(addr, wdata_bytes[i]).unwrap_or_default()
+            if wenable {
+                memory.set(addr, wdata_bytes[i])
             } else {
-                memory.get(&addr).copied().unwrap_or_default()
+                rdata_bytes[i] = memory.get(addr)
             };
             true
         } else {

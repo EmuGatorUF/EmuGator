@@ -13,8 +13,8 @@ pub enum MemoryViewType {
 #[component]
 #[allow(non_snake_case)]
 pub fn MemoryView(
-    assembled_program: Signal<Option<AssembledProgram>>,
-    emulator_state: Signal<AnyEmulatorState>,
+    assembled_program: ReadOnlySignal<Option<AssembledProgram>>,
+    emulator_state: ReadOnlySignal<AnyEmulatorState>,
 ) -> Element {
     let mut view_type = use_signal(|| MemoryViewType::Instruction);
 
@@ -43,7 +43,7 @@ pub fn MemoryView(
                         InstructionView { assembled_program, emulator_state }
                     },
                     MemoryViewType::Data => rsx! {
-                        DataView { assembled_program }
+                        DataView { assembled_program, emulator_state }
                     },
                 }
             }

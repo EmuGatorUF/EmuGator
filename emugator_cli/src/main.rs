@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, default};
+use std::collections::BTreeSet;
 
 use clap::Parser;
 use emugator_core::{
@@ -53,9 +53,7 @@ fn main() {
             }
         };
 
-        let starting_state = EmulatorState::<CVE2Pipeline>::default();
-        program.init_uart_data_memory(&starting_state.uart);
-
+        let starting_state = EmulatorState::<CVE2Pipeline>::new(&program);
         let ending_state =
             starting_state.clock_until_break(&mut program, &BTreeSet::new(), args.timeout);
 

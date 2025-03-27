@@ -1,12 +1,17 @@
 use crate::assembler::AssembledProgram;
 
-use super::{Pipeline, register_file::RegisterFile};
+use super::{Pipeline, data_memory::DataMemory, register_file::RegisterFile};
 
 #[derive(Clone, Default, Debug)]
 pub struct FiveStagePipeline {}
 
 impl Pipeline for FiveStagePipeline {
-    fn clock(&mut self, _program: &mut AssembledProgram, _registers: &mut RegisterFile) {
+    fn clock(
+        &mut self,
+        _program: &AssembledProgram,
+        _registers: &mut RegisterFile,
+        _data_memory: &mut DataMemory,
+    ) {
         todo!()
     }
 
@@ -14,7 +19,7 @@ impl Pipeline for FiveStagePipeline {
         todo!()
     }
 
-    fn current_pc(&self) -> u32 {
+    fn if_pc(&mut self) -> &mut u32 {
         todo!()
     }
 }
