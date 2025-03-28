@@ -156,6 +156,26 @@ pub fn FiveStageVisualization(
                 "stroke-width": "2",
                 fill: element_fill!(PCMux),
             }
+            text {
+                x: "60",
+                y: "43",
+                "font-family": "Arial",
+                "font-size": "12",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(PCMux),
+                "JMP"
+            }
+            text {
+                x: "57",
+                y: "77",
+                "font-family": "Arial",
+                "font-size": "12",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(PCMux),
+                "PC+4"
+            }
             line {
                 id: "next_pc_line1",
                 x1: "20",
@@ -198,6 +218,16 @@ pub fn FiveStageVisualization(
                 stroke: element_stroke!(PC),
                 "stroke-width": "2",
                 fill: element_fill!(PC),
+            }
+            text {
+                x: "58",
+                y: "245",
+                "font-family": "Arial",
+                "font-size": "24",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(PC),
+                "PC"
             }
             path {
                 id: "if_pc_arrow1",
@@ -253,6 +283,26 @@ pub fn FiveStageVisualization(
                 d: "M402.707 188.707C403.098 188.317 403.098 187.683 402.707 187.293L396.343 180.929C395.953 180.538 395.319 180.538 394.929 180.929C394.538 181.319 394.538 181.953 394.929 182.343L400.586 188L394.929 193.657C394.538 194.047 394.538 194.681 394.929 195.071C395.319 195.462 395.953 195.462 396.343 195.071L402.707 188.707ZM338 189H402V187H338V189Z",
                 fill: element_stroke!(InstructionMemory),
             }
+            text {
+                x: "258",
+                y: "230",
+                "font-family": "Arial",
+                "font-size": "20",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(InstructionMemory),
+                "INSTRUCTION"
+            }
+            text {
+                x: "258",
+                y: "260",
+                "font-family": "Arial",
+                "font-size": "20",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(InstructionMemory),
+                "MEMORY"
+            }
         }
         g {
             id: "plus4_group",
@@ -278,6 +328,16 @@ pub fn FiveStageVisualization(
                 d: "M78.2929 73.2929C77.9024 73.6834 77.9024 74.3166 78.2929 74.7071L84.6569 81.0711C85.0474 81.4616 85.6805 81.4616 86.0711 81.0711C86.4616 80.6805 86.4616 80.0474 86.0711 79.6569L80.4142 74L86.0711 68.3431C86.4616 67.9526 86.4616 67.3195 86.0711 66.9289C85.6805 66.5384 85.0474 66.5384 84.6569 66.9289L78.2929 73.2929ZM117 73H79V75H117V73Z",
                 fill: element_stroke!(PCPlus4),
             }
+            text {
+                x: "137",
+                y: "80",
+                "font-family": "Arial",
+                "font-size": "16",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(PCPlus4),
+                "+4"
+            }
         }
         g {
             id: "ifid_buffer_group",
@@ -297,6 +357,26 @@ pub fn FiveStageVisualization(
                 stroke: element_stroke!(IFIDBuffer),
                 "stroke-width": "2",
                 fill: element_fill!(IFIDBuffer),
+            }
+            text {
+                x: "443",
+                y: "530",
+                "font-family": "Arial",
+                "font-size": "22",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(IFIDBuffer),
+                "IF"
+            }
+            text {
+                x: "443",
+                y: "550",
+                "font-family": "Arial",
+                "font-size": "22",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(IFIDBuffer),
+                "ID"
             }
         }
         g {
@@ -318,6 +398,26 @@ pub fn FiveStageVisualization(
                 "stroke-width": "2",
                 fill: element_fill!(IDEXBuffer),
             }
+            text {
+                x: "799",
+                y: "530",
+                "font-family": "Arial",
+                "font-size": "22",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(IDEXBuffer),
+                "ID"
+            }
+            text {
+                x: "799",
+                y: "550",
+                "font-family": "Arial",
+                "font-size": "22",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(IDEXBuffer),
+                "EX"
+            }
         }
         g {
             id: "exmem_buffer_group",
@@ -338,6 +438,26 @@ pub fn FiveStageVisualization(
                 "stroke-width": "2",
                 fill: element_fill!(EXMEMBuffer),
             }
+            text {
+                x: "1156",
+                y: "530",
+                "font-family": "Arial",
+                "font-size": "22",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(EXMEMBuffer),
+                "EX"
+            }
+            text {
+                x: "1156",
+                y: "550",
+                "font-family": "Arial",
+                "font-size": "22",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(EXMEMBuffer),
+                "MEM"
+            }
         }
         g {
             id: "memwb_buffer_group",
@@ -357,6 +477,26 @@ pub fn FiveStageVisualization(
                 stroke: element_stroke!(MEMWBBuffer),
                 "stroke-width": "2",
                 fill: element_fill!(MEMWBBuffer),
+            }
+            text {
+                x: "1513",
+                y: "530",
+                "font-family": "Arial",
+                "font-size": "22",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(MEMWBBuffer),
+                "MEM"
+            }
+            text {
+                x: "1513",
+                y: "550",
+                "font-family": "Arial",
+                "font-size": "22",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(MEMWBBuffer),
+                "WB"
             }
         }
         g {
@@ -383,6 +523,16 @@ pub fn FiveStageVisualization(
                 d: "M540.707 188.707C541.098 188.317 541.098 187.683 540.707 187.293L534.343 180.929C533.953 180.538 533.319 180.538 532.929 180.929C532.538 181.319 532.538 181.953 532.929 182.343L538.586 188L532.929 193.657C532.538 194.047 532.538 194.681 532.929 195.071C533.319 195.462 533.953 195.462 534.343 195.071L540.707 188.707ZM483 189H540V187H483V189Z",
                 fill: element_stroke!(IFIDInstruction),
             }
+            text {
+                x: "443",
+                y: "194",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(IFIDInstruction),
+                "INST"
+            }
         }
         g {
             id: "ifid_pc_group",
@@ -408,6 +558,16 @@ pub fn FiveStageVisualization(
                 d: "M758.707 109.707C759.098 109.317 759.098 108.683 758.707 108.293L752.343 101.929C751.953 101.538 751.319 101.538 750.929 101.929C750.538 102.319 750.538 102.953 750.929 103.343L756.586 109L750.929 114.657C750.538 115.047 750.538 115.681 750.929 116.071C751.319 116.462 751.953 116.462 752.343 116.071L758.707 109.707ZM483 110H758V108H483V110Z",
                 fill: element_stroke!(IFIDPC),
             }
+            text {
+                x: "443",
+                y: "114",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(IFIDPC),
+                "IDPC"
+            }
         }
         g {
             id: "decoder_group",
@@ -427,6 +587,16 @@ pub fn FiveStageVisualization(
                 stroke: element_stroke!(Decoder),
                 "stroke-width": "2",
                 fill: element_fill!(Decoder),
+            }
+            text {
+                x: "621",
+                y: "193",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(Decoder),
+                "DECODER"
             }
         }
         g {
@@ -541,6 +711,56 @@ pub fn FiveStageVisualization(
                 "stroke-width": "2",
                 fill: element_fill!(RegisterFile),
             }
+            text {
+                x: "621",
+                y: "370",
+                "font-family": "Arial",
+                "font-size": "20",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(RegisterFile),
+                "REGISTER"
+            }
+            text {
+                x: "621",
+                y: "400",
+                "font-family": "Arial",
+                "font-size": "20",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(RegisterFile),
+                "FILE"
+            }
+        }
+        g {
+            id: "lsu_group",
+            style: "pointer-events: all;",
+            onmouseenter: move |_| {
+                hovered_element.set(Some(FiveStageElement::LSU));
+            },
+            onmouseleave: move |_| {
+                hovered_element.set(None);
+            },
+            rect {
+                id: "lsu_rect",
+                x: "1215",
+                y: "236",
+                width: "238",
+                height: "78",
+                stroke: element_stroke!(LSU),
+                "stroke-width": "2",
+                fill: element_fill!(LSU),
+            }
+            text {
+                x: "1334",
+                y: "285",
+                "font-family": "Arial",
+                "font-size": "20",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(LSU),
+                "LSU"
+            }
         }
         g {
             id: "rs1_value_group",
@@ -556,6 +776,16 @@ pub fn FiveStageVisualization(
                 d: "M758.707 325.707C759.098 325.317 759.098 324.683 758.707 324.293L752.343 317.929C751.953 317.538 751.319 317.538 750.929 317.929C750.538 318.319 750.538 318.953 750.929 319.343L756.586 325L750.929 330.657C750.538 331.047 750.538 331.681 750.929 332.071C751.319 332.462 751.953 332.462 752.343 332.071L758.707 325.707ZM701 326H758V324H701V326Z",
                 fill: element_stroke!(RegisterFileRS1Value),
             }
+            text {
+                x: "682",
+                y: "330",
+                "font-family": "Arial",
+                "font-size": "14",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(RegisterFileRS1Value),
+                "RS1"
+            }
         }
         g {
             id: "rs2_value_group",
@@ -570,6 +800,16 @@ pub fn FiveStageVisualization(
                 id: "rs2_value_arrow",
                 d: "M758.707 447.707C759.098 447.317 759.098 446.683 758.707 446.293L752.343 439.929C751.953 439.538 751.319 439.538 750.929 439.929C750.538 440.319 750.538 440.953 750.929 441.343L756.586 447L750.929 452.657C750.538 453.047 750.538 453.681 750.929 454.071C751.319 454.462 751.953 454.462 752.343 454.071L758.707 447.707ZM701 448H758V446H701V448Z",
                 fill: element_stroke!(RegisterFileRS2Value),
+            }
+            text {
+                x: "682",
+                y: "451",
+                "font-family": "Arial",
+                "font-size": "14",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(RegisterFileRS2Value),
+                "RS2"
             }
         }
         g {
@@ -617,6 +857,51 @@ pub fn FiveStageVisualization(
                 r: "3",
                 fill: element_stroke!(IDEXPC),
             }
+            text {
+                x: "799",
+                y: "115",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(IDEXPC),
+                "EXPC"
+            }
+        }
+        g {
+            id: "memwb_lsu_group",
+            style: "pointer-events: all;",
+            onmouseenter: move |_| {
+                hovered_element.set(Some(FiveStageElement::MEMWBLsu));
+            },
+            onmouseleave: move |_| {
+                hovered_element.set(None);
+            },
+            rect {
+                id: "memwb_lsu_rect",
+                x: "1474",
+                y: "393",
+                width: "78",
+                height: "38",
+                stroke: element_stroke!(MEMWBLsu),
+                "stroke-width": "2",
+                fill: element_fill!(MEMWBLsu),
+            }
+            path {
+                id: "memwb_lsu_arrow",
+                d: "M1578.71 412.707C1579.1 412.317 1579.1 411.683 1578.71 411.293L1572.34 404.929C1571.95 404.538 1571.32 404.538 1570.93 404.929C1570.54 405.319 1570.54 405.953 1570.93 406.343L1576.59 412L1570.93 417.657C1570.54 418.047 1570.54 418.681 1570.93 419.071C1571.32 419.462 1571.95 419.462 1572.34 419.071L1578.71 412.707ZM1553 413H1578V411H1553V413Z",
+                fill: element_stroke!(MEMWBLsu),
+            }
+            text {
+                x: "1513",
+                y: "417",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(MEMWBLsu),
+                "LSU"
+            }
         }
         g {
             id: "idex_branch_group",
@@ -651,6 +936,16 @@ pub fn FiveStageVisualization(
                 stroke: element_stroke!(IDEXBranch),
                 "stroke-width": "2",
             }
+            text {
+                x: "799",
+                y: "193",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(IDEXBranch),
+                "BR"
+            }
         }
         g {
             id: "idex_rs1_group",
@@ -675,6 +970,16 @@ pub fn FiveStageVisualization(
                 id: "idex_rs1_arrow",
                 d: "M886.707 325.707C887.098 325.317 887.098 324.683 886.707 324.293L880.343 317.929C879.953 317.538 879.319 317.538 878.929 317.929C878.538 318.319 878.538 318.953 878.929 319.343L884.586 325L878.929 330.657C878.538 331.047 878.538 331.681 878.929 332.071C879.319 332.462 879.953 332.462 880.343 332.071L886.707 325.707ZM839 326H886V324H839V326Z",
                 fill: element_stroke!(IDEXRS1),
+            }
+            text {
+                x: "799",
+                y: "329",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(IDEXRS1),
+                "RS1"
             }
         }
         g {
@@ -740,6 +1045,16 @@ pub fn FiveStageVisualization(
                 r: "3",
                 fill: element_stroke!(IDEXRS2),
             }
+            text {
+                x: "799",
+                y: "454",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(IDEXRS2),
+                "RS2"
+            }
         }
         g {
             id: "idex_imm_group",
@@ -764,6 +1079,16 @@ pub fn FiveStageVisualization(
                 id: "idex_imm_arrow",
                 d: "M886.707 395.707C887.098 395.317 887.098 394.683 886.707 394.293L880.343 387.929C879.953 387.538 879.319 387.538 878.929 387.929C878.538 388.319 878.538 388.953 878.929 389.343L884.586 395L878.929 400.657C878.538 401.047 878.538 401.681 878.929 402.071C879.319 402.462 879.953 402.462 880.343 402.071L886.707 395.707ZM839 396H886V394H839V396Z",
                 fill: element_stroke!(IDEXImm),
+            }
+            text {
+                x: "799",
+                y: "402",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(IDEXImm),
+                "IMM"
             }
         }
         g {
@@ -790,6 +1115,16 @@ pub fn FiveStageVisualization(
                 d: "M78.2929 38.293C77.9024 38.6835 77.9024 39.3167 78.2929 39.7072L84.6569 46.0711C85.0474 46.4617 85.6805 46.4617 86.0711 46.0711C86.4616 45.6806 86.4616 45.0474 86.0711 44.6569L80.4142 39.0001L86.0711 33.3432C86.4616 32.9527 86.4616 32.3195 86.0711 31.929C85.6805 31.5385 85.0474 31.5385 84.6569 31.929L78.2929 38.293ZM877 38L79 38.0001L79 40.0001L877 40L877 38Z",
                 fill: element_stroke!(BranchUnit),
             }
+            text {
+                x: "960",
+                y: "45",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(BranchUnit),
+                "BRANCH UNIT"
+            }
         }
         g {
             id: "opa_mux_group",
@@ -812,6 +1147,26 @@ pub fn FiveStageVisualization(
                 d: "M976.707 297.707C977.098 297.317 977.098 296.683 976.707 296.293L970.343 289.929C969.953 289.538 969.319 289.538 968.929 289.929C968.538 290.319 968.538 290.953 968.929 291.343L974.586 297L968.929 302.657C968.538 303.047 968.538 303.681 968.929 304.071C969.319 304.462 969.953 304.462 970.343 304.071L976.707 297.707ZM947 298H976V296H947V298Z",
                 fill: element_stroke!(ALUMuxA),
             }
+            text {
+                x: "902",
+                y: "273",
+                "font-family": "Arial",
+                "font-size": "14",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(ALUMuxA),
+                "PC"
+            }
+            text {
+                x: "905",
+                y: "330",
+                "font-family": "Arial",
+                "font-size": "14",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(ALUMuxA),
+                "RS1"
+            }
         }
         g {
             id: "opb_mux_group",
@@ -833,6 +1188,36 @@ pub fn FiveStageVisualization(
                 id: "opb_arrow",
                 d: "M976.707 419.707C977.098 419.317 977.098 418.683 976.707 418.293L970.343 411.929C969.953 411.538 969.319 411.538 968.929 411.929C968.538 412.319 968.538 412.953 968.929 413.343L974.586 419L968.929 424.657C968.538 425.047 968.538 425.681 968.929 426.071C969.319 426.462 969.953 426.462 970.343 426.071L976.707 419.707ZM947 420H976V418H947V420Z",
                 fill: element_stroke!(ALUMuxB),
+            }
+            text {
+                x: "905",
+                y: "400",
+                "font-family": "Arial",
+                "font-size": "14",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(ALUMuxB),
+                "IMM"
+            }
+            text {
+                x: "900",
+                y: "426",
+                "font-family": "Arial",
+                "font-size": "14",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(ALUMuxB),
+                "#4"
+            }
+            text {
+                x: "905",
+                y: "452",
+                "font-family": "Arial",
+                "font-size": "14",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(ALUMuxB),
+                "RS2"
             }
         }
         g {
@@ -880,6 +1265,36 @@ pub fn FiveStageVisualization(
                 stroke: element_stroke!(ALU),
                 "stroke-width": "2",
             }
+            text {
+                x: "1022",
+                y: "366",
+                "font-family": "Arial",
+                "font-size": "24",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(ALU),
+                "ALU"
+            }
+            text {
+                x: "983",
+                y: "302",
+                "font-family": "Arial",
+                "font-size": "14",
+                "font-weight": "bold",
+                "text-anchor": "start",
+                fill: element_stroke!(ALU),
+                "OPA"
+            }
+            text {
+                x: "983",
+                y: "424",
+                "font-family": "Arial",
+                "font-size": "14",
+                "font-weight": "bold",
+                "text-anchor": "start",
+                fill: element_stroke!(ALU),
+                "OPB"
+            }
         }
         g {
             id: "exmem_pc_group",
@@ -904,6 +1319,70 @@ pub fn FiveStageVisualization(
                 id: "exmem_pc_arrow",
                 d: "M1472.71 109.707C1473.1 109.317 1473.1 108.683 1472.71 108.293L1466.34 101.929C1465.95 101.538 1465.32 101.538 1464.93 101.929C1464.54 102.319 1464.54 102.953 1464.93 103.343L1470.59 109L1464.93 114.657C1464.54 115.047 1464.54 115.681 1464.93 116.071C1465.32 116.462 1465.95 116.462 1466.34 116.071L1472.71 109.707ZM1196 110H1472V108H1196V110Z",
                 fill: element_stroke!(EXMEMPC),
+            }
+            text {
+                x: "1156",
+                y: "118",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(EXMEMPC),
+                "MEMPC"
+            }
+        }
+        g {
+            id: "exmem_rs2_group",
+            style: "pointer-events: all;",
+            onmouseenter: move |_| {
+                hovered_element.set(Some(FiveStageElement::EXMEMRS2));
+            },
+            onmouseleave: move |_| {
+                hovered_element.set(None);
+            },
+            rect {
+                id: "ex_mem_rs2_rect",
+                x: "1117",
+                y: "428",
+                width: "78",
+                height: "38",
+                stroke: element_stroke!(EXMEMRS2),
+                "stroke-width": "2",
+                fill: element_fill!(EXMEMRS2),
+            }
+            line {
+                id: "exmem_rs2_value_line",
+                x1: "1196",
+                y1: "446",
+                x2: "1337",
+                y2: "446",
+                stroke: element_stroke!(EXMEMRS2),
+                "stroke-width": "2",
+            }
+            path {
+                id: "exmem_rs2_value_arrow",
+                d: "M1336.71 315.293C1336.32 314.902 1335.68 314.902 1335.29 315.293L1328.93 321.657C1328.54 322.047 1328.54 322.681 1328.93 323.071C1329.32 323.462 1329.95 323.462 1330.34 323.071L1336 317.414L1341.66 323.071C1342.05 323.462 1342.68 323.462 1343.07 323.071C1343.46 322.681 1343.46 322.047 1343.07 321.657L1336.71 315.293ZM1337 447L1337 316L1335 316L1335 447L1337 447Z",
+                fill: element_stroke!(EXMEMRS2),
+            }
+            text {
+                x: "1156",
+                y: "453",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(EXMEMRS2),
+                "RS2"
+            }
+            text {
+                x: "1337",
+                y: "309",
+                "font-family": "Arial",
+                "font-size": "11",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(EXMEMRS2),
+                "WR_DATA"
             }
         }
         g {
@@ -942,59 +1421,25 @@ pub fn FiveStageVisualization(
                 r: "3",
                 fill: element_stroke!(EXMEMAlu),
             }
-        }
-        g {
-            id: "exmem_rs2_group",
-            style: "pointer-events: all;",
-            onmouseenter: move |_| {
-                hovered_element.set(Some(FiveStageElement::EXMEMRS2));
-            },
-            onmouseleave: move |_| {
-                hovered_element.set(None);
-            },
-            rect {
-                id: "ex_mem_rs2_rect",
-                x: "1117",
-                y: "428",
-                width: "78",
-                height: "38",
-                stroke: element_stroke!(EXMEMRS2),
-                "stroke-width": "2",
-                fill: element_fill!(EXMEMRS2),
+            text {
+                x: "1156",
+                y: "364",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(EXMEMAlu),
+                "ALU"
             }
-            line {
-                id: "exmem_rs2_value_line",
-                x1: "1196",
-                y1: "446",
-                x2: "1337",
-                y2: "446",
-                stroke: element_stroke!(EXMEMRS2),
-                "stroke-width": "2",
-            }
-            path {
-                id: "exmem_rs2_value_arrow",
-                d: "M1336.71 315.293C1336.32 314.902 1335.68 314.902 1335.29 315.293L1328.93 321.657C1328.54 322.047 1328.54 322.681 1328.93 323.071C1329.32 323.462 1329.95 323.462 1330.34 323.071L1336 317.414L1341.66 323.071C1342.05 323.462 1342.68 323.462 1343.07 323.071C1343.46 322.681 1343.46 322.047 1343.07 321.657L1336.71 315.293ZM1337 447L1337 316L1335 316L1335 447L1337 447Z",
-                fill: element_stroke!(EXMEMRS2),
-            }
-        }
-        g {
-            id: "lsu_group",
-            style: "pointer-events: all;",
-            onmouseenter: move |_| {
-                hovered_element.set(Some(FiveStageElement::LSU));
-            },
-            onmouseleave: move |_| {
-                hovered_element.set(None);
-            },
-            rect {
-                id: "lsu_rect",
-                x: "1215",
-                y: "236",
-                width: "238",
-                height: "78",
-                stroke: element_stroke!(LSU),
-                "stroke-width": "2",
-                fill: element_fill!(LSU),
+            text {
+                x: "1253",
+                y: "309",
+                "font-family": "Arial",
+                "font-size": "11",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(EXMEMAlu),
+                "ADDR"
             }
         }
         g {
@@ -1008,13 +1453,23 @@ pub fn FiveStageVisualization(
             },
             rect {
                 id: "data_memory_rect",
-                x: "1209.59",
+                x: "1209",
                 y: "131",
-                width: "253.692",
+                width: "254",
                 height: "78",
                 stroke: element_stroke!(DataMemory),
                 "stroke-width": "2",
                 fill: element_fill!(DataMemory),
+            }
+            text {
+                x: "1334",
+                y: "180",
+                "font-family": "Arial",
+                "font-size": "20",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(DataMemory),
+                "DATA MEMORY"
             }
         }
         g {
@@ -1030,6 +1485,16 @@ pub fn FiveStageVisualization(
                 id: "addr_arrow",
                 d: "M1229.71 210.293C1229.32 209.902 1228.68 209.902 1228.29 210.293L1221.93 216.657C1221.54 217.047 1221.54 217.681 1221.93 218.071C1222.32 218.462 1222.95 218.462 1223.34 218.071L1229 212.414L1234.66 218.071C1235.05 218.462 1235.68 218.462 1236.07 218.071C1236.46 217.681 1236.46 217.047 1236.07 216.657L1229.71 210.293ZM1230 235V211H1228V235H1230Z",
                 fill: element_stroke!(LSUADDR),
+            }
+            text {
+                x: "1229",
+                y: "204",
+                "font-family": "Arial",
+                "font-size": "11",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(LSUADDR),
+                "ADDR"
             }
         }
         g {
@@ -1051,6 +1516,16 @@ pub fn FiveStageVisualization(
                 d: "M1286.29 234.707C1286.68 235.098 1287.32 235.098 1287.71 234.707L1294.07 228.343C1294.46 227.953 1294.46 227.319 1294.07 226.929C1293.68 226.538 1293.05 226.538 1292.66 226.929L1287 232.586L1281.34 226.929C1280.95 226.538 1280.32 226.538 1279.93 226.929C1279.54 227.319 1279.54 227.953 1279.93 228.343L1286.29 234.707ZM1286 210V234H1288V210H1286Z",
                 fill: element_stroke!(LSUDATA),
             }
+            text {
+                x: "1276",
+                y: "204",
+                "font-family": "Arial",
+                "font-size": "11",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(LSUDATA),
+                "DATA"
+            }
         }
         g {
             id: "wr_group",
@@ -1065,6 +1540,16 @@ pub fn FiveStageVisualization(
                 id: "wr_arrow",
                 d: "M1354.71 210.293C1354.32 209.902 1353.68 209.902 1353.29 210.293L1346.93 216.657C1346.54 217.047 1346.54 217.681 1346.93 218.071C1347.32 218.462 1347.95 218.462 1348.34 218.071L1354 212.414L1359.66 218.071C1360.05 218.462 1360.68 218.462 1361.07 218.071C1361.46 217.681 1361.46 217.047 1361.07 216.657L1354.71 210.293ZM1355 235V211H1353V235H1355Z",
                 fill: element_stroke!(LSUWR),
+            }
+            text {
+                x: "1354",
+                y: "204",
+                "font-family": "Arial",
+                "font-size": "11",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(LSUWR),
+                "WR"
             }
         }
         g {
@@ -1081,6 +1566,16 @@ pub fn FiveStageVisualization(
                 d: "M1438.29 234.707C1438.68 235.098 1439.32 235.098 1439.71 234.707L1446.07 228.343C1446.46 227.953 1446.46 227.319 1446.07 226.929C1445.68 226.538 1445.05 226.538 1444.66 226.929L1439 232.586L1433.34 226.929C1432.95 226.538 1432.32 226.538 1431.93 226.929C1431.54 227.319 1431.54 227.953 1431.93 228.343L1438.29 234.707ZM1438 210V234H1440V210H1438Z",
                 fill: element_stroke!(LSUVALID),
             }
+            text {
+                x: "1439",
+                y: "204",
+                "font-family": "Arial",
+                "font-size": "11",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(LSUVALID),
+                "VALID"
+            }
         }
         g {
             id: "byte_en_group",
@@ -1096,6 +1591,16 @@ pub fn FiveStageVisualization(
                 d: "M1397.71 210.293C1397.32 209.902 1396.68 209.902 1396.29 210.293L1389.93 216.657C1389.54 217.047 1389.54 217.681 1389.93 218.071C1390.32 218.462 1390.95 218.462 1391.34 218.071L1397 212.414L1402.66 218.071C1403.05 218.462 1403.68 218.462 1404.07 218.071C1404.46 217.681 1404.46 217.047 1404.07 216.657L1397.71 210.293ZM1398 235V211H1396V235H1398Z",
                 fill: element_stroke!(LSUBYTE_EN),
             }
+            text {
+                x: "1395",
+                y: "204",
+                "font-family": "Arial",
+                "font-size": "11",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(LSUBYTE_EN),
+                "BYTE_EN"
+            }
         }
         g {
             id: "req_group",
@@ -1110,6 +1615,16 @@ pub fn FiveStageVisualization(
                 id: "req_arrow",
                 d: "M1321.71 210.293C1321.32 209.902 1320.68 209.902 1320.29 210.293L1313.93 216.657C1313.54 217.047 1313.54 217.681 1313.93 218.071C1314.32 218.462 1314.95 218.462 1315.34 218.071L1321 212.414L1326.66 218.071C1327.05 218.462 1327.68 218.462 1328.07 218.071C1328.46 217.681 1328.46 217.047 1328.07 216.657L1321.71 210.293ZM1322 235V211H1320V235H1322Z",
                 fill: element_stroke!(LSUREQ),
+            }
+            text {
+                x: "1321",
+                y: "204",
+                "font-family": "Arial",
+                "font-size": "11",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(LSUREQ),
+                "REQ"
             }
         }
         g {
@@ -1135,6 +1650,16 @@ pub fn FiveStageVisualization(
                 d: "M1472.71 412.707C1473.1 412.317 1473.1 411.683 1472.71 411.293L1466.34 404.929C1465.95 404.538 1465.32 404.538 1464.93 404.929C1464.54 405.319 1464.54 405.953 1464.93 406.343L1470.59 412L1464.93 417.657C1464.54 418.047 1464.54 418.681 1464.93 419.071C1465.32 419.462 1465.95 419.462 1466.34 419.071L1472.71 412.707ZM1416 413H1472V411H1416V413Z",
                 fill: element_stroke!(LSURDOut),
             }
+            text {
+                x: "1417",
+                y: "309",
+                "font-family": "Arial",
+                "font-size": "11",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(LSURDOut),
+                "DATA_OUT"
+            }
         }
         g {
             id: "memwb_pc_group",
@@ -1154,6 +1679,16 @@ pub fn FiveStageVisualization(
                 stroke: element_stroke!(MEMWBPC),
                 "stroke-width": "2",
                 fill: element_fill!(MEMWBPC),
+            }
+            text {
+                x: "1513",
+                y: "118",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(MEMWBPC),
+                "WBPC"
             }
         }
         g {
@@ -1180,30 +1715,15 @@ pub fn FiveStageVisualization(
                 d: "M1578.71 360.707C1579.1 360.317 1579.1 359.683 1578.71 359.293L1572.34 352.929C1571.95 352.538 1571.32 352.538 1570.93 352.929C1570.54 353.319 1570.54 353.953 1570.93 354.343L1576.59 360L1570.93 365.657C1570.54 366.047 1570.54 366.681 1570.93 367.071C1571.32 367.462 1571.95 367.462 1572.34 367.071L1578.71 360.707ZM1553 361H1578V359H1553V361Z",
                 fill: element_stroke!(MEMWBAlu),
             }
-        }
-        g {
-            id: "memwb_lsu_group",
-            style: "pointer-events: all;",
-            onmouseenter: move |_| {
-                hovered_element.set(Some(FiveStageElement::MEMWBLsu));
-            },
-            onmouseleave: move |_| {
-                hovered_element.set(None);
-            },
-            rect {
-                id: "memwb_lsu_rect",
-                x: "1474",
-                y: "393",
-                width: "78",
-                height: "38",
-                stroke: element_stroke!(MEMWBLsu),
-                "stroke-width": "2",
-                fill: element_fill!(MEMWBLsu),
-            }
-            path {
-                id: "memwb_lsu_arrow",
-                d: "M1578.71 412.707C1579.1 412.317 1579.1 411.683 1578.71 411.293L1572.34 404.929C1571.95 404.538 1571.32 404.538 1570.93 404.929C1570.54 405.319 1570.54 405.953 1570.93 406.343L1576.59 412L1570.93 417.657C1570.54 418.047 1570.54 418.681 1570.93 419.071C1571.32 419.462 1571.95 419.462 1572.34 419.071L1578.71 412.707ZM1553 413H1578V411H1553V413Z",
-                fill: element_stroke!(MEMWBLsu),
+            text {
+                x: "1513",
+                y: "366",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(MEMWBAlu),
+                "ALU"
             }
         }
         g {
@@ -1263,6 +1783,26 @@ pub fn FiveStageVisualization(
                 d: "M540.707 447.707C541.098 447.317 541.098 446.683 540.707 446.293L534.343 439.929C533.953 439.538 533.319 439.538 532.929 439.929C532.538 440.319 532.538 440.953 532.929 441.343L538.586 447L532.929 452.657C532.538 453.047 532.538 453.681 532.929 454.071C533.319 454.462 533.953 454.462 534.343 454.071L540.707 447.707ZM510 448H540V446H510V448Z",
                 fill: element_stroke!(WritebackResult),
             }
+            text {
+                x: "1595",
+                y: "365",
+                "font-family": "Arial",
+                "font-size": "12",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(WritebackResult),
+                "ALU"
+            }
+            text {
+                x: "1595",
+                y: "416",
+                "font-family": "Arial",
+                "font-size": "12",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(WritebackResult),
+                "LSU"
+            }
         }
         g {
             id: "controller_group",
@@ -1276,12 +1816,22 @@ pub fn FiveStageVisualization(
             rect {
                 id: "controller_rect",
                 x: "1",
-                y: "599.088",
+                y: "599",
                 width: "1663",
-                height: "83.8247",
+                height: "84",
                 stroke: element_stroke!(ControlUnit),
                 "stroke-width": "2",
                 fill: element_fill!(ControlUnit),
+            }
+            text {
+                x: "832",
+                y: "651",
+                "font-family": "Arial",
+                "font-size": "20",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(ControlUnit),
+                "CONTROLLER"
             }
         }
     }
