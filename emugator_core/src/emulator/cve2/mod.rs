@@ -1,4 +1,4 @@
-pub mod controller;
+mod controller;
 mod datapath;
 mod pipeline;
 

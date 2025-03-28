@@ -4,10 +4,8 @@ use std::{collections::BTreeSet, ops::Deref};
 use super::format_pc;
 use emugator_core::emulator::{
     AnyEmulatorState,
-    cve2::{
-        CVE2Control, CVE2Pipeline,
-        controller::{OpASel, OpBSel},
-    },
+    controller_common::{OpASel, OpBSel},
+    cve2::{CVE2Control, CVE2Pipeline},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

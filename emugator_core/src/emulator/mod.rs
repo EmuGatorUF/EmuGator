@@ -1,3 +1,4 @@
+pub mod controller_common;
 pub mod cve2;
 pub mod data_memory;
 pub mod five_stage;
@@ -7,7 +8,7 @@ pub mod uart;
 #[cfg(test)]
 mod cve2_tests;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::assembler::{AssembledProgram, Section};
 use data_memory::DataMemory;
@@ -157,4 +158,23 @@ pub trait Pipeline: Clone {
     /// Mutable reference to the instruction fetch PC
     /// Allows reading to trigger breakpoints, and writing to set where to start execution
     fn if_pc(&mut self) -> &mut u32;
+}
+
+fn read_instruction(memory: &BTreeMap<u32, u8>, address: u32) -> Option<u32> {
+    let mut rdata_bytes: [u8; 4] = [0; 4];
+    let success = (0usize..4usize).all(|i| {
+        let addr = address + i as u32;
+        if let Some(byte) = memory.get(&addr).copied() {
+            rdata_bytes[i] = byte;
+            true
+        } else {
+            false
+        }
+    });
+
+    if success {
+        Some(u32::from_le_bytes(rdata_bytes))
+    } else {
+        None
+    }
 }

@@ -34,4 +34,23 @@ impl DataMemory {
     pub fn len(&self) -> usize {
         self.mem.len()
     }
+
+    pub fn write_word(&mut self, address: u32, value: u32, byte_enable: [bool; 4]) {
+        let bytes = value.to_le_bytes();
+        for i in 0..4 {
+            if byte_enable[i] {
+                self.set(address + i as u32, bytes[i]);
+            }
+        }
+    }
+
+    pub fn read_word(&self, address: u32, byte_enable: [bool; 4]) -> u32 {
+        let mut bytes = [0; 4];
+        for i in 0..4 {
+            if byte_enable[i] {
+                bytes[i] = self.get(address + i as u32);
+            }
+        }
+        u32::from_le_bytes(bytes)
+    }
 }

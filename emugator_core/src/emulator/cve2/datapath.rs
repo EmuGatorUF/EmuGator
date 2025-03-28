@@ -1,3 +1,5 @@
+use crate::emulator::controller_common::PCSel;
+
 /// Lines in the datapath
 ///
 /// Initially based on the `cve2_top` module.
@@ -65,12 +67,4 @@ pub struct CVE2Datapath {
     pub should_cond_jump: bool, // If the branch should be taken
     pub next_pc_sel: PCSel,     // Mux control for selecting the next program counter.
     pub next_pc: Option<u32>,   // Next program counter value.
-}
-
-#[repr(u32)]
-#[derive(Copy, Clone, Debug, Default)]
-pub enum PCSel {
-    #[default]
-    PC4,
-    ALU,
 }
