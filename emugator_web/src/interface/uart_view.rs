@@ -1,10 +1,10 @@
 use dioxus::prelude::*;
 use dioxus::{prelude::component, signals::Signal};
-use emugator_core::emulator::uart::Uart;
+use emugator_core::emulator::AnyEmulatorState;
 
 #[component]
 #[allow(non_snake_case)]
-pub fn UartView(uart_module: MappedSignal<Uart>, minimize_console: Signal<bool>) -> Element {
+pub fn UartView(emulator_state: Signal<AnyEmulatorState>, minimize_console: Signal<bool>) -> Element {
     rsx! {
         div { class: "flex-col bg-inherit text-gray-200 font-mono border-t-[0.450px] border-gray-600",
             div {
@@ -35,8 +35,21 @@ pub fn UartView(uart_module: MappedSignal<Uart>, minimize_console: Signal<bool>)
                     hr {}
                 }
             }
-            div { class: if *minimize_console.read() { "h-0" } else { "p-3 whitespace-pre" },
-                "{uart_module.read().to_string()}"
+            div { class: if *minimize_console.read() { "h-0" } else { "p-3" },
+                div { class: "relative rounded-sm hover:outline",
+                    div { class: "absolute inset-0 bg-inherit p-1 w-full leading-none break-words min-h-[3rem]",
+                        "{emulator_state.read().uart().get_characters_read_in()}"
+                    }
+                    textarea { class: "relative leading-none w-full p-1 min-h-[3rem] resize-y z-10 focus:outline-none",
+                        placeholder: "> Type here",
+                        oninput: move |event| {
+                            emulator_state.write().uart_mut().set_input_string(event.value().as_str());
+                        }
+                    }
+                },
+                div { class: "whitespace-pre",
+                    "{emulator_state.read().uart()}"
+                }
             }
         }
     }

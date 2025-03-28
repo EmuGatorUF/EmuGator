@@ -65,6 +65,13 @@ impl AnyEmulatorState {
         }
     }
 
+    pub fn uart_mut(&mut self) -> &mut Uart {
+        match self {
+            AnyEmulatorState::CVE2(state) => &mut state.uart,
+            AnyEmulatorState::FiveStage(state) => &mut state.uart,
+        }
+    }
+
     pub fn data_memory(&self) -> &DataMemory {
         match self {
             AnyEmulatorState::CVE2(state) => &state.data_memory,

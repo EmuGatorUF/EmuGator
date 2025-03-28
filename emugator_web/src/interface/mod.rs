@@ -98,7 +98,7 @@ pub fn App() -> Element {
                         class: "transition-all duration-300 ease-in-out ".to_owned()
                             + { if *minimize_console.read() { "h-min" } else { "h-4/10" } },
                         UartView {
-                            uart_module: emulator_state.map(|s| s.uart()),
+                            emulator_state,
                             minimize_console,
                         }
                     }
