@@ -78,44 +78,6 @@ pub fn App() -> Element {
         document::Stylesheet { href: asset!("tailwind.css") }
         style { "html, body {{ margin: 0; padding: 0; }} #main {{ margin: 0; }}" }
 
-<<<<<<< HEAD
-        div { class: "flex h-screen w-full",
-            div { class: "w-1/2 pt-4 flex flex-col h-full bg-[#1E1E1E] overflow-hidden",
-                RunButtons {
-                    source,
-                    assembled_program,
-                    assembler_errors,
-                    emulator_state,
-                    breakpoints,
-                }
-                if assembled_program.read().is_some() {
-                    div { class: "flex-1 relative overflow-hidden",
-                        CodeEditor {
-                            source,
-                            line_highlights,
-                            breakpoints,
-                            assembler_errors,
-                        }
-                    }
-                    div {
-                        class: "transition-all duration-300 ease-in-out ".to_owned()
-                            + { if *minimize_console.read() { "h-min" } else { "h-4/10" } },
-                        UartView {
-                            emulator_state,
-                            minimize_console,
-                        }
-                    }
-                } else {
-                    div { class: "flex-col h-screen",
-                        CodeEditor {
-                            source,
-                            line_highlights,
-                            breakpoints,
-                            assembler_errors,
-                        }
-                    }
-                }
-=======
         div { class: "flex flex-col h-screen w-full bg-gray-800 m-0 p-0",
             Navbar {
                 source,
@@ -124,7 +86,6 @@ pub fn App() -> Element {
                 emulator_state,
                 breakpoints,
                 show_five_stage,
->>>>>>> 856fcbb9815f4fac73181a643e792698e50a2813
             }
             div { class: "flex flex-1 overflow-hidden",
                 div { class: "w-1/2 flex flex-col h-full bg-[#1E1E1E] overflow-hidden border-r-2 border-gray-900",
@@ -141,7 +102,7 @@ pub fn App() -> Element {
                             class: "transition-all duration-300 ease-in-out bg-[#2D2D2D] border-t-2 border-gray-900 "
                                 .to_owned() + { if *minimize_console.read() { "h-min" } else { "h-4/10" } },
                             UartView {
-                                uart_module: emulator_state.map(|s| s.uart()),
+                                emulator_state,
                                 minimize_console,
                             }
                         }

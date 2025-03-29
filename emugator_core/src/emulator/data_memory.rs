@@ -68,7 +68,7 @@ impl DataMemory {
         let mut bytes = [0; 4];
         for i in 0..4 {
             if byte_enable[i] {
-                bytes[i] = self.get(address + i as u32);
+                bytes[i] = self.preview(address + i as u32);
             }
         }
         u32::from_le_bytes(bytes)
