@@ -2,7 +2,7 @@
 University of Florida Computer Engineering Design Project
 
 ## Completed Work
-The assembler, front-end, and user-interface are now connected. Users can step through programs. Most instructions in the RV-32I instruction set are implemented except ECALL. The assembler assembles the code and detects syntax errors. The UI includes syntax highlighting and allows users to step through clock cycles through calls to the emulator functions. Users can see the current instruction executing, the last instruction fetched, registers, instruction memory, and data memory. The user can also use the uart module to print text to the built-in console.
+The assembler, front-end, and user-interface are now connected. Users can step through programs. Most instructions in the RV-32I instruction set are implemented except ECALL. The assembler assembles the code and detects syntax errors and displays them in the code editor. The UI includes syntax highlighting and allows users to step through clock cycles through calls to the emulator functions. Users can see the current instruction executing, the last instruction fetched, registers, instruction memory, and data memory. The user can also use the uart module to print text to the built-in console.
 
 ## Project Architecture
 
