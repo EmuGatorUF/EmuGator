@@ -15,7 +15,10 @@ fn format_pc(pc: u32) -> String {
 
 #[component]
 #[allow(non_snake_case)]
-pub fn PipelineVisualization(emulator_state: Signal<AnyEmulatorState>) -> Element {
+pub fn PipelineVisualization(
+    emulator_state: Signal<AnyEmulatorState>,
+    show_five_stage: Signal<bool>,
+) -> Element {
     let initial_view = (0.0, 0.0, 1261.0, 660.0);
     let mut view_box = use_signal(|| initial_view);
     let mut is_panning = use_signal(|| false);
@@ -111,15 +114,14 @@ pub fn PipelineVisualization(emulator_state: Signal<AnyEmulatorState>) -> Elemen
                     fill: "white",
                 }
                 {
-                    match *emulator_state.read() {
-                        AnyEmulatorState::CVE2(_) => rsx! {
-                            // FiveStageVisualization { emulator_state, tooltip_text }
-                            // UNCOMMENT THE LINE ABOVE AND COMMENT THE LINE BELOW FOR 5 STAGE VISUALIZATION TESTING
-                            CVE2Visualization { emulator_state, tooltip_text }
-                        },
-                        AnyEmulatorState::FiveStage(_) => rsx! {
+                    if *show_five_stage.read() {
+                        rsx! {
                             FiveStageVisualization { emulator_state, tooltip_text }
-                        },
+                        }
+                    } else {
+                        rsx! {
+                            CVE2Visualization { emulator_state, tooltip_text }
+                        }
                     }
                 }
             }

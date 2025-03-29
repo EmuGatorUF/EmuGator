@@ -29,6 +29,10 @@ impl AnyEmulatorState {
         AnyEmulatorState::CVE2(EmulatorState::new(program))
     }
 
+    pub fn new_five_stage(program: &AssembledProgram) -> Self {
+        AnyEmulatorState::FiveStage(EmulatorState::new(program))
+    }
+
     pub fn clock_until_break(
         &self,
         program: &mut AssembledProgram,
@@ -97,6 +101,15 @@ impl<P: Pipeline + Clone + Default> EmulatorState<P> {
             data_memory,
             uart,
             pipeline,
+        }
+    }
+
+    pub fn into_five_stage(self) -> EmulatorState<FiveStagePipeline> {
+        EmulatorState {
+            x: self.x,
+            data_memory: self.data_memory,
+            uart: self.uart,
+            pipeline: FiveStagePipeline::default(),
         }
     }
 
