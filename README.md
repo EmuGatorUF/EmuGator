@@ -55,8 +55,8 @@ Under construction.
 2. Install the tailwind css cli: https://tailwindcss.com/docs/installation
 3. Install Rust and Cargo: https://doc.rust-lang.org/cargo/getting-started/installation.html 
 4. Install the Dioxus CLI: `cargo install dioxus-cli`
-5. Then run these two commands in parallel in `/emugator-core/`
-  - `cd emugator-core/`
+5. Then run these two commands in parallel in `/emugator_web/`
+  - `cd emugator_web/`
   - Start Tailwind compiler: `npm run tailwind-dev`
   - Start Dioxus developement server: `dx serve`
 6. Open the browser to http://localhost:8080
