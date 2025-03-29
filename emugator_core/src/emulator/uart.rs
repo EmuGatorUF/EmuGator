@@ -111,9 +111,14 @@ pub fn trigger_uart(uart_module: &Uart, data_memory: &mut DataMemory) -> Uart {
 
         // Set UART busy for delay cycles
         next_uart.uart_cycle_count = next_uart.uart_delay;
-    } else if !the_receive_data.is_empty() {
+    } else if !the_receive_data.is_empty() && data_memory.get(next_uart.rx_buffer_address) == 0 {
         // Input buffer is not empty, so we can take a char and place it in data memory
-        let character = the_receive_data.chars().next().unwrap() as u8;
+        let character = if next_uart.characters_read_in.len() < the_receive_data.len() {
+            the_receive_data.as_bytes()[next_uart.characters_read_in.len()] as u8
+        } else {
+            0
+        };
+
         data_memory.set(next_uart.rx_buffer_address, character);
 
         // Set ReceiveBusy bit in LSR

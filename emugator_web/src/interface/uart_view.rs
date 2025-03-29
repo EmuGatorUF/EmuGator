@@ -1,10 +1,15 @@
 use dioxus::prelude::*;
 use dioxus::{prelude::component, signals::Signal};
+use dioxus_logger::tracing::info;
 use emugator_core::emulator::AnyEmulatorState;
 
 #[component]
 #[allow(non_snake_case)]
 pub fn UartView(emulator_state: Signal<AnyEmulatorState>, minimize_console: Signal<bool>) -> Element {
+    let mut input_text = use_signal(|| String::new());
+
+    info!("{:?}", emulator_state.read().uart());
+
     rsx! {
         div { class: "flex-col bg-inherit text-gray-200 font-mono border-t-[0.450px] border-gray-600",
             div {
@@ -43,8 +48,11 @@ pub fn UartView(emulator_state: Signal<AnyEmulatorState>, minimize_console: Sign
                     textarea { class: "relative leading-none w-full p-1 min-h-[3rem] resize-y z-10 focus:outline-none",
                         placeholder: "> Type here",
                         oninput: move |event| {
-                            emulator_state.write().uart_mut().set_input_string(event.value().as_str());
-                        }
+                            let value = event.value().clone();
+                            emulator_state.write().uart_mut().set_input_string(value.as_str());
+                            input_text.set(value + "5");
+                        },
+                        "{input_text}"
                     }
                 },
                 div { class: "whitespace-pre",

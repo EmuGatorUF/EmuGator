@@ -5,6 +5,9 @@ use super::uart::{LineStatusRegisterBitMask, Uart};
 #[derive(Clone, Debug)]
 pub struct DataMemory {
     mem: BTreeMap<u32, u8>,
+    rx_buffer_address: u32,
+    tx_buffer_address: u32,
+    lsr_address: u32
 }
 
 impl DataMemory {
@@ -20,10 +23,27 @@ impl DataMemory {
                 | LineStatusRegisterBitMask::ReceiveReady as u8,
         );
 
-        DataMemory { mem }
+        DataMemory { mem, rx_buffer_address: uart.rx_buffer_address, tx_buffer_address: uart.tx_buffer_address, lsr_address: uart.lsr_address }
     }
 
-    pub fn get(&self, address: u32) -> u8 {
+    pub fn get(&mut self, address: u32) -> u8 {
+        if address == self.rx_buffer_address {
+            // return the data, clear the memory address, and update lsr
+            let data = *self.mem.get(&address).unwrap_or(&0);
+            self.mem.insert(address, 0);
+
+            let mut lsr = *self.mem.get(&self.lsr_address).unwrap_or(&0);
+            lsr ^= LineStatusRegisterBitMask::ReceiveReady as u8;
+            lsr |= LineStatusRegisterBitMask::ReceiveBusy as u8;
+            self.mem.insert(self.lsr_address, lsr);
+
+            return data;
+        }
+
+        *self.mem.get(&address).unwrap_or(&0)
+    }
+
+    pub fn preview(&self, address: u32) -> u8 {
         *self.mem.get(&address).unwrap_or(&0)
     }
 

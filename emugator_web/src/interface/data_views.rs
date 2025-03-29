@@ -39,7 +39,7 @@ pub fn DataView(
                                     {
                                         let mut dw_bytes: [u8; 8] = [0; 8];
                                         for (j, b) in dw_bytes.iter_mut().enumerate() {
-                                            *b = data_memory.get((base_addr + j) as u32);
+                                            *b = data_memory.preview((base_addr + j) as u32);
                                         }
                                         let hex_string1 = format!(
                                             "{:02x} {:02x} {:02x} {:02x}",
