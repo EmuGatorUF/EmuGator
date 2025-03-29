@@ -23,14 +23,14 @@ pub fn MemoryView(
             // View selector buttons
             div { class: "flex gap-4 mb-2 flex-shrink-0",
                 button {
-                    class: "text-lg font-mono font-bold text-gray-900 hover:text-gray-700 transition-colors",
+                    class: "text-lg font-mono font-bold text-gray-200 hover:text-gray-300 transition-colors",
                     style: if *view_type.read() == MemoryViewType::Instruction { "text-decoration: underline" } else { "" },
                     onclick: move |_| view_type.set(MemoryViewType::Instruction),
                     "Instruction Memory"
                 }
-                span { class: "text-lg font-mono font-bold text-gray-900", "/" }
+                span { class: "text-lg font-mono font-bold text-gray-200", "/" }
                 button {
-                    class: "text-lg font-mono font-bold text-gray-900 hover:text-gray-700 transition-colors",
+                    class: "text-lg font-mono font-bold text-gray-200 hover:text-gray-300 transition-colors",
                     style: if *view_type.read() == MemoryViewType::Data { "text-decoration: underline" } else { "" },
                     onclick: move |_| view_type.set(MemoryViewType::Data),
                     "Data Memory"

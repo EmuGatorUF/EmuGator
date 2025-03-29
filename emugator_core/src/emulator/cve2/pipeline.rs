@@ -3,13 +3,18 @@ use std::collections::BTreeMap;
 use crate::{
     assembler::AssembledProgram,
     bitmask, bits,
-    emulator::{Pipeline, RegisterFile, data_memory::DataMemory},
+    emulator::{
+        Pipeline, RegisterFile,
+        controller_common::{DataDestSel, OpASel, OpBSel, PCSel},
+        data_memory::DataMemory,
+        read_instruction,
+    },
     isa::Instruction,
 };
 
 use super::{
-    controller::{ALUOp, CVE2Control, DataDestSel, OpASel, OpBSel, get_control_signals},
-    datapath::{CVE2Datapath, PCSel},
+    controller::{CVE2Control, get_control_signals},
+    datapath::CVE2Datapath,
 };
 
 #[allow(non_snake_case)]
@@ -84,21 +89,18 @@ impl Pipeline for CVE2Pipeline {
 
 impl CVE2Pipeline {
     fn run_instruction_fetch(&mut self, program: &AssembledProgram) {
-        // Load the fetched instruction into the instr_rdata lines
-        if self.control.instr_req {
-            // Read the next instruction into the instruction fetch register
-            match r_memory(&program.instruction_memory, self.IF_pc) {
-                Ok(instr_data) => {
-                    self.IF_inst = instr_data;
-                    self.datapath.instr_gnt_i = true;
-                    self.datapath.instr_rvalid_i = true;
-                    self.datapath.instr_err_i = false;
-                }
-                Err(_) => {
-                    self.datapath.instr_gnt_i = true;
-                    self.datapath.instr_rvalid_i = false;
-                    self.datapath.instr_err_i = true;
-                }
+        // Read the next instruction into the instruction fetch register
+        match read_instruction(&program.instruction_memory, self.IF_pc) {
+            Some(instr_data) => {
+                self.IF_inst = instr_data;
+                self.datapath.instr_gnt_i = true;
+                self.datapath.instr_rvalid_i = true;
+                self.datapath.instr_err_i = false;
+            }
+            None => {
+                self.datapath.instr_gnt_i = true;
+                self.datapath.instr_rvalid_i = false;
+                self.datapath.instr_err_i = true;
             }
         }
     }
@@ -130,9 +132,6 @@ impl CVE2Pipeline {
     }
 
     fn run_alu(&mut self) {
-        let Some(op) = self.control.alu_op else {
-            return;
-        };
         let Some(a) = self.datapath.alu_op_a else {
             return;
         };
@@ -140,23 +139,7 @@ impl CVE2Pipeline {
             return;
         };
 
-        self.datapath.alu_out = Some(match op {
-            ALUOp::ADD => ((a as i32) + (b as i32)) as u32,
-            ALUOp::SUB => ((a as i32) - (b as i32)) as u32,
-            ALUOp::XOR => a ^ b,
-            ALUOp::OR => a | b,
-            ALUOp::AND => a & b,
-            ALUOp::SLL => a << (b & 0x1F),
-            ALUOp::SRL => a >> (b & 0x1F),
-            ALUOp::SRA => ((a as i32) >> (b & 0x1F)) as u32,
-            ALUOp::EQ => (a == b) as u32,
-            ALUOp::NEQ => (a != b) as u32,
-            ALUOp::LT => ((a as i32) < (b as i32)) as u32,
-            ALUOp::GE => ((a as i32) >= (b as i32)) as u32,
-            ALUOp::LTU => (a < b) as u32,
-            ALUOp::GEU => (a >= b) as u32,
-            ALUOp::SELB => b,
-        });
+        self.datapath.alu_out = self.control.alu_op.map(|op| op.apply(a, b));
     }
 
     fn run_lsu(&mut self) {
@@ -202,26 +185,20 @@ impl CVE2Pipeline {
     fn run_data_memory(&mut self, data_memory: &mut DataMemory) {
         // Perform any requested memory read/write
         if self.datapath.data_req_o {
-            match rw_memory(
-                data_memory,
-                self.datapath.data_addr_o,
-                self.datapath.data_be_o,
-                self.datapath.data_we_o,
-                self.datapath.data_wdata_o,
-            ) {
-                Ok(rdata) => {
-                    self.datapath.data_rdata_i = rdata;
-                    self.datapath.data_gnt_i = true;
-                    self.datapath.data_rvalid_i = true;
-                    self.datapath.data_err_i = false;
-                }
-                Err(_) => {
-                    self.datapath.data_rdata_i = 0;
-                    self.datapath.data_gnt_i = true;
-                    self.datapath.data_rvalid_i = false;
-                    self.datapath.data_err_i = true;
-                }
+            if self.datapath.data_we_o {
+                data_memory.write_word(
+                    self.datapath.data_addr_o,
+                    self.datapath.data_wdata_o,
+                    self.datapath.data_be_o,
+                );
+                self.datapath.data_rdata_i = 0;
+            } else {
+                self.datapath.data_rdata_i =
+                    data_memory.read_word(self.datapath.data_addr_o, self.datapath.data_be_o);
             }
+            self.datapath.data_gnt_i = true;
+            self.datapath.data_rvalid_i = true;
+            self.datapath.data_err_i = false;
         } else {
             self.datapath.data_rdata_i = 0;
             self.datapath.data_gnt_i = false;
@@ -247,10 +224,10 @@ impl CVE2Pipeline {
     fn run_pc_mux(&mut self) {
         self.datapath.should_cond_jump = self.control.jump_cond && self.datapath.cmp_result;
         let should_jump = self.control.jump_uncond || self.datapath.should_cond_jump;
-        self.datapath.next_pc_sel = if should_jump { PCSel::ALU } else { PCSel::PC4 };
+        self.datapath.next_pc_sel = if should_jump { PCSel::JMP } else { PCSel::PC4 };
         self.datapath.next_pc = match self.datapath.next_pc_sel {
             PCSel::PC4 => Some(self.ID_pc + 4),
-            PCSel::ALU => self.datapath.alu_out,
+            PCSel::JMP => self.datapath.alu_out,
         }
     }
 
@@ -267,57 +244,12 @@ impl CVE2Pipeline {
 
     fn run_pipeline_buffer_registers(&mut self) {
         // Move the pipeline forward
-        if self.control.id_in_ready {
+        if self.control.if_id_set {
             self.ID_pc = self.IF_pc;
             self.ID_inst = self.IF_inst;
             self.instr_cycle = 0;
         } else {
             self.instr_cycle += 1;
         }
-    }
-}
-
-fn r_memory(memory: &BTreeMap<u32, u8>, address: u32) -> Result<u32, ()> {
-    let mut rdata_bytes: [u8; 4] = [0; 4];
-    let success = (0usize..4usize).all(|i| {
-        let addr = address + i as u32;
-        rdata_bytes[i] = memory.get(&addr).copied().unwrap_or_default();
-        true
-    });
-
-    if success {
-        Ok(u32::from_le_bytes(rdata_bytes))
-    } else {
-        Err(())
-    }
-}
-
-fn rw_memory(
-    memory: &mut DataMemory,
-    address: u32,
-    byte_enable: [bool; 4],
-    wenable: bool,
-    wdata: u32,
-) -> Result<u32, ()> {
-    let mut rdata_bytes: [u8; 4] = [0; 4];
-    let wdata_bytes = wdata.to_le_bytes();
-    let success = (0usize..4usize).all(|i| {
-        if byte_enable[i] {
-            let addr = address + i as u32;
-            if wenable {
-                memory.set(addr, wdata_bytes[i])
-            } else {
-                rdata_bytes[i] = memory.get(addr)
-            };
-            true
-        } else {
-            true
-        }
-    });
-
-    if success {
-        Ok(u32::from_le_bytes(rdata_bytes))
-    } else {
-        Err(())
     }
 }

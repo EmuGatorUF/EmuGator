@@ -1,4 +1,5 @@
 use crate::bits;
+use crate::emulator::controller_common::*;
 use crate::isa::Instruction;
 
 /// Control signals for the CVE2 datapath.
@@ -25,8 +26,7 @@ pub struct CVE2Control {
     pub jump_uncond: bool, // Unconditional jump control.
     pub jump_cond: bool,   // Conditional jump control.
     pub pc_set: bool,      // Program counter write control.
-    pub instr_req: bool,   // Instruction memory request
-    pub id_in_ready: bool, // ID stage registers ready
+    pub if_id_set: bool,   // ID stage registers ready
 
     // Debug Control
     pub debug_req: bool, // Debug request control
@@ -48,8 +48,7 @@ impl Default for CVE2Control {
             jump_uncond: false,
             jump_cond: false,
             pc_set: true,
-            instr_req: true,
-            id_in_ready: true,
+            if_id_set: true,
             debug_req: false,
         }
     }
@@ -103,8 +102,7 @@ impl CVE2Control {
 
             // don't move onto the next instruction
             pc_set: false,
-            instr_req: false,
-            id_in_ready: false,
+            if_id_set: false,
 
             ..Default::default()
         }
@@ -137,8 +135,7 @@ impl CVE2Control {
 
             // don't move onto the next instruction
             pc_set: false,
-            instr_req: false,
-            id_in_ready: false,
+            if_id_set: false,
 
             ..Default::default()
         }
@@ -162,7 +159,7 @@ impl CVE2Control {
             pc_set: true,
 
             // preserve the ID stage registers for link
-            id_in_ready: false,
+            if_id_set: false,
 
             ..Default::default()
         }
@@ -191,8 +188,7 @@ impl CVE2Control {
 
             // don't move onto the next instruction
             pc_set: false,
-            instr_req: false,
-            id_in_ready: false,
+            if_id_set: false,
 
             ..Default::default()
         }
@@ -210,77 +206,9 @@ impl CVE2Control {
             pc_set: true,
 
             // wait until new PC before loading IF into ID
-            id_in_ready: false,
+            if_id_set: false,
 
             ..Default::default()
-        }
-    }
-}
-
-#[repr(u32)]
-#[derive(Copy, Clone, Debug)]
-pub enum ALUOp {
-    ADD,
-    SUB,
-    XOR,
-    OR,
-    AND,
-    SLL,
-    SRL,
-    SRA,
-    EQ,
-    NEQ,
-    LT,
-    GE,
-    LTU,
-    GEU,
-    SELB,
-}
-
-#[repr(u32)]
-#[derive(Copy, Clone, Debug)]
-pub enum OpASel {
-    PC,
-    RF,
-}
-
-#[repr(u32)]
-#[derive(Copy, Clone, Debug)]
-pub enum OpBSel {
-    RF,
-    IMM,
-    Four,
-}
-
-#[repr(u32)]
-#[derive(Copy, Clone, Debug)]
-pub enum DataDestSel {
-    ALU,
-    LSU,
-}
-
-#[repr(u32)]
-#[derive(Copy, Clone, Debug)]
-pub enum LSUDataType {
-    Word,
-    HalfWord,
-    Byte,
-}
-
-impl LSUDataType {
-    pub fn byte_enable(&self) -> [bool; 4] {
-        match self {
-            LSUDataType::Word => [true; 4],
-            LSUDataType::HalfWord => [true, true, false, false],
-            LSUDataType::Byte => [true, false, false, false],
-        }
-    }
-
-    pub fn size_in_bits(&self) -> usize {
-        match self {
-            LSUDataType::Word => 32,
-            LSUDataType::HalfWord => 16,
-            LSUDataType::Byte => 8,
         }
     }
 }
