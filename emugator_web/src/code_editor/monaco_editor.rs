@@ -19,7 +19,7 @@ type MouseEventHandler = DisposableClosure<dyn FnMut(IEditorMouseEvent)>;
 #[derive(Clone, PartialEq, Debug)]
 pub struct LineHighlight {
     pub line: usize,
-    pub css_class: &'static str,
+    pub css_class: String,
 }
 
 /// The monaco editor directly wrapped
@@ -79,7 +79,7 @@ pub fn MonacoEditor(
                 for line_highlight in line_highlights.read().iter() {
                     new_decor.push(&line_decoration(
                         line_highlight.line,
-                        line_highlight.css_class,
+                        &line_highlight.css_class,
                     ));
                 }
 
@@ -138,7 +138,7 @@ fn on_mouse_click(e: IEditorMouseEvent, mut breakpoints: Signal<BTreeSet<usize>>
     }
 }
 
-fn line_decoration(line_number: usize, class: &'static str) -> IModelDeltaDecoration {
+fn line_decoration(line_number: usize, class: &str) -> IModelDeltaDecoration {
     let decoration: IModelDeltaDecoration = new_object().into();
     let range = Range::new(line_number as f64, 0.0, line_number as f64, 1.0);
     decoration.set_range(&IRange::from(range.dyn_into::<JsValue>().unwrap()));

@@ -33,6 +33,13 @@ impl AnyEmulatorState {
         AnyEmulatorState::FiveStage(EmulatorState::new(program))
     }
 
+    pub fn new_same_type(&self, program: &AssembledProgram) -> Self {
+        match self {
+            AnyEmulatorState::CVE2(_) => Self::new_cve2(program),
+            AnyEmulatorState::FiveStage(_) => Self::new_five_stage(program),
+        }
+    }
+
     pub fn clock_until_break(
         &self,
         program: &mut AssembledProgram,
@@ -81,6 +88,13 @@ impl AnyEmulatorState {
         match self {
             AnyEmulatorState::CVE2(state) => &state.data_memory,
             AnyEmulatorState::FiveStage(state) => &state.data_memory,
+        }
+    }
+
+    pub fn all_pcs(&self) -> Vec<PcPos> {
+        match self {
+            AnyEmulatorState::CVE2(state) => state.pipeline.all_pcs(),
+            AnyEmulatorState::FiveStage(state) => state.pipeline.all_pcs(),
         }
     }
 }
@@ -178,6 +192,21 @@ pub trait Pipeline: Clone {
     /// Mutable reference to the instruction fetch PC
     /// Allows reading to trigger breakpoints, and writing to set where to start execution
     fn if_pc(&mut self) -> &mut u32;
+
+    /// Returns all current PCs in the pipeline
+    /// This is used for editor line highlighting
+    fn all_pcs(&self) -> Vec<PcPos>;
+}
+
+pub struct PcPos {
+    pub pc: u32,
+    pub name: &'static str,
+}
+
+impl PcPos {
+    pub fn new(pc: u32, name: &'static str) -> Self {
+        PcPos { pc, name }
+    }
 }
 
 fn read_instruction(memory: &BTreeMap<u32, u8>, address: u32) -> Option<u32> {

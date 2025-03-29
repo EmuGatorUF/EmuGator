@@ -2,6 +2,7 @@ use crate::assembler::Address;
 
 use bimap::BiBTreeMap;
 use std::collections::{BTreeMap, HashMap};
+use std::sync::OnceLock;
 
 #[derive(Debug)]
 pub struct AssembledProgram {
@@ -27,13 +28,14 @@ impl AssembledProgram {
         }
     }
 
-    pub fn empty() -> Self {
-        AssembledProgram {
+    pub fn empty() -> &'static Self {
+        static EMPTY: OnceLock<AssembledProgram> = OnceLock::new();
+        EMPTY.get_or_init(|| AssembledProgram {
             instruction_memory: BTreeMap::new(),
             initial_data_memory: BTreeMap::new(),
             source_map: BiBTreeMap::new(),
             symbol_table: HashMap::new(),
-        }
+        })
     }
 
     #[cfg(test)]

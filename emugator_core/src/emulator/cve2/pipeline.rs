@@ -1,10 +1,10 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, vec};
 
 use crate::{
     assembler::AssembledProgram,
     bitmask, bits,
     emulator::{
-        Pipeline, RegisterFile,
+        PcPos, Pipeline, RegisterFile,
         controller_common::{DataDestSel, OpASel, OpBSel, PCSel},
         data_memory::DataMemory,
         read_instruction,
@@ -84,6 +84,10 @@ impl Pipeline for CVE2Pipeline {
 
     fn if_pc(&mut self) -> &mut u32 {
         &mut self.IF_pc
+    }
+
+    fn all_pcs(&self) -> Vec<PcPos> {
+        vec![PcPos::new(self.IF_pc, "if"), PcPos::new(self.ID_pc, "id")]
     }
 }
 

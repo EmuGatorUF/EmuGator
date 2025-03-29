@@ -1,6 +1,8 @@
+use std::vec;
+
 use crate::assembler::AssembledProgram;
 use crate::emulator::controller_common::{DataDestSel, OpASel, OpBSel, PCSel};
-use crate::emulator::read_instruction;
+use crate::emulator::{PcPos, read_instruction};
 use crate::emulator::{Pipeline, data_memory::DataMemory, register_file::RegisterFile};
 use crate::isa::Instruction;
 use crate::{bitmask, bits};
@@ -47,6 +49,16 @@ impl Pipeline for FiveStagePipeline {
 
     fn if_pc(&mut self) -> &mut u32 {
         &mut self.if_pc
+    }
+
+    fn all_pcs(&self) -> Vec<PcPos> {
+        vec![
+            PcPos::new(self.if_pc, "if"),
+            PcPos::new(self.if_id.id_pc, "id"),
+            PcPos::new(self.id_ex.ex_pc, "ex"),
+            PcPos::new(self.ex_mem.mem_pc, "mem"),
+            PcPos::new(self.mem_wb.wb_pc, "wb"),
+        ]
     }
 }
 

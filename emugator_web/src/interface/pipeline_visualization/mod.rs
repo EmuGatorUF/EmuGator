@@ -3,7 +3,6 @@ use dioxus::prelude::*;
 use dioxus_elements::geometry::WheelDelta;
 use dioxus_elements::input_data::MouseButton;
 use emugator_core::emulator::AnyEmulatorState;
-use emugator_core::emulator::five_stage::FiveStagePipeline;
 use five_stage_visualization::FiveStageVisualization;
 
 mod cve2_visualization;
@@ -15,10 +14,7 @@ fn format_pc(pc: u32) -> String {
 
 #[component]
 #[allow(non_snake_case)]
-pub fn PipelineVisualization(
-    emulator_state: Signal<AnyEmulatorState>,
-    show_five_stage: Signal<bool>,
-) -> Element {
+pub fn PipelineVisualization(emulator_state: Signal<AnyEmulatorState>) -> Element {
     let initial_view = (0.0, 0.0, 1261.0, 660.0);
     let mut view_box = use_signal(|| initial_view);
     let mut is_panning = use_signal(|| false);
@@ -114,14 +110,13 @@ pub fn PipelineVisualization(
                     fill: "white",
                 }
                 {
-                    if *show_five_stage.read() {
-                        rsx! {
-                            FiveStageVisualization { emulator_state, tooltip_text }
-                        }
-                    } else {
-                        rsx! {
+                    match *emulator_state.read() {
+                        AnyEmulatorState::CVE2(_) => rsx! {
                             CVE2Visualization { emulator_state, tooltip_text }
-                        }
+                        },
+                        AnyEmulatorState::FiveStage(_) => rsx! {
+                            FiveStageVisualization { emulator_state, tooltip_text }
+                        },
                     }
                 }
             }

@@ -31,7 +31,6 @@ pub fn App() -> Element {
     let emulator_state: Signal<AnyEmulatorState> =
         use_signal(|| AnyEmulatorState::new_cve2(&AssembledProgram::empty()));
     let breakpoints: Signal<BTreeSet<usize>> = use_signal(BTreeSet::new);
-    let show_five_stage: Signal<bool> = use_signal(|| false);
 
     let minimize_console: Signal<bool> = use_signal(|| false);
 
@@ -54,24 +53,23 @@ pub fn App() -> Element {
                 .and_then(|p| p.source_map.get_by_left(&pc).copied())
         }
 
-        match &*emulator_state.read() {
-            AnyEmulatorState::CVE2(state) => {
-                if let Some(line) = get_pc_line(state.pipeline.ID_pc, &assembled_program) {
-                    line_highlights.write().push(LineHighlight {
-                        line,
-                        css_class: "id-pc-decoration",
-                    });
-                }
-
-                if let Some(line) = get_pc_line(state.pipeline.IF_pc, &assembled_program) {
-                    line_highlights.write().push(LineHighlight {
-                        line,
-                        css_class: "if-pc-decoration",
-                    });
-                }
-            }
-            AnyEmulatorState::FiveStage(_) => todo!(),
-        }
+        line_highlights.set(
+            emulator_state
+                .read()
+                .all_pcs()
+                .iter()
+                .filter_map(|pc_pos| {
+                    if let Some(line) = get_pc_line(pc_pos.pc, &assembled_program) {
+                        Some(LineHighlight {
+                            line,
+                            css_class: format!("{}-pc-decoration", pc_pos.name),
+                        })
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
+        );
     });
 
     rsx! {
@@ -85,7 +83,6 @@ pub fn App() -> Element {
                 assembler_errors,
                 emulator_state,
                 breakpoints,
-                show_five_stage,
             }
             div { class: "flex flex-1 overflow-hidden",
                 div { class: "w-1/2 flex flex-col h-full bg-[#1E1E1E] overflow-hidden border-r-2 border-gray-900",
@@ -101,10 +98,7 @@ pub fn App() -> Element {
                         div {
                             class: "transition-all duration-300 ease-in-out bg-[#2D2D2D] border-t-2 border-gray-900 "
                                 .to_owned() + { if *minimize_console.read() { "h-min" } else { "h-4/10" } },
-                            UartView {
-                                emulator_state,
-                                minimize_console,
-                            }
+                            UartView { emulator_state, minimize_console }
                         }
                     } else {
                         div { class: "flex-col h-full",
@@ -127,7 +121,7 @@ pub fn App() -> Element {
                                 }
                             }
                             div { class: "h-[calc(100%-2rem)] overflow-auto",
-                                PipelineVisualization { emulator_state, show_five_stage }
+                                PipelineVisualization { emulator_state }
                             }
                         }
                     }

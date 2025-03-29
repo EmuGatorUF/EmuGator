@@ -23,9 +23,9 @@ pub fn InstructionView(
     let instruction_memory = &program.instruction_memory;
     let text_start = program.get_section_start(Section::Text) as usize;
     let current_pc = match &*emulator_state {
-        AnyEmulatorState::CVE2(state) => state.pipeline.ID_pc as usize,
-        AnyEmulatorState::FiveStage(_state) => todo!(),
-    };
+        AnyEmulatorState::CVE2(state) => state.pipeline.ID_pc,
+        AnyEmulatorState::FiveStage(state) => state.pipeline.if_id.id_pc,
+    } as usize;
 
     let total_instructions = instruction_memory.len() / 4; // Since each instruction is 4 bytes
 

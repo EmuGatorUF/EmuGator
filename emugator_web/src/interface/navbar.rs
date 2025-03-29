@@ -14,15 +14,16 @@ pub fn Navbar(
     assembler_errors: Signal<Vec<AssemblerError>>,
     emulator_state: Signal<AnyEmulatorState>,
     breakpoints: ReadOnlySignal<BTreeSet<usize>>,
-    show_five_stage: Signal<bool>,
 ) -> Element {
     let is_assembled = assembled_program.read().is_some();
     let error_count = assembler_errors.read().len();
 
+    let is_cve2 = matches!(*emulator_state.read(), AnyEmulatorState::CVE2(_));
+
     rsx! {
         nav { class: "bg-gray-900 text-white w-full py-2 px-4 flex items-center justify-between shadow-md border-b-2 border-gray-950",
             div { class: "flex items-center",
-                span { class: "text-xl font-semibold text-blue-400 mr-4", "Emugator" }
+                span { class: "text-xl font-semibold text-blue-400 mr-4", "EmuGator" }
                 div { class: "flex space-x-2",
                     button {
                         class: "bg-green-600 hover:bg-green-700 text-white font-medium py-1.5 px-3 rounded transition duration-150 ease-in-out flex items-center",
@@ -31,7 +32,8 @@ pub fn Navbar(
                             match assembler::assemble(&source.read()) {
                                 Ok(assembled) => {
                                     info!("Assembly succeeded.");
-                                    emulator_state.set(AnyEmulatorState::new_cve2(&assembled));
+                                    let new_state = emulator_state.read().new_same_type(&assembled);
+                                    emulator_state.set(new_state);
                                     assembled_program.set(Some(assembled));
                                     assembler_errors.set(Vec::new());
                                 }
@@ -57,8 +59,16 @@ pub fn Navbar(
                     button {
                         class: "bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-1.5 px-3 rounded transition duration-150 ease-in-out flex items-center",
                         onclick: move |_| {
-                            let current = *show_five_stage.read();
-                            show_five_stage.set(!current);
+                            let program = assembled_program.read();
+                            let program_or_default = program.as_ref().unwrap_or(AssembledProgram::empty());
+                            emulator_state
+                                .set(
+                                    if is_cve2 {
+                                        AnyEmulatorState::new_five_stage(program_or_default)
+                                    } else {
+                                        AnyEmulatorState::new_cve2(program_or_default)
+                                    },
+                                );
                         },
                         svg {
                             class: "w-4 h-4 mr-1 fill-current",
@@ -70,10 +80,10 @@ pub fn Navbar(
                                 clip_rule: "evenodd",
                             }
                         }
-                        if *show_five_stage.read() {
-                            "Showing Five Stage"
+                        if is_cve2 {
+                            "Two Stage Pipeline (CVE2)"
                         } else {
-                            "Showing CVE2"
+                            "Five Stage Pipeline"
                         }
                     }
                     if is_assembled {
