@@ -51,6 +51,7 @@ Under construction.
 
 ## Development
 
+### Building Web Application Locally
 1. Install npm: https://docs.npmjs.com/downloading-and-installing-node-js-and-npm
 2. Install the tailwind css cli: https://tailwindcss.com/docs/installation
 3. Install Rust and Cargo: https://doc.rust-lang.org/cargo/getting-started/installation.html 
@@ -60,3 +61,9 @@ Under construction.
   - Start Tailwind compiler: `npm run tailwind-dev`
   - Start Dioxus developement server: `dx serve`
 6. Open the browser to http://localhost:8080
+
+### Running Command-line Interface and AutoGrader
+1. Install Rust and Cargo: https://doc.rust-lang.org/cargo/getting-started/installation.html 
+2. cd into `/emugator_cli`
+3. run `cargo run -- [--programs filename] [--tests filename] [--timeout time]`
+  - example: cargo run -- test --programs ../test-files --tests ../test-files/test-dir --timeout 1000

@@ -1,12 +1,42 @@
-use std::collections::BTreeSet;
-
 use clap::{Args, Parser, Subcommand};
+
 use emugator_core::{
     assembler::assemble,
     emulator::{EmulatorState, cve2::CVE2Pipeline},
 };
+use serde::{Deserialize, Serialize};
+use std::{collections::{BTreeSet, HashMap}, default};
 
-/// CLI for the Emugator emulator
+#[derive(Debug, Deserialize, Serialize, Default)]
+struct ExpectedState {
+    // STILL NEED DEFAULTS
+    registers: HashMap<u8, HexValue>,
+    //#[serde(default)]
+    data_memory: HashMap<HexValue, HexValue>,
+}
+
+#[derive(Serialize, Debug, Deserialize, Clone, Copy)]
+#[serde(transparent)]
+struct HexValue {
+    #[serde(with = "hex::serde")]
+    value: [u8; 4],
+}
+
+impl std::cmp::PartialEq for HexValue {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl std::cmp::Eq for HexValue {}
+
+impl std::hash::Hash for HexValue {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.value.hash(state);
+    }
+}
+
+/// Simple program to greet a person
 #[derive(Parser, Debug)]
 #[command(version, about)]
 struct Arguments {
@@ -47,15 +77,16 @@ struct TestArgs {
     timeout: usize,
 }
 
+//TODO: Make it so that memory data is not u32 and is u8
 const EXAMPLE_JSON: &str = r##"
 {
     "registers": {
-        "1": "0x76",
-        "9": "0x42"
+        "1": "00000076",
+        "9": "00000042"
     },
     "data_memory": {
-        "0x64": "0x00",
-        "0x65": "0x01"
+        "00000064": "00000000",
+        "00000065": "00000001"
     }
 }
 "##;
@@ -120,6 +151,53 @@ fn run_tests(args: TestArgs) {
         })
         .collect::<Vec<_>>();
 
+    let test_dirs = std::fs::read_dir(&args.tests)
+        .expect("Failed to read tests dir")
+        .filter_map(|entry| {
+            let entry = entry.expect("Failed to read entry");
+            let path = entry.path();
+            if path.is_dir() {
+                let test_name = path.file_stem()?.to_str()?.to_string();
+                let mut input = None;
+                let mut expected_output = None;
+                let mut expected_state: Option<ExpectedState> = None;
+
+                // read files in test directory
+                for entry in std::fs::read_dir(path.as_path()).expect("Failed to read") {
+                    let entry = entry.expect("Failed to read entry");
+                    if entry.path().is_file() {
+                        let file_path = entry.path();
+                        let name = file_path.file_stem()?.to_str()?.to_string();
+                        println!("Name of file: {}", name);
+
+                        if name.contains("input") {
+                            input = Some(std::fs::read_to_string(file_path).ok()?);
+                        } else if name.contains("output") {
+                            expected_output = Some(std::fs::read_to_string(file_path).ok()?);
+                        } else if name.contains("state") || name.contains("registers") {
+                            let file = std::fs::File::open(file_path)
+                                .expect("Failed to open expected state file.");
+                            expected_state = Some(
+                                serde_json::from_reader(file)
+                                    .expect("Failed to read JSON, improperly formatted."),
+                            );
+                        }
+                    }
+                }
+                Some((test_name, input, expected_output, expected_state))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    // check that output dir exists (or create it) and is valid
+    let output_path = std::path::Path::new(&args.tests).join("test_output");
+    if !std::fs::exists(&output_path).expect("Can't check if output directory exists") {
+        std::fs::create_dir(&output_path).expect("Failed to create test output directory");
+    }
+
+    // Run programs
     for (name, source) in &program_files {
         println!("Running: {}", name);
         // Assemble the program
@@ -131,10 +209,59 @@ fn run_tests(args: TestArgs) {
             }
         };
 
-        let starting_state = EmulatorState::<CVE2Pipeline>::new(&program);
-        let ending_state =
-            starting_state.clock_until_break(&mut program, &BTreeSet::new(), args.timeout);
+        let mut failed_tests: Vec<String> = Vec::new();
+        // run program for each test
+        for (test_name, input, expected_output, expected_state) in &test_dirs {
+            //program.data_memory = original_data_mem.clone();
+            let starting_state = EmulatorState::<CVE2Pipeline>::new(&program);
 
-        // TODO: run tests
+            let mut ending_state =
+                starting_state.clock_until_break(&mut program, &BTreeSet::new(), args.timeout);
+
+            let mut pass: bool = true;
+
+            let mut state_diff: ExpectedState = ExpectedState::default();
+
+            if let Some(expected_state_ref) = expected_state {
+                for (reg, data) in &expected_state_ref.registers {
+                    let actual_data = ending_state.x[*reg as usize];
+                    if actual_data != u32::from_be_bytes(data.value) {
+                        pass = false;
+                        state_diff.registers.insert(*reg, HexValue{value: u32::to_be_bytes(actual_data)});
+                    }
+                }
+                for (addr, data) in &expected_state_ref.data_memory {
+                    let actual_data = ending_state.data_memory.get(u32::from_be_bytes(addr.value));
+                    if actual_data != data.value[3]
+                    {
+                        pass = false;
+                        state_diff.data_memory.insert(*addr, HexValue{value: u32::to_be_bytes(actual_data as u32)});
+                    }
+                }
+            }
+
+            if !pass {
+                failed_tests.push(test_name.to_string());
+
+                let test_dir = output_path.join(test_name);
+                if !std::fs::exists(&test_dir).expect("Can't check if output subdirectory for test exists") {
+                    std::fs::create_dir(&test_dir).expect("Failed to create output subdirectory for a test");
+                }
+
+                let json_string = serde_json::to_string(&state_diff).expect("Couldn't convert state difference to string!");
+            
+                let file_name = name.to_owned() + "_finalstate.json";
+                let test_result_path = test_dir.join(file_name);
+                std::fs::write(&test_result_path, &json_string).expect("Failed to create test output file");
+            }
+        }
+        println!("Failed {:?}\n", failed_tests);
     }
+    println!("The difference between ending states for failed tests can be found in: {:?}", output_path.to_str());
+
+    // TODO: print results to a CSV file cleanly
+    // TODO: jazz up UI with ratatui
+    // TODO: Print usage information
+    // TODO: UART input, compare UART output with expected output
+    // TODO: Clean up code, modularize
 }

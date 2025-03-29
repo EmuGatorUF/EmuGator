@@ -35,6 +35,7 @@ pub enum InstructionFormat {
     J,
 }
 
+#[allow(non_camel_case_types)]
 #[derive(EnumString, Debug)]
 pub enum ISA {
     ADD,
