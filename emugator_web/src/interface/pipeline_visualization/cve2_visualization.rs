@@ -41,20 +41,23 @@ impl CVE2Element {
             CVE2Element::IfPc => {
                 format!("IF PC: {}", format_pc(pipeline.IF_pc))
             }
-            CVE2Element::InstructionMemory => {
-                format!("Instruction: {}", format!("0x{:08X}", pipeline.IF_inst),)
-            }
+            CVE2Element::InstructionMemory => match pipeline.IF_inst {
+                Some(inst) => format!("Instruction: {}", format!("0x{:08X}", inst)),
+                None => return "None".to_string(),
+            },
             CVE2Element::PCPlus4 => {
                 let pc_value = pipeline.IF_pc;
                 let plus4_value = pc_value.wrapping_add(4);
                 format!("PC+4: {}", format_pc(plus4_value))
             }
-            CVE2Element::IdPc => {
-                format!("ID PC: {}", format_pc(pipeline.ID_pc))
-            }
-            CVE2Element::IdIr => {
-                format!("Instruction: {}", format!("0x{:08X}", pipeline.ID_inst),)
-            }
+            CVE2Element::IdPc => match pipeline.ID_pc {
+                Some(pc) => format!("ID PC: {}", format_pc(pc)),
+                None => return "None".to_string(),
+            },
+            CVE2Element::IdIr => match pipeline.ID_inst {
+                Some(inst) => format!("Instruction: {}", format!("0x{:08X}", inst)),
+                None => return "None".to_string(),
+            },
             CVE2Element::Rs1 => format!("RS1: {}", pipeline.datapath.reg_s1),
             CVE2Element::Rs2 => format!("RS2: {}", pipeline.datapath.reg_s2),
             CVE2Element::Rd => format!("RD: {}", pipeline.datapath.reg_d),

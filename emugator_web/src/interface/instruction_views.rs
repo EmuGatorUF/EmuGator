@@ -21,13 +21,10 @@ pub fn InstructionView(
     };
 
     let instruction_memory = &program.instruction_memory;
-    let text_start = program.get_section_start(Section::Text) as usize;
-    let current_pc = match &*emulator_state {
-        AnyEmulatorState::CVE2(state) => state.pipeline.ID_pc,
-        AnyEmulatorState::FiveStage(state) => state.pipeline.if_id.id_pc,
-    } as usize;
+    let text_start = program.get_section_start(Section::Text);
+    let current_pc = emulator_state.id_pc();
 
-    let total_instructions = instruction_memory.len() / 4; // Since each instruction is 4 bytes
+    let total_instructions = (instruction_memory.len() / 4) as u32; // Since each instruction is 4 bytes
 
     rsx! {
         div { class: "h-full overflow-hidden",
@@ -36,16 +33,14 @@ pub fn InstructionView(
                     for i in 0..total_instructions {
                         {
                             let base_addr = text_start + i * 4;
-                            let instruction = (instruction_memory
-                                .get(&(base_addr as u32))
-                                .copied()
-                                .unwrap_or(0) as u32)
-                                | ((instruction_memory.get(&((base_addr + 1) as u32)).copied().unwrap_or(0)
-                                    as u32) << 8)
-                                | ((instruction_memory.get(&((base_addr + 2) as u32)).copied().unwrap_or(0)
-                                    as u32) << 16)
-                                | ((instruction_memory.get(&((base_addr + 3) as u32)).copied().unwrap_or(0)
-                                    as u32) << 24);
+                            let instruction = (instruction_memory.get(&(base_addr)).copied().unwrap_or(0)
+                                as u32)
+                                | ((instruction_memory.get(&(base_addr + 1)).copied().unwrap_or(0) as u32)
+                                    << 8)
+                                | ((instruction_memory.get(&(base_addr + 2)).copied().unwrap_or(0) as u32)
+                                    << 16)
+                                | ((instruction_memory.get(&(base_addr + 3)).copied().unwrap_or(0) as u32)
+                                    << 24);
                             let instr = Instruction::from_raw(instruction);
                             let instr_frmt = InstructionDefinition::from_instr(instr).unwrap().format;
                             rsx! {
@@ -62,7 +57,7 @@ pub fn InstructionView(
                                             div { class: "font-mono text-gray-500 text-xs", "0x{base_addr:04x}:" }
                                             div { class: "font-mono font-bold text-xs",
                                                 // if instruction is current instruction, color each piece
-                                                if base_addr == current_pc {
+                                                if Some(base_addr) == current_pc {
                                                     div {
                                                         class: "invisible",
                                                         onmounted: move |ctx| async move {
@@ -115,7 +110,7 @@ pub fn InstructionView(
                                             }
                                         }
                                         // displays information about which colors correspond to which part of the instruction
-                                        if base_addr == current_pc {
+                                        if Some(base_addr) == current_pc {
                                             div { class: "flex justify-center",
                                                 div { class: "font-mono font-bold text-xs text-gray-500",
                                                     {

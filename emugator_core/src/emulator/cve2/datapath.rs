@@ -14,9 +14,9 @@ pub struct CVE2Datapath {
     // pub instr_req_o: bool, // Output signal requesting an instruction fetch.
     // pub instr_addr_o: u32,    // Output address for fetching instructions.
     // pub instr_rdata_i: u32, // Input data received as the fetched instruction.
-    pub instr_gnt_i: bool, // Input signal indicating the instruction request is granted.
-    pub instr_rvalid_i: bool, // Input signal indicating valid instruction data is available.
-    pub instr_err_i: bool, // Input signal indicating an error during instruction fetch.
+    // pub instr_gnt_i: bool, // Input signal indicating the instruction request is granted.
+    // pub instr_rvalid_i: bool, // Input signal indicating valid instruction data is available.
+    // pub instr_err_i: bool, // Input signal indicating an error during instruction fetch.
 
     // Data memory interface
     pub data_req_o: bool,  // Output signal requesting a data memory operation.
@@ -63,8 +63,6 @@ pub struct CVE2Datapath {
     pub reg_write_data: Option<u32>,
 
     // program counter
-    pub cmp_result: bool,       // Result of the branch comparison operation.
-    pub should_cond_jump: bool, // If the branch should be taken
-    pub next_pc_sel: PCSel,     // Mux control for selecting the next program counter.
-    pub next_pc: Option<u32>,   // Next program counter value.
+    pub cmp_result: bool,     // Result of the branch comparison operation.
+    pub next_pc: Option<u32>, // Next program counter value.
 }

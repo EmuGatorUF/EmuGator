@@ -99,6 +99,13 @@ impl AnyEmulatorState {
             AnyEmulatorState::FiveStage(state) => state.pipeline.all_pcs(),
         }
     }
+
+    pub fn id_pc(&self) -> Option<u32> {
+        match self {
+            AnyEmulatorState::CVE2(state) => state.pipeline.id_pc(),
+            AnyEmulatorState::FiveStage(state) => state.pipeline.id_pc(),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -117,7 +124,7 @@ impl<P: Pipeline + Clone + Default> EmulatorState<P> {
 
         // set starting address to start
         let start_addr = program.get_section_start(Section::Text);
-        *pipeline.if_pc() = start_addr;
+        pipeline.set_if_pc(start_addr, program);
 
         EmulatorState {
             x: RegisterFile::default(),
@@ -148,12 +155,16 @@ impl<P: Pipeline + Clone + Default> EmulatorState<P> {
         loop {
             state = state.clock(program);
 
-            let hit_breakpoint =
-                if let Some(line_num) = program.source_map.get_by_left(state.pipeline.if_pc()) {
+            let hit_breakpoint = if let Some(id_pc) = state.pipeline.id_pc() {
+                if let Some(line_num) = program.source_map.get_by_left(&id_pc) {
                     breakpoints.contains(line_num)
                 } else {
                     false
-                };
+                }
+            } else {
+                false
+            };
+
             let hit_ebreak = state.pipeline.requesting_debug();
 
             if hit_ebreak || hit_breakpoint {
@@ -188,12 +199,16 @@ pub trait Pipeline: Clone {
         data_memory: &mut DataMemory,
     );
 
+    /// Set the initial address of the instruction fetch stage
+    /// and resolve dependent lines
+    fn set_if_pc(&mut self, address: u32, program: &AssembledProgram);
+
     /// Check if the pipeline is currently requesting a debug via a ebreak
     fn requesting_debug(&mut self) -> bool;
 
-    /// Mutable reference to the instruction fetch PC
-    /// Allows reading to trigger breakpoints, and writing to set where to start execution
-    fn if_pc(&mut self) -> &mut u32;
+    /// Mutable reference to the instruction decode PC
+    /// Allows reading to trigger breakpoints
+    fn id_pc(&self) -> Option<u32>;
 
     /// Returns all current PCs in the pipeline
     /// This is used for editor line highlighting

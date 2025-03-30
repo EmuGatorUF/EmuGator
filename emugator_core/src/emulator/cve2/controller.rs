@@ -22,11 +22,10 @@ pub struct CVE2Control {
     pub reg_write: bool,                    // Register write control.
 
     // PC Control
-    pub cmp_set: bool,     // Comparison result register set control.
-    pub jump_uncond: bool, // Unconditional jump control.
-    pub jump_cond: bool,   // Conditional jump control.
-    pub pc_set: bool,      // Program counter write control.
-    pub if_id_set: bool,   // ID stage registers ready
+    pub cmp_set: bool,      // Comparison result register set control.
+    pub next_pc_sel: PCSel, // Mux control for selecting the next program counter.
+    pub pc_set: bool,       // Program counter write control.
+    pub if_id_set: bool,    // ID stage registers ready
 
     // Debug Control
     pub debug_req: bool, // Debug request control
@@ -45,8 +44,7 @@ impl Default for CVE2Control {
             data_dest_sel: None,
             reg_write: false,
             cmp_set: false,
-            jump_uncond: false,
-            jump_cond: false,
+            next_pc_sel: PCSel::PC4,
             pc_set: true,
             if_id_set: true,
             debug_req: false,
@@ -155,10 +153,10 @@ impl CVE2Control {
             alu_op: Some(ALUOp::ADD),
 
             // set the PC to it
-            jump_uncond: true,
+            next_pc_sel: PCSel::JMP,
             pc_set: true,
 
-            // preserve the ID stage registers for link
+            // wait until new PC before loading IF into ID
             if_id_set: false,
 
             ..Default::default()
@@ -193,28 +191,14 @@ impl CVE2Control {
             ..Default::default()
         }
     }
-
-    pub fn branch_jump() -> Self {
-        CVE2Control {
-            // calculate the destination address
-            alu_op_a_sel: Some(OpASel::PC),
-            alu_op_b_sel: Some(OpBSel::IMM),
-            alu_op: Some(ALUOp::ADD),
-
-            // jump if the comparison was true
-            jump_cond: true,
-            pc_set: true,
-
-            // wait until new PC before loading IF into ID
-            if_id_set: false,
-
-            ..Default::default()
-        }
-    }
 }
 
 #[allow(clippy::unusual_byte_groupings)]
-pub fn get_control_signals(instr: Instruction, instr_cycle: u32) -> Option<CVE2Control> {
+pub fn get_control_signals(
+    instr: Instruction,
+    instr_cycle: u32,
+    branch_cmp: bool,
+) -> Option<CVE2Control> {
     match instr.opcode() {
         0b0110111 => Some(CVE2Control::immediate(ALUOp::SELB)), // LUI
         0b0010111 => Some(CVE2Control::arithmetic(OpASel::PC, OpBSel::IMM, ALUOp::ADD)), // AUIPC
@@ -241,8 +225,16 @@ pub fn get_control_signals(instr: Instruction, instr_cycle: u32) -> Option<CVE2C
                 0b111 => ALUOp::GEU,
                 _ => panic!("Invalid funct3 for branch instruction"),
             })),
-            1 => Some(CVE2Control::branch_jump()),
-            2 => Some(CVE2Control::default()), // NOP cycle to load next instruction into ID
+            1 => {
+                if branch_cmp {
+                    Some(CVE2Control::jump(OpASel::PC))
+                } else {
+                    // If the branch comparison was false, we need to continue
+                    // to the next instruction without jumping.
+                    Some(CVE2Control::default())
+                }
+            }
+            2 => Some(CVE2Control::default()), // If branched, NOP cycle to load next instruction into ID
             _ => panic!("Invalid instruction cycle for branch instruction"),
         },
         0b0000011 => {

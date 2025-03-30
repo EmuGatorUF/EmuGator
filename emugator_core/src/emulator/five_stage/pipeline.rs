@@ -47,8 +47,16 @@ impl Pipeline for FiveStagePipeline {
         todo!()
     }
 
-    fn if_pc(&mut self) -> &mut u32 {
-        &mut self.if_pc
+    fn set_if_pc(&mut self, address: u32, program: &AssembledProgram) {
+        if address & 0x00000003 != 0x00 {
+            panic!("PC must be on a 4-byte boundary");
+        }
+        self.if_pc = address;
+        // TODO: set dependent lines
+    }
+
+    fn id_pc(&self) -> Option<u32> {
+        Some(self.if_id.id_pc)
     }
 
     fn all_pcs(&self) -> Vec<PcPos> {

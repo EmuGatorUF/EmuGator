@@ -85,7 +85,7 @@ fn test_AUIPC() {
     state = state.clock(&program);
 
     // After AUIPC, x1 should hold the value (PC + 0x12345000)
-    let pc = state.pipeline.ID_pc;
+    let pc = state.pipeline.ID_pc.unwrap();
     state = state.clock(&program);
     assert_eq!(state.x[1], pc + 0x12345000);
 }
@@ -128,7 +128,7 @@ fn test_JAL() {
     state = state.clock(&program);
 
     // After JAL, x1 should contain PC + 4, and the PC should jump to PC + 0x8
-    let pc = state.pipeline.ID_pc;
+    let pc = state.pipeline.ID_pc.unwrap();
     state = state.clock(&program);
     assert_eq!(state.pipeline.IF_pc, pc + 0x8);
     state = state.clock(&program);
@@ -167,13 +167,14 @@ fn test_JAL_neg_offset() {
 
     // Instruction fetch
     state = state.clock(&program);
+
     // ADDI ( x5 := x0 + 1)
     state = state.clock(&program);
     // ADDI ( x5 := x5 + 1)
     state = state.clock(&program);
 
     // After JAL, x1 should contain PC + 4, and the PC should jump to PC + 0x04
-    let pc = state.pipeline.ID_pc;
+    let pc = state.pipeline.ID_pc.unwrap();
     state = state.clock(&program);
     assert_eq!(state.pipeline.IF_pc, pc - 0x04);
     state = state.clock(&program);
@@ -250,7 +251,7 @@ fn test_JALR() {
     assert_eq!(state.x[2], 0x4);
 
     // After JALR, x1 should contain PC + 4, and the PC should jump to (x4 + 0x2) & ~1
-    let pc = state.pipeline.ID_pc;
+    let pc = state.pipeline.ID_pc.unwrap();
     state = state.clock(&program);
     assert_eq!(state.pipeline.IF_pc, (state.x[2] + 0x8) & !1);
     state = state.clock(&program);
@@ -291,13 +292,14 @@ fn test_JALR_neg_offset() {
 
     // Instruction fetch
     state = state.clock(&program);
+
     // ADDI ( x5 := x0 + 1)
     state = state.clock(&program);
     // ADDI ( x5 := x0 + 1)
     state = state.clock(&program);
 
     // After JALR, x1 should contain PC + 4, and the PC should jump to x2 (12) - 4
-    let pc = state.pipeline.ID_pc;
+    let pc = state.pipeline.ID_pc.unwrap();
     state = state.clock(&program);
     assert_eq!(state.pipeline.IF_pc, (state.x[2] as i32 - 4) as u32 & !1);
     state = state.clock(&program);
@@ -349,18 +351,17 @@ fn test_BEQ() {
     assert_eq!(state.x[1], 1);
 
     // BEQ (branch if x1 == x2) - should not branch because x1 != x2
-    let pc = state.pipeline.ID_pc;
+    let pc = state.pipeline.ID_pc.unwrap();
     state = state.clock(&program);
     state = state.clock(&program);
-    state = state.clock(&program);
-    assert_eq!(state.pipeline.ID_pc, pc + 0x4);
+    assert_eq!(state.pipeline.ID_pc.unwrap(), pc + 0x4);
 
     // BEQ (branch if x0 == x2) - should branch because x0 == x2
-    let pc = state.pipeline.ID_pc;
+    let pc = state.pipeline.ID_pc.unwrap();
     state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
-    assert_eq!(state.pipeline.ID_pc, pc + 0x8);
+    assert_eq!(state.pipeline.ID_pc.unwrap(), pc + 0x8);
 
     // ADDI ( x5 := x0 + 2)
     assert_eq!(state.x[5], 0);
@@ -412,18 +413,17 @@ fn test_BNE() {
     state = state.clock(&program);
 
     // BNE (branch if x0 != x2) - should not branch because x0 == x2
-    let pc = state.pipeline.ID_pc;
+    let pc = state.pipeline.ID_pc.unwrap();
     state = state.clock(&program);
     state = state.clock(&program);
-    state = state.clock(&program);
-    assert_eq!(state.pipeline.ID_pc, pc + 0x4);
+    assert_eq!(state.pipeline.ID_pc.unwrap(), pc + 0x4);
 
     // BNE (branch if x1 != x2) - should branch because x1 != x2
-    let pc = state.pipeline.ID_pc;
+    let pc = state.pipeline.ID_pc.unwrap();
     state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
-    assert_eq!(state.pipeline.ID_pc, pc + 0x8);
+    assert_eq!(state.pipeline.ID_pc.unwrap(), pc + 0x8);
 
     // ADDI ( x5 := x0 + 2)
     assert_eq!(state.x[5], 0);
@@ -476,18 +476,17 @@ fn test_BLT() {
     assert_eq!(state.x[1], u32::MAX);
 
     // BLT (branch if x0 < x1) - should not branch because x0 > x1
-    let pc = state.pipeline.ID_pc;
+    let pc = state.pipeline.ID_pc.unwrap();
     state = state.clock(&program);
     state = state.clock(&program);
-    state = state.clock(&program);
-    assert_eq!(state.pipeline.ID_pc, pc + 0x4);
+    assert_eq!(state.pipeline.ID_pc.unwrap(), pc + 0x4);
 
     // BLT (branch if x1 < x0) - should branch because x1 < x0
-    let pc = state.pipeline.ID_pc;
+    let pc = state.pipeline.ID_pc.unwrap();
     state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
-    assert_eq!(state.pipeline.ID_pc, pc + 0x8);
+    assert_eq!(state.pipeline.ID_pc.unwrap(), pc + 0x8);
 
     // ADDI ( x5 := x0 + 2)
     assert_eq!(state.x[5], 0);
@@ -546,18 +545,17 @@ fn test_BGE() {
     assert_eq!(state.x[1], u32::MAX);
 
     // BGE (branch if x1 >= x0) - should not branch because x0 > x1
-    let pc = state.pipeline.ID_pc;
+    let pc = state.pipeline.ID_pc.unwrap();
     state = state.clock(&program);
     state = state.clock(&program);
-    state = state.clock(&program);
-    assert_eq!(state.pipeline.ID_pc, pc + 0x4);
+    assert_eq!(state.pipeline.ID_pc.unwrap(), pc + 0x4);
 
     // BLT (branch if x0 >= x1) - should branch because x1 < x0
-    let pc = state.pipeline.ID_pc;
+    let pc = state.pipeline.ID_pc.unwrap();
     state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
-    assert_eq!(state.pipeline.ID_pc, pc + 0x8);
+    assert_eq!(state.pipeline.ID_pc.unwrap(), pc + 0x8);
 
     // ADDI ( x5 := x0 + 2)
     assert_eq!(state.x[5], 0);
@@ -565,11 +563,11 @@ fn test_BGE() {
     assert_eq!(state.x[5], 2);
 
     // BGE (branch if x0 >= x2) - should branch because x0 == x2
-    let pc = state.pipeline.ID_pc;
+    let pc = state.pipeline.ID_pc.unwrap();
     state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
-    assert_eq!(state.pipeline.ID_pc, pc - 0x8);
+    assert_eq!(state.pipeline.ID_pc.unwrap(), pc - 0x8);
 
     // ADDI ( x5 := x0 + 1)
     assert_eq!(state.x[5], 2);
@@ -622,18 +620,17 @@ fn test_BLTU() {
     assert_eq!(state.x[1], u32::MAX);
 
     // BLTU (branch if x1 < x0) - should not branch because x1 > x0
-    let pc = state.pipeline.ID_pc;
+    let pc = state.pipeline.ID_pc.unwrap();
     state = state.clock(&program);
     state = state.clock(&program);
-    state = state.clock(&program);
-    assert_eq!(state.pipeline.ID_pc, pc + 0x4);
+    assert_eq!(state.pipeline.ID_pc.unwrap(), pc + 0x4);
 
     // BLTU (branch if x0 < x1) - should branch because x0 < x1
-    let pc = state.pipeline.ID_pc;
+    let pc = state.pipeline.ID_pc.unwrap();
     state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
-    assert_eq!(state.pipeline.ID_pc, pc + 0x8);
+    assert_eq!(state.pipeline.ID_pc.unwrap(), pc + 0x8);
 
     // ADDI ( x5 := x0 + 2)
     assert_eq!(state.x[5], 0);
@@ -692,18 +689,17 @@ fn test_BGEU() {
     assert_eq!(state.x[1], u32::MAX);
 
     // BGEU (branch if x0 >= x1) - should not branch because x0 < x1
-    let pc = state.pipeline.ID_pc;
+    let pc = state.pipeline.ID_pc.unwrap();
     state = state.clock(&program);
     state = state.clock(&program);
-    state = state.clock(&program);
-    assert_eq!(state.pipeline.ID_pc, pc + 0x4);
+    assert_eq!(state.pipeline.ID_pc.unwrap(), pc + 0x4);
 
     // BLT (branch if x1 >= x0) - should branch because x1 > x0
-    let pc = state.pipeline.ID_pc;
+    let pc = state.pipeline.ID_pc.unwrap();
     state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
-    assert_eq!(state.pipeline.ID_pc, pc + 0x8);
+    assert_eq!(state.pipeline.ID_pc.unwrap(), pc + 0x8);
 
     // ADDI ( x5 := x0 + 2)
     assert_eq!(state.x[5], 0);
@@ -711,11 +707,11 @@ fn test_BGEU() {
     assert_eq!(state.x[5], 2);
 
     // BGEU (branch if x0 >= x2) - should branch because x0 == x2
-    let pc = state.pipeline.ID_pc;
+    let pc = state.pipeline.ID_pc.unwrap();
     state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
-    assert_eq!(state.pipeline.ID_pc, pc - 0x8);
+    assert_eq!(state.pipeline.ID_pc.unwrap(), pc - 0x8);
 
     // ADDI ( x5 := x0 + 1)
     assert_eq!(state.x[5], 2);
@@ -1698,8 +1694,10 @@ fn test_SLT() {
 
     let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
 
-    // Execute each instruction and validate
+    // Instruction fetch
     state = state.clock(&program);
+
+    // Execute each instruction and validate
     state = state.clock(&program); // Set x1 = 5
     state = state.clock(&program); // Set x2 = 10
     state = state.clock(&program);
@@ -1747,7 +1745,9 @@ fn test_SLTU() {
 
     let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
 
+    // Instruction fetch
     state = state.clock(&program);
+
     state = state.clock(&program); // Set x1 = -1 (0xFFFFFFFF unsigned)
     state = state.clock(&program); // Set x2 = 1
     state = state.clock(&program);
@@ -1785,7 +1785,10 @@ fn test_XOR() {
 
     let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
 
+    // Instruction fetch
     state = state.clock(&program);
+
+    // Run each instruction
     state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
@@ -1821,7 +1824,10 @@ fn test_SRL() {
 
     let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
 
+    // Instruction fetch
     state = state.clock(&program);
+
+    // Run each instruction
     state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
@@ -1857,7 +1863,10 @@ fn test_SRA() {
 
     let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
 
+    // Instruction fetch
     state = state.clock(&program);
+
+    // Run each instruction
     state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
@@ -1893,7 +1902,10 @@ fn test_OR() {
 
     let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
 
+    // Instruction fetch
     state = state.clock(&program);
+
+    // Run each instruction
     state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
@@ -1929,7 +1941,10 @@ fn test_AND() {
 
     let mut state = EmulatorState::<CVE2Pipeline>::new(&program);
 
+    // Instruction fetch
     state = state.clock(&program);
+
+    // Run each instruction
     state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
