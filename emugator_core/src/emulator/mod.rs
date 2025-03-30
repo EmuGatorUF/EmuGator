@@ -7,6 +7,8 @@ pub mod uart;
 
 #[cfg(test)]
 mod cve2_tests;
+//#[cfg(test)]
+//mod five_stage_tests;
 
 use std::collections::{BTreeMap, BTreeSet};
 
