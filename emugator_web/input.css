@@ -5,6 +5,7 @@
 @layer utilities {
     .if-pc-decoration {
         box-sizing: border-box;
+        pointer-events: none;
         outline: #3b82f6 2px solid;
         outline-offset: -2px;
         z-index: 9000;
@@ -12,6 +13,7 @@
 
     .id-pc-decoration {
         box-sizing: border-box;
+        pointer-events: none;
         outline: #d97706 2px solid;
         outline-offset: -2px;
         z-index: 9001;

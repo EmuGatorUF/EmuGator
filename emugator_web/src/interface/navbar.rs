@@ -9,13 +9,14 @@ use std::ops::Deref;
 #[component]
 #[allow(non_snake_case)]
 pub fn Navbar(
-    source: Signal<String>,
+    source: ReadOnlySignal<String>,
     assembled_program: Signal<Option<AssembledProgram>>,
     assembler_errors: Signal<Vec<AssemblerError>>,
     emulator_state: Signal<AnyEmulatorState>,
     breakpoints: ReadOnlySignal<BTreeSet<usize>>,
+    minimize_console: Signal<bool>,
 ) -> Element {
-    let is_assembled = assembled_program.read().is_some();
+    let is_started = assembled_program.read().is_some();
     let error_count = assembler_errors.read().len();
 
     let is_cve2 = matches!(*emulator_state.read(), AnyEmulatorState::CVE2(_));
@@ -26,19 +27,20 @@ pub fn Navbar(
                 span { class: "text-xl font-semibold text-blue-400 mr-4", "EmuGator" }
                 div { class: "flex space-x-2",
                     button {
-                        class: "bg-green-600 hover:bg-green-700 text-white font-medium py-1.5 px-3 rounded transition duration-150 ease-in-out flex items-center",
+                        class: "bg-green-600 hover:bg-green-700 text-white font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex items-center",
                         onclick: move |_| {
-                            info!("Assembler clicked");
+                            info!("Start clicked");
                             match assembler::assemble(&source.read()) {
                                 Ok(assembled) => {
-                                    info!("Assembly succeeded.");
+                                    info!("Final assembly succeeded.");
                                     let new_state = emulator_state.read().new_same_type(&assembled);
                                     emulator_state.set(new_state);
                                     assembled_program.set(Some(assembled));
                                     assembler_errors.set(Vec::new());
+                                    minimize_console.set(false);
                                 }
                                 Err(errors) => {
-                                    info!("Assembly failed.");
+                                    info!("Final assembly failed.");
                                     assembled_program.set(None);
                                     assembler_errors.set(errors);
                                 }
@@ -54,118 +56,82 @@ pub fn Navbar(
                                 clip_rule: "evenodd",
                             }
                         }
-                        "Assemble"
+                        "Start"
                     }
+
                     button {
-                        class: "bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-1.5 px-3 rounded transition duration-150 ease-in-out flex items-center",
+                        class: format!(
+                            "{} font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex items-center",
+                            if is_started {
+                                "bg-indigo-600 hover:bg-indigo-700 text-white"
+                            } else {
+                                "bg-gray-600 text-gray-300 cursor-not-allowed"
+                            },
+                        ),
+                        disabled: !is_started,
                         onclick: move |_| {
-                            let program = assembled_program.read();
-                            let program_or_default = program.as_ref().unwrap_or(AssembledProgram::empty());
-                            emulator_state
-                                .set(
-                                    if is_cve2 {
-                                        AnyEmulatorState::new_five_stage(program_or_default)
-                                    } else {
-                                        AnyEmulatorState::new_cve2(program_or_default)
-                                    },
-                                );
+                            if let Some(mut program) = assembled_program.as_mut() {
+                                let new_state = emulator_state.read().clock(&mut program);
+                                emulator_state.set(new_state);
+                            }
                         },
                         svg {
                             class: "w-4 h-4 mr-1 fill-current",
                             xmlns: "http://www.w3.org/2000/svg",
                             view_box: "0 0 20 20",
                             path {
-                                d: "M4 2h12a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V4a2 2 0 012-2zm0 2v12h12V4H4z",
+                                d: "M13.7 10L8.3 5.5a.8.8 0 00-1.3.6v9a.8.8 0 001.3.6L13.7 10z",
                                 fill_rule: "evenodd",
                                 clip_rule: "evenodd",
                             }
                         }
-                        if is_cve2 {
-                            "Two Stage Pipeline (CVE2)"
-                        } else {
-                            "Five Stage Pipeline"
-                        }
+                        "Step"
                     }
-                    if is_assembled {
-                        button {
-                            class: "bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-1.5 px-3 rounded transition duration-150 ease-in-out flex items-center",
-                            onclick: move |_| {
-                                if let Some(mut program) = assembled_program.as_mut() {
-                                    let new_state = emulator_state.read().clock(&mut program);
-                                    emulator_state.set(new_state);
-                                }
+                    button {
+                        class: format!(
+                            "{} text-white font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex items-center",
+                            if is_started {
+                                "bg-indigo-600 hover:bg-indigo-700 text-white"
+                            } else {
+                                "bg-gray-600 text-gray-300 cursor-not-allowed"
                             },
-                            svg {
-                                class: "w-4 h-4 mr-1 fill-current",
-                                xmlns: "http://www.w3.org/2000/svg",
-                                view_box: "0 0 20 20",
-                                path {
-                                    d: "M13.7 10L8.3 5.5a.8.8 0 00-1.3.6v9a.8.8 0 001.3.6L13.7 10z",
-                                    fill_rule: "evenodd",
-                                    clip_rule: "evenodd",
-                                }
+                        ),
+                        disabled: !is_started,
+                        onclick: move |_| {
+                            if let Some(mut program) = assembled_program.as_mut() {
+                                let new_state = emulator_state
+                                    .read()
+                                    .clock_until_break(&mut program, breakpoints.read().deref(), 10_000);
+                                emulator_state.set(new_state);
                             }
-                            "Step"
-                        }
-                        button {
-                            class: "bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-1.5 px-3 rounded transition duration-150 ease-in-out flex items-center",
-                            onclick: move |_| {
-                                if let Some(mut program) = assembled_program.as_mut() {
-                                    let new_state = emulator_state
-                                        .read()
-                                        .clock_until_break(&mut program, breakpoints.read().deref(), 10_000);
-                                    emulator_state.set(new_state);
-                                }
-                            },
-                            svg {
-                                class: "w-4 h-4 mr-1 fill-current",
-                                xmlns: "http://www.w3.org/2000/svg",
-                                view_box: "0 0 20 20",
-                                path {
-                                    d: "M10 3.5l8 6.5-8 6.5V3.5zM2 4h5v12H2V4z",
-                                    fill_rule: "evenodd",
-                                    clip_rule: "evenodd",
-                                }
+                        },
+                        svg {
+                            class: "w-4 h-4 mr-1 fill-current",
+                            xmlns: "http://www.w3.org/2000/svg",
+                            view_box: "0 0 20 20",
+                            path {
+                                d: "M10 3.5l8 6.5-8 6.5V3.5zM2 4h5v12H2V4z",
+                                fill_rule: "evenodd",
+                                clip_rule: "evenodd",
                             }
-                            "Run to Break"
                         }
-                    } else {
-                        button {
-                            class: "bg-gray-600 cursor-not-allowed text-gray-300 font-medium py-1.5 px-3 rounded opacity-70 flex items-center",
-                            disabled: true,
-                            svg {
-                                class: "w-4 h-4 mr-1 fill-current",
-                                xmlns: "http://www.w3.org/2000/svg",
-                                view_box: "0 0 20 20",
-                                path {
-                                    d: "M13.7 10L8.3 5.5a.8.8 0 00-1.3.6v9a.8.8 0 001.3.6L13.7 10z",
-                                    fill_rule: "evenodd",
-                                    clip_rule: "evenodd",
-                                }
-                            }
-                            "Step"
-                        }
-                        button {
-                            class: "bg-gray-600 cursor-not-allowed text-gray-300 font-medium py-1.5 px-3 rounded opacity-70 flex items-center",
-                            disabled: true,
-                            svg {
-                                class: "w-4 h-4 mr-1 fill-current",
-                                xmlns: "http://www.w3.org/2000/svg",
-                                view_box: "0 0 20 20",
-                                path {
-                                    d: "M10 3.5l8 6.5-8 6.5V3.5zM2 4h5v12H2V4z",
-                                    fill_rule: "evenodd",
-                                    clip_rule: "evenodd",
-                                }
-                            }
-                            "Run to Break"
-                        }
+                        "Run to Break"
                     }
                 }
             }
-            div { class: "flex items-center",
-                if is_assembled {
-                    span { class: "text-white text-sm font-medium mr-2 bg-green-600 rounded px-2 py-0.5 flex items-center",
+            div { class: "flex items-stretch space-x-2",
+                span {
+                    class: format!(
+                        "text-white text-sm font-medium {} rounded py-1 px-2 flex items-center",
+                        if is_started {
+                            "bg-green-600"
+                        } else if error_count > 0 {
+                            "bg-red-600"
+                        } else {
+                            "bg-gray-700"
+                        },
+                    ),
+                    if is_started {
                         svg {
                             class: "w-4 h-4 mr-1 fill-current",
                             xmlns: "http://www.w3.org/2000/svg",
@@ -177,9 +143,7 @@ pub fn Navbar(
                             }
                         }
                         "Program Assembled"
-                    }
-                } else if error_count > 0 {
-                    span { class: "text-white text-sm font-medium mr-2 bg-red-600 rounded px-2 py-0.5 flex items-center",
+                    } else if error_count > 0 {
                         svg {
                             class: "w-4 h-4 mr-1 fill-current",
                             xmlns: "http://www.w3.org/2000/svg",
@@ -191,14 +155,42 @@ pub fn Navbar(
                             }
                         }
                         "Errors: {error_count}"
-                    }
-                } else {
-                    span { class: "text-white text-sm font-medium mr-2 bg-gray-700 rounded px-2 py-0.5",
+                    } else {
                         "Ready"
                     }
                 }
                 button {
-                    class: "ml-2 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm font-medium py-1 px-2 rounded transition duration-150 ease-in-out",
+                    class: "bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex items-center",
+                    onclick: move |_| {
+                        let program = assembled_program.read();
+                        let program_or_default = program.as_ref().unwrap_or(AssembledProgram::empty());
+                        emulator_state
+                            .set(
+                                if is_cve2 {
+                                    AnyEmulatorState::new_five_stage(program_or_default)
+                                } else {
+                                    AnyEmulatorState::new_cve2(program_or_default)
+                                },
+                            );
+                    },
+                    svg {
+                        class: "w-4 h-4 mr-1 fill-current",
+                        xmlns: "http://www.w3.org/2000/svg",
+                        view_box: "0 0 20 20",
+                        path {
+                            d: "M4 2h12a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V4a2 2 0 012-2zm0 2v12h12V4H4z",
+                            fill_rule: "evenodd",
+                            clip_rule: "evenodd",
+                        }
+                    }
+                    if is_cve2 {
+                        "Two Stage Pipeline"
+                    } else {
+                        "Five Stage Pipeline"
+                    }
+                }
+                button {
+                    class: "bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm font-medium py-1 px-2 rounded transition duration-150 ease-in-out",
                     onclick: move |_| {},
                     svg {
                         class: "w-4 h-4 fill-current",

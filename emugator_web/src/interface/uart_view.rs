@@ -5,7 +5,10 @@ use emugator_core::emulator::AnyEmulatorState;
 
 #[component]
 #[allow(non_snake_case)]
-pub fn UartView(emulator_state: Signal<AnyEmulatorState>, minimize_console: Signal<bool>) -> Element {
+pub fn UartView(
+    emulator_state: Signal<AnyEmulatorState>,
+    minimize_console: Signal<bool>,
+) -> Element {
     let mut input_text = use_signal(|| String::new());
 
     info!("{:?}", emulator_state.read().uart());
@@ -45,7 +48,8 @@ pub fn UartView(emulator_state: Signal<AnyEmulatorState>, minimize_console: Sign
                     div { class: "absolute inset-0 bg-inherit p-1 w-full leading-none break-words min-h-[3rem]",
                         "{emulator_state.read().uart().get_characters_read_in()}"
                     }
-                    textarea { class: "relative leading-none w-full p-1 min-h-[3rem] resize-y z-10 focus:outline-none",
+                    textarea {
+                        class: "relative leading-none w-full p-1 min-h-[3rem] resize-y z-10 focus:outline-none",
                         placeholder: "> Type here",
                         oninput: move |event| {
                             let value = event.value().clone();
@@ -54,10 +58,8 @@ pub fn UartView(emulator_state: Signal<AnyEmulatorState>, minimize_console: Sign
                         },
                         "{input_text}"
                     }
-                },
-                div { class: "whitespace-pre",
-                    "{emulator_state.read().uart()}"
                 }
+                div { class: "whitespace-pre", "{emulator_state.read().uart()}" }
             }
         }
     }

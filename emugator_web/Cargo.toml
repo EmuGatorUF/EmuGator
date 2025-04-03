@@ -9,6 +9,7 @@ emugator-core = { path = "../emugator_core" }
 
 # dioxus
 dioxus = { version = "0.6", features = ["web", "router"] }
+dioxus-sdk = { version = "0.6", features = ["timing"] }
 dioxus-logger = "0.6"
 
 # text editor

@@ -32,7 +32,7 @@ pub fn CodeEditor(
     });
 
     let mut source_sync = use_effect(move || {
-        *source.write() = model().get_value();
+        source.set(model.peek().get_value());
     });
 
     let _model_listener = use_signal(move || {

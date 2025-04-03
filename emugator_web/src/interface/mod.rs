@@ -6,10 +6,11 @@ mod pipeline_visualization;
 mod register_view;
 mod uart_view;
 
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, time::Duration};
 
 use dioxus::prelude::*;
 use dioxus_logger::tracing::info;
+use dioxus_sdk::utils::timing::use_debounce;
 
 use self::{
     memory_view::MemoryView, navbar::Navbar, pipeline_visualization::PipelineVisualization,
@@ -17,7 +18,7 @@ use self::{
 };
 use crate::code_editor::{CodeEditor, LineHighlight};
 use emugator_core::{
-    assembler::{AssembledProgram, AssemblerError},
+    assembler::{self, AssembledProgram, AssemblerError},
     emulator::AnyEmulatorState,
     include_test_file,
 };
@@ -26,17 +27,34 @@ use emugator_core::{
 #[allow(non_snake_case)]
 pub fn App() -> Element {
     let source = use_signal(|| include_test_file!("beta-demo.s").to_string());
-    let assembled_program: Signal<Option<AssembledProgram>> = use_signal(|| None);
-    let assembler_errors: Signal<Vec<AssemblerError>> = use_signal(Vec::new);
+    let mut assembled_program: Signal<Option<AssembledProgram>> = use_signal(|| None);
+    let mut assembler_errors: Signal<Vec<AssemblerError>> = use_signal(Vec::new);
     let emulator_state: Signal<AnyEmulatorState> =
         use_signal(|| AnyEmulatorState::new_cve2(&AssembledProgram::empty()));
     let breakpoints: Signal<BTreeSet<usize>> = use_signal(BTreeSet::new);
 
-    let minimize_console: Signal<bool> = use_signal(|| false);
+    let minimize_console: Signal<bool> = use_signal(|| true);
+
+    let mut assemble_debounce = use_debounce(Duration::from_secs(1), move |_| {
+        info!("Assembling...");
+        match assembler::assemble(&source.peek()) {
+            Ok(assembled) => {
+                info!("Assembly succeeded.");
+                assembled_program.set(Some(assembled));
+                assembler_errors.set(Vec::new());
+            }
+            Err(errors) => {
+                info!("Assembly failed.");
+                assembled_program.set(None);
+                assembler_errors.set(errors);
+            }
+        }
+    });
 
     use_effect(move || {
-        info!("source changed");
-        // TODO: Get diagnostics
+        info!("Source changed");
+        let _ = source.read();
+        assemble_debounce.action(());
     });
 
     let mut line_highlights = use_signal(Vec::<LineHighlight>::new);
@@ -83,32 +101,24 @@ pub fn App() -> Element {
                 assembler_errors,
                 emulator_state,
                 breakpoints,
+                minimize_console,
             }
             div { class: "flex flex-1 overflow-hidden",
                 div { class: "w-1/2 flex flex-col h-full bg-[#1E1E1E] overflow-hidden border-r-2 border-gray-900",
-                    if assembled_program.read().is_some() {
-                        div { class: "flex-1 relative overflow-hidden",
-                            CodeEditor {
-                                source,
-                                line_highlights,
-                                breakpoints,
-                                assembler_errors,
-                            }
+                    div { class: "flex-1 relative overflow-hidden",
+                        CodeEditor {
+                            source,
+                            line_highlights,
+                            breakpoints,
+                            assembler_errors,
                         }
-                        div {
-                            class: "transition-all duration-300 ease-in-out bg-[#2D2D2D] border-t-2 border-gray-900 "
-                                .to_owned() + { if *minimize_console.read() { "h-min" } else { "h-4/10" } },
-                            UartView { emulator_state, minimize_console }
-                        }
-                    } else {
-                        div { class: "flex-col h-full",
-                            CodeEditor {
-                                source,
-                                line_highlights,
-                                breakpoints,
-                                assembler_errors,
-                            }
-                        }
+                    }
+                    div {
+                        class: format!(
+                            "transition-all duration-300 ease-in-out bg-[#2D2D2D] border-t-2 border-gray-900 {}",
+                            if *minimize_console.read() { "h-min" } else { "h-4/10" },
+                        ),
+                        UartView { emulator_state, minimize_console }
                     }
                 }
                 div { class: "w-1/2 flex flex-col bg-gray-700 text-white",
