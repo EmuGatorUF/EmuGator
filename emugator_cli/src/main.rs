@@ -5,7 +5,10 @@ use emugator_core::{
     emulator::{EmulatorState, cve2::CVE2Pipeline},
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::{BTreeSet, HashMap}, default};
+use std::{
+    collections::{BTreeSet, HashMap},
+    iter::zip,
+};
 
 #[derive(Debug, Deserialize, Serialize, Default)]
 struct ExpectedState {
@@ -13,6 +16,8 @@ struct ExpectedState {
     registers: HashMap<u8, HexValue>,
     //#[serde(default)]
     data_memory: HashMap<HexValue, HexValue>,
+    //#[serde(default)]
+    output_buffer: String,
 }
 
 #[derive(Serialize, Debug, Deserialize, Clone, Copy)]
@@ -82,12 +87,14 @@ const EXAMPLE_JSON: &str = r##"
 {
     "registers": {
         "1": "00000076",
+        "2": "00000000",
         "9": "00000042"
     },
     "data_memory": {
         "00000064": "00000000",
         "00000065": "00000001"
-    }
+    },
+    "output_buffer": "Alas!\nPoor\tYorick"
 }
 "##;
 
@@ -126,11 +133,12 @@ fn new_project(args: NewArgs) {
     std::fs::create_dir(&test_path).expect("Failed to create example test directory");
 
     // populate example test
+    let example_program = programs_path.join("example_program.s");
     let input_path = test_path.join("input.txt");
-    let output_path = test_path.join("output.txt");
     let final_state = test_path.join("final_state.json");
+    std::fs::write(&example_program, include_str!("example_program.s"))
+        .expect("Failed to create example program");
     std::fs::write(&input_path, "input data").expect("Failed to create input file");
-    std::fs::write(&output_path, "output data").expect("Failed to create output file");
     std::fs::write(&final_state, EXAMPLE_JSON).expect("Failed to create final state file");
 }
 
@@ -159,7 +167,6 @@ fn run_tests(args: TestArgs) {
             if path.is_dir() {
                 let test_name = path.file_stem()?.to_str()?.to_string();
                 let mut input = None;
-                let mut expected_output = None;
                 let mut expected_state: Option<ExpectedState> = None;
 
                 // read files in test directory
@@ -172,8 +179,6 @@ fn run_tests(args: TestArgs) {
 
                         if name.contains("input") {
                             input = Some(std::fs::read_to_string(file_path).ok()?);
-                        } else if name.contains("output") {
-                            expected_output = Some(std::fs::read_to_string(file_path).ok()?);
                         } else if name.contains("state") || name.contains("registers") {
                             let file = std::fs::File::open(file_path)
                                 .expect("Failed to open expected state file.");
@@ -184,7 +189,7 @@ fn run_tests(args: TestArgs) {
                         }
                     }
                 }
-                Some((test_name, input, expected_output, expected_state))
+                Some((test_name, input, expected_state))
             } else {
                 None
             }
@@ -211,9 +216,13 @@ fn run_tests(args: TestArgs) {
 
         let mut failed_tests: Vec<String> = Vec::new();
         // run program for each test
-        for (test_name, input, expected_output, expected_state) in &test_dirs {
+        for (test_name, input, expected_state) in &test_dirs {
             //program.data_memory = original_data_mem.clone();
-            let starting_state = EmulatorState::<CVE2Pipeline>::new(&program);
+            let mut starting_state = EmulatorState::<CVE2Pipeline>::new(&program);
+            starting_state
+                .uart
+                .set_input_string(input.as_ref().map_or("", |v| v));
+            let starting_state = starting_state;
 
             let mut ending_state =
                 starting_state.clock_until_break(&mut program, &BTreeSet::new(), args.timeout);
@@ -227,15 +236,42 @@ fn run_tests(args: TestArgs) {
                     let actual_data = ending_state.x[*reg as usize];
                     if actual_data != u32::from_be_bytes(data.value) {
                         pass = false;
-                        state_diff.registers.insert(*reg, HexValue{value: u32::to_be_bytes(actual_data)});
+                        state_diff.registers.insert(
+                            *reg,
+                            HexValue {
+                                value: u32::to_be_bytes(actual_data),
+                            },
+                        );
                     }
                 }
                 for (addr, data) in &expected_state_ref.data_memory {
                     let actual_data = ending_state.data_memory.get(u32::from_be_bytes(addr.value));
-                    if actual_data != data.value[3]
-                    {
+                    if actual_data != data.value[3] {
                         pass = false;
-                        state_diff.data_memory.insert(*addr, HexValue{value: u32::to_be_bytes(actual_data as u32)});
+                        state_diff.data_memory.insert(
+                            *addr,
+                            HexValue {
+                                value: u32::to_be_bytes(actual_data as u32),
+                            },
+                        );
+                    }
+                }
+
+                // Check UART output
+                let expected_output = expected_state_ref.output_buffer.clone();
+                let actual_output = ending_state.uart.get_uart_output_buffer();
+                if &actual_output != &expected_state_ref.output_buffer {
+                    pass = false;
+                    let count = zip(expected_output.chars(), actual_output.chars())
+                        .take_while(|(a, b)| a == b)
+                        .count();
+                    if count == 0 {
+                        state_diff.output_buffer = actual_output;
+                    } else {
+                        // get the first n characters of the actual output
+                        let mut iter = actual_output.chars();
+                        iter.nth(count - 1);
+                        state_diff.output_buffer = iter.collect();
                     }
                 }
             }
@@ -244,24 +280,43 @@ fn run_tests(args: TestArgs) {
                 failed_tests.push(test_name.to_string());
 
                 let test_dir = output_path.join(test_name);
-                if !std::fs::exists(&test_dir).expect("Can't check if output subdirectory for test exists") {
-                    std::fs::create_dir(&test_dir).expect("Failed to create output subdirectory for a test");
+                if !std::fs::exists(&test_dir)
+                    .expect("Can't check if output subdirectory for test exists")
+                {
+                    std::fs::create_dir(&test_dir)
+                        .expect("Failed to create output subdirectory for a test");
                 }
 
-                let json_string = serde_json::to_string(&state_diff).expect("Couldn't convert state difference to string!");
-            
+                let json_string = serde_json::to_string(&state_diff)
+                    .expect("Couldn't convert state difference to string!");
+
                 let file_name = name.to_owned() + "_finalstate.json";
                 let test_result_path = test_dir.join(file_name);
-                std::fs::write(&test_result_path, &json_string).expect("Failed to create test output file");
+                std::fs::write(&test_result_path, &json_string)
+                    .expect("Failed to create test output file");
+            } else {
+                let test_dir = output_path.join(test_name);
+                if !std::fs::exists(&test_dir)
+                    .expect("Can't check if output subdirectory for test exists")
+                {
+                    std::fs::create_dir(&test_dir)
+                        .expect("Failed to create output subdirectory for a test");
+                }
+
+                let file_name = name.to_owned() + "_finalstate.json";
+                let test_result_path = test_dir.join(file_name);
+                let _ = std::fs::remove_file(&test_result_path);
             }
         }
         println!("Failed {:?}\n", failed_tests);
     }
-    println!("The difference between ending states for failed tests can be found in: {:?}", output_path.to_str());
+    println!(
+        "The difference between ending states for failed tests can be found in: {:?}",
+        output_path.to_str()
+    );
 
     // TODO: print results to a CSV file cleanly
     // TODO: jazz up UI with ratatui
     // TODO: Print usage information
-    // TODO: UART input, compare UART output with expected output
     // TODO: Clean up code, modularize
 }

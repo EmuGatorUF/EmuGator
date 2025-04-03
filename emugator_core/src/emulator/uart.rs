@@ -50,6 +50,10 @@ impl Uart {
     pub fn get_characters_read_in(&self) -> String {
         std::str::from_utf8(&self.characters_read_in).unwrap_or("Invalid UTF-8").to_string()
     }
+
+    pub fn get_uart_output_buffer(&self) -> String {
+        std::str::from_utf8(&self.uart_output_buffer).unwrap_or("Invalid UTF-8").to_string()
+    }
 }
 
 impl Default for Uart {
