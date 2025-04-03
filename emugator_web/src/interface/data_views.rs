@@ -8,20 +8,20 @@ use emugator_core::{
 #[allow(non_snake_case)]
 pub fn DataView(
     assembled_program: ReadOnlySignal<Option<AssembledProgram>>,
-    emulator_state: ReadOnlySignal<AnyEmulatorState>,
+    emulator_state: ReadOnlySignal<Option<AnyEmulatorState>>,
 ) -> Element {
     // Early return if no program is assembled
     let assembled_program = assembled_program.read();
-    let Some(program) = assembled_program.as_ref() else {
+    let emulator_state = emulator_state.read();
+    let (Some(program), Some(state)) = (assembled_program.as_ref(), emulator_state.as_ref()) else {
         return rsx! {
             div { class: "flex justify-center items-center h-full",
-                span { class: "text-gray-500 font-mono", "No program loaded" }
+                span { class: "text-gray-500 font-mono", "No program running" }
             }
         };
     };
 
-    let emulator_state = emulator_state.read();
-    let data_memory = emulator_state.data_memory();
+    let data_memory = state.data_memory();
     let data_start = program.get_section_start(Section::Data) as usize;
 
     // changed this to fix a bug where partial words did not show in data view

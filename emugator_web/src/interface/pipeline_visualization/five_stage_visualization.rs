@@ -105,7 +105,7 @@ impl FiveStageElement {
 #[component]
 #[allow(non_snake_case)]
 pub fn FiveStageVisualization(
-    emulator_state: ReadOnlySignal<AnyEmulatorState>,
+    emulator_state: ReadOnlySignal<Option<AnyEmulatorState>>,
     tooltip_text: Signal<Option<String>>,
 ) -> Element {
     const HOVER_STROKE: &'static str = "rgba(66, 133, 244, 1)";

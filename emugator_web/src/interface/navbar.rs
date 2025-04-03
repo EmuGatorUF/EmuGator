@@ -1,5 +1,5 @@
 use emugator_core::assembler::{self, AssembledProgram, AssemblerError};
-use emugator_core::emulator::AnyEmulatorState;
+use emugator_core::emulator::{AnyEmulatorState, EmulatorOption};
 
 use dioxus::prelude::*;
 use dioxus_logger::tracing::info;
@@ -12,14 +12,14 @@ pub fn Navbar(
     source: ReadOnlySignal<String>,
     assembled_program: Signal<Option<AssembledProgram>>,
     assembler_errors: Signal<Vec<AssemblerError>>,
-    emulator_state: Signal<AnyEmulatorState>,
+    emulator_state: Signal<Option<AnyEmulatorState>>,
+    selected_emulator: Signal<EmulatorOption>,
     breakpoints: ReadOnlySignal<BTreeSet<usize>>,
     minimize_console: Signal<bool>,
 ) -> Element {
-    let is_started = assembled_program.read().is_some();
+    let is_started = emulator_state.read().is_some();
+    let is_assembled = assembled_program.read().is_some();
     let error_count = assembler_errors.read().len();
-
-    let is_cve2 = matches!(*emulator_state.read(), AnyEmulatorState::CVE2(_));
 
     rsx! {
         nav { class: "bg-gray-900 text-white w-full py-2 px-4 flex items-center justify-between shadow-md border-b-2 border-gray-950",
@@ -33,8 +33,11 @@ pub fn Navbar(
                             match assembler::assemble(&source.read()) {
                                 Ok(assembled) => {
                                     info!("Final assembly succeeded.");
-                                    let new_state = emulator_state.read().new_same_type(&assembled);
-                                    emulator_state.set(new_state);
+                                    let new_state = AnyEmulatorState::new_of_type(
+                                        &assembled,
+                                        *selected_emulator.read(),
+                                    );
+                                    emulator_state.set(Some(new_state));
                                     assembled_program.set(Some(assembled));
                                     assembler_errors.set(Vec::new());
                                     minimize_console.set(false);
@@ -71,7 +74,10 @@ pub fn Navbar(
                         disabled: !is_started,
                         onclick: move |_| {
                             if let Some(mut program) = assembled_program.as_mut() {
-                                let new_state = emulator_state.read().clock(&mut program);
+                                let new_state = emulator_state
+                                    .read()
+                                    .as_ref()
+                                    .map(|e| e.clock(&mut program));
                                 emulator_state.set(new_state);
                             }
                         },
@@ -101,7 +107,10 @@ pub fn Navbar(
                             if let Some(mut program) = assembled_program.as_mut() {
                                 let new_state = emulator_state
                                     .read()
-                                    .clock_until_break(&mut program, breakpoints.read().deref(), 10_000);
+                                    .as_ref()
+                                    .map(|e| {
+                                        e.clock_until_break(&mut program, breakpoints.read().deref(), 10_000)
+                                    });
                                 emulator_state.set(new_state);
                             }
                         },
@@ -123,7 +132,7 @@ pub fn Navbar(
                 span {
                     class: format!(
                         "text-white text-sm font-medium {} rounded py-1 px-2 flex items-center",
-                        if is_started {
+                        if is_assembled {
                             "bg-green-600"
                         } else if error_count > 0 {
                             "bg-red-600"
@@ -131,7 +140,7 @@ pub fn Navbar(
                             "bg-gray-700"
                         },
                     ),
-                    if is_started {
+                    if is_assembled {
                         svg {
                             class: "w-4 h-4 mr-1 fill-current",
                             xmlns: "http://www.w3.org/2000/svg",
@@ -142,7 +151,11 @@ pub fn Navbar(
                                 clip_rule: "evenodd",
                             }
                         }
-                        "Program Assembled"
+                        if is_started {
+                            "Program Running"
+                        } else {
+                            "Program Assembled"
+                        }
                     } else if error_count > 0 {
                         svg {
                             class: "w-4 h-4 mr-1 fill-current",
@@ -162,16 +175,9 @@ pub fn Navbar(
                 button {
                     class: "bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex items-center",
                     onclick: move |_| {
-                        let program = assembled_program.read();
-                        let program_or_default = program.as_ref().unwrap_or(AssembledProgram::empty());
-                        emulator_state
-                            .set(
-                                if is_cve2 {
-                                    AnyEmulatorState::new_five_stage(program_or_default)
-                                } else {
-                                    AnyEmulatorState::new_cve2(program_or_default)
-                                },
-                            );
+                        let new_selection = selected_emulator.read().other();
+                        selected_emulator.set(new_selection);
+                        emulator_state.set(None);
                     },
                     svg {
                         class: "w-4 h-4 mr-1 fill-current",
@@ -183,11 +189,7 @@ pub fn Navbar(
                             clip_rule: "evenodd",
                         }
                     }
-                    if is_cve2 {
-                        "Two Stage Pipeline"
-                    } else {
-                        "Five Stage Pipeline"
-                    }
+                    "{selected_emulator.read().display_string()}"
                 }
                 button {
                     class: "bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm font-medium py-1 px-2 rounded transition duration-150 ease-in-out",

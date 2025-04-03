@@ -14,7 +14,7 @@ pub enum MemoryViewType {
 #[allow(non_snake_case)]
 pub fn MemoryView(
     assembled_program: ReadOnlySignal<Option<AssembledProgram>>,
-    emulator_state: ReadOnlySignal<AnyEmulatorState>,
+    emulator_state: ReadOnlySignal<Option<AnyEmulatorState>>,
 ) -> Element {
     let mut view_type = use_signal(|| MemoryViewType::Instruction);
 

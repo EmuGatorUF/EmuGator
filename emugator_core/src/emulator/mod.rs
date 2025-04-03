@@ -20,6 +20,28 @@ use uart::{Uart, trigger_uart};
 use cve2::CVE2Pipeline;
 use register_file::RegisterFile;
 
+#[derive(Clone, Copy, Debug)]
+pub enum EmulatorOption {
+    CVE2,
+    FiveStage,
+}
+
+impl EmulatorOption {
+    pub fn display_string(&self) -> &'static str {
+        match self {
+            EmulatorOption::CVE2 => "Two Stage Pipeline",
+            EmulatorOption::FiveStage => "Five Stage Pipeline",
+        }
+    }
+
+    pub fn other(&self) -> Self {
+        match self {
+            EmulatorOption::CVE2 => EmulatorOption::FiveStage,
+            EmulatorOption::FiveStage => EmulatorOption::CVE2,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum AnyEmulatorState {
     CVE2(EmulatorState<CVE2Pipeline>),
@@ -35,10 +57,10 @@ impl AnyEmulatorState {
         AnyEmulatorState::FiveStage(EmulatorState::new(program))
     }
 
-    pub fn new_same_type(&self, program: &AssembledProgram) -> Self {
-        match self {
-            AnyEmulatorState::CVE2(_) => Self::new_cve2(program),
-            AnyEmulatorState::FiveStage(_) => Self::new_five_stage(program),
+    pub fn new_of_type(program: &AssembledProgram, emulator_type: EmulatorOption) -> Self {
+        match emulator_type {
+            EmulatorOption::CVE2 => AnyEmulatorState::new_cve2(program),
+            EmulatorOption::FiveStage => AnyEmulatorState::new_five_stage(program),
         }
     }
 

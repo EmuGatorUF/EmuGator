@@ -220,7 +220,7 @@ fn find_active_elements(control: CVE2Control) -> BTreeSet<CVE2Element> {
 #[component]
 #[allow(non_snake_case)]
 pub fn CVE2Visualization(
-    emulator_state: ReadOnlySignal<AnyEmulatorState>,
+    emulator_state: ReadOnlySignal<Option<AnyEmulatorState>>,
     tooltip_text: Signal<Option<String>>,
 ) -> Element {
     const HOVER_STROKE: &'static str = "rgba(66, 133, 244, 1)";
@@ -232,7 +232,7 @@ pub fn CVE2Visualization(
 
     // Update active elements based on control signals
     use_effect(move || match &*emulator_state.read() {
-        AnyEmulatorState::CVE2(state) => {
+        Some(AnyEmulatorState::CVE2(state)) => {
             active_elements.set(find_active_elements(state.pipeline.control));
         }
         _ => {}
@@ -240,7 +240,7 @@ pub fn CVE2Visualization(
 
     // Sync tooltip text with the hovered element
     use_effect(move || {
-        let AnyEmulatorState::CVE2(state) = &*emulator_state.read() else {
+        let Some(AnyEmulatorState::CVE2(state)) = &*emulator_state.read() else {
             dioxus_logger::tracing::error!("Expected CVE2 emulator state");
             return;
         };

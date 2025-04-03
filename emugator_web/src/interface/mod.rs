@@ -19,7 +19,7 @@ use self::{
 use crate::code_editor::{CodeEditor, LineHighlight};
 use emugator_core::{
     assembler::{self, AssembledProgram, AssemblerError},
-    emulator::AnyEmulatorState,
+    emulator::{AnyEmulatorState, EmulatorOption},
     include_test_file,
 };
 
@@ -29,8 +29,8 @@ pub fn App() -> Element {
     let source = use_signal(|| include_test_file!("beta-demo.s").to_string());
     let mut assembled_program: Signal<Option<AssembledProgram>> = use_signal(|| None);
     let mut assembler_errors: Signal<Vec<AssemblerError>> = use_signal(Vec::new);
-    let emulator_state: Signal<AnyEmulatorState> =
-        use_signal(|| AnyEmulatorState::new_cve2(&AssembledProgram::empty()));
+    let selected_emulator: Signal<EmulatorOption> = use_signal(|| EmulatorOption::CVE2);
+    let emulator_state: Signal<Option<AnyEmulatorState>> = use_signal(|| None);
     let breakpoints: Signal<BTreeSet<usize>> = use_signal(BTreeSet::new);
 
     let minimize_console: Signal<bool> = use_signal(|| true);
@@ -71,23 +71,24 @@ pub fn App() -> Element {
                 .and_then(|p| p.source_map.get_by_left(&pc).copied())
         }
 
-        line_highlights.set(
-            emulator_state
-                .read()
-                .all_pcs()
-                .iter()
-                .filter_map(|pc_pos| {
-                    if let Some(line) = get_pc_line(pc_pos.pc, &assembled_program) {
-                        Some(LineHighlight {
-                            line,
-                            css_class: format!("{}-pc-decoration", pc_pos.name),
-                        })
-                    } else {
-                        None
-                    }
-                })
-                .collect(),
-        );
+        if let Some(emulator_state) = emulator_state.read().as_ref() {
+            line_highlights.set(
+                emulator_state
+                    .all_pcs()
+                    .iter()
+                    .filter_map(|pc_pos| {
+                        if let Some(line) = get_pc_line(pc_pos.pc, &assembled_program) {
+                            Some(LineHighlight {
+                                line,
+                                css_class: format!("{}-pc-decoration", pc_pos.name),
+                            })
+                        } else {
+                            None
+                        }
+                    })
+                    .collect(),
+            );
+        }
     });
 
     rsx! {
@@ -100,6 +101,7 @@ pub fn App() -> Element {
                 assembled_program,
                 assembler_errors,
                 emulator_state,
+                selected_emulator,
                 breakpoints,
                 minimize_console,
             }
@@ -131,7 +133,7 @@ pub fn App() -> Element {
                                 }
                             }
                             div { class: "h-[calc(100%-2rem)] overflow-auto",
-                                PipelineVisualization { emulator_state }
+                                PipelineVisualization { emulator_state, selected_emulator }
                             }
                         }
                     }
