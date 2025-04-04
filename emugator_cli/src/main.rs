@@ -220,8 +220,8 @@ fn run_tests(args: TestArgs) {
             //program.data_memory = original_data_mem.clone();
             let mut starting_state = EmulatorState::<CVE2Pipeline>::new(&program);
             starting_state
-                .uart
-                .set_input_string(input.as_ref().map_or("", |v| v));
+                .data_memory
+                .set_serial_in(input.as_ref().map_or(&vec![], |v| v.as_bytes()));
             let starting_state = starting_state;
 
             let mut ending_state =
@@ -258,21 +258,16 @@ fn run_tests(args: TestArgs) {
                 }
 
                 // Check UART output
-                let expected_output = expected_state_ref.output_buffer.clone();
-                let actual_output = ending_state.uart.get_uart_output_buffer();
-                if &actual_output != &expected_state_ref.output_buffer {
+                let expected_output = expected_state_ref.output_buffer.as_bytes();
+                let actual_output = ending_state.data_memory.get_serial_out();
+                if actual_output != expected_output {
                     pass = false;
-                    let count = zip(expected_output.chars(), actual_output.chars())
+                    let count = zip(expected_output, actual_output)
                         .take_while(|(a, b)| a == b)
                         .count();
-                    if count == 0 {
-                        state_diff.output_buffer = actual_output;
-                    } else {
-                        // get the first n characters of the actual output
-                        let mut iter = actual_output.chars();
-                        iter.nth(count - 1);
-                        state_diff.output_buffer = iter.collect();
-                    }
+
+                    state_diff.output_buffer =
+                        String::from_utf8_lossy(&actual_output[count..]).to_string();
                 }
             }
 

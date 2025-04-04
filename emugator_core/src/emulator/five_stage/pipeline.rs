@@ -1,7 +1,7 @@
 use crate::assembler::AssembledProgram;
 use crate::emulator::controller_common::{DataDestSel, OpASel, OpBSel, PCSel};
 use crate::emulator::{PcPos, read_instruction};
-use crate::emulator::{Pipeline, data_memory::DataMemory, register_file::RegisterFile};
+use crate::emulator::{Pipeline, memory_module::MemoryMappedIO, register_file::RegisterFile};
 use crate::isa::Instruction;
 use crate::{bitmask, bits};
 
@@ -38,7 +38,7 @@ impl Pipeline for FiveStagePipeline {
         &mut self,
         program: &AssembledProgram,
         registers: &mut RegisterFile,
-        data_memory: &mut DataMemory,
+        data_memory: &mut MemoryMappedIO,
     ) {
         // Run the registers that had stuff to write in the last cycle
         // (this is done first to represent it taking a clock edge to write)
@@ -310,7 +310,7 @@ impl FiveStagePipeline {
         }
     }
 
-    fn run_data_memory(&mut self, data_memory: &mut DataMemory) {
+    fn run_data_memory(&mut self, data_memory: &mut MemoryMappedIO) {
         if self.mem_lines.data_req_o {
             if self.mem_lines.data_we_o {
                 data_memory.write_word(

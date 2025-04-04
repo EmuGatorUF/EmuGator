@@ -1,7 +1,7 @@
 pub mod controller_common;
 pub mod cve2;
-pub mod data_memory;
 pub mod five_stage;
+pub mod memory_module;
 mod register_file;
 pub mod uart;
 
@@ -13,9 +13,9 @@ mod five_stage_tests;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::assembler::{AssembledProgram, Section};
-use data_memory::DataMemory;
 use five_stage::FiveStagePipeline;
-use uart::{Uart, trigger_uart};
+use memory_module::MemoryMappedIO;
+use uart::Uart;
 
 use cve2::CVE2Pipeline;
 use register_file::RegisterFile;
@@ -109,24 +109,17 @@ impl AnyEmulatorState {
         }
     }
 
-    pub fn uart(&self) -> &Uart {
-        match self {
-            AnyEmulatorState::CVE2(state) => &state.uart,
-            AnyEmulatorState::FiveStage(state) => &state.uart,
-        }
-    }
-
-    pub fn uart_mut(&mut self) -> &mut Uart {
-        match self {
-            AnyEmulatorState::CVE2(state) => &mut state.uart,
-            AnyEmulatorState::FiveStage(state) => &mut state.uart,
-        }
-    }
-
-    pub fn data_memory(&self) -> &DataMemory {
+    pub fn memory_io(&self) -> &MemoryMappedIO {
         match self {
             AnyEmulatorState::CVE2(state) => &state.data_memory,
             AnyEmulatorState::FiveStage(state) => &state.data_memory,
+        }
+    }
+    
+    pub fn memory_io_mut(&mut self) -> &mut MemoryMappedIO {
+        match self {
+            AnyEmulatorState::CVE2(state) => &mut state.data_memory,
+            AnyEmulatorState::FiveStage(state) => &mut state.data_memory,
         }
     }
 
@@ -148,16 +141,14 @@ impl AnyEmulatorState {
 #[derive(Clone, Debug)]
 pub struct EmulatorState<P: Pipeline> {
     pub x: RegisterFile,
-    pub data_memory: DataMemory,
-    pub uart: Uart,
+    pub data_memory: MemoryMappedIO,
     pub pipeline: P,
 }
 
 impl<P: Pipeline + Clone + Default> EmulatorState<P> {
     pub fn new(program: &AssembledProgram) -> Self {
-        let uart = Uart::default();
         let mut pipeline = P::default();
-        let data_memory = DataMemory::new(&program.initial_data_memory, &uart);
+        let data_memory = MemoryMappedIO::new(&program.initial_data_memory, 0xF0);
 
         // set starting address to start
         let start_addr = program.get_section_start(Section::Text);
@@ -166,7 +157,6 @@ impl<P: Pipeline + Clone + Default> EmulatorState<P> {
         EmulatorState {
             x: RegisterFile::default(),
             data_memory,
-            uart,
             pipeline,
         }
     }
@@ -175,7 +165,6 @@ impl<P: Pipeline + Clone + Default> EmulatorState<P> {
         EmulatorState {
             x: self.x,
             data_memory: self.data_memory,
-            uart: self.uart,
             pipeline: FiveStagePipeline::default(),
         }
     }
@@ -242,7 +231,8 @@ impl<P: Pipeline + Clone + Default> EmulatorState<P> {
         next_state
             .pipeline
             .clock(program, &mut next_state.x, &mut next_state.data_memory);
-        next_state.uart = trigger_uart(&next_state.uart, &mut next_state.data_memory);
+        // Clock the memory module
+        next_state.data_memory.clock();
         next_state
     }
 }
@@ -253,7 +243,7 @@ pub trait Pipeline: Clone {
         &mut self,
         program: &AssembledProgram,
         registers: &mut RegisterFile,
-        data_memory: &mut DataMemory,
+        data_memory: &mut MemoryMappedIO,
     );
 
     /// Set the initial address of the instruction fetch stage
