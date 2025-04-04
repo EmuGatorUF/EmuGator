@@ -1,43 +1,41 @@
 use crate::emulator::controller_common::PCSel;
 
-use super::controller::FiveStageControl;
-
 #[derive(Clone, Copy, Default, Debug)]
 pub struct IfLines {
-    pub instr: u32,
-    pub instr_read_err: bool,
+    pub instr: Option<u32>,
+    pub next_pc_sel: PCSel,
+    pub next_pc: Option<u32>,
 }
 
 #[derive(Clone, Copy, Default, Debug)]
 pub struct IfIdBuffer {
-    pub id_pc: u32,
-    pub id_inst: u32,
+    pub id_pc: Option<u32>,
+    pub id_inst: Option<u32>,
 }
 
 #[derive(Clone, Copy, Default, Debug)]
 pub struct IdLines {
-    pub id_control: FiveStageControl,
-
     // decode
     pub rs1: u8,
     pub rs2: u8,
     pub imm: Option<u32>,
     pub rd: u8,
-    pub br_dst: u32,
 
     // register reads
     pub rs1_v: u32,
     pub rs2_v: u32,
+
+    // hazard detection
+    pub hazard_detected: bool,
 }
 
 #[derive(Clone, Copy, Default, Debug)]
 pub struct IdExBuffer {
-    pub ex_control: FiveStageControl,
-    pub ex_pc: u32,
-    pub br_dst: u32,
+    pub ex_pc: Option<u32>,
     pub rs1_v: u32,
     pub rs2_v: u32,
     pub imm: Option<u32>,
+    pub rd: Option<u8>,
 }
 
 #[derive(Clone, Copy, Default, Debug)]
@@ -48,22 +46,22 @@ pub struct ExLines {
     pub alu_out: Option<u32>,
 
     // next pc
+    pub jmp_base: Option<u32>,
     pub jmp_dst: Option<u32>,
-    pub next_pc_sel: PCSel,
-    pub next_pc: Option<u32>,
+    pub cmp_result: Option<u32>,
 }
 
 #[derive(Clone, Copy, Default, Debug)]
 pub struct ExMemBuffer {
-    pub mem_control: FiveStageControl,
-    pub mem_pc: u32,
+    pub mem_pc: Option<u32>,
     pub alu_o: Option<u32>,
     pub rs2_v: u32,
+    pub rd: Option<u8>,
 }
 
 #[derive(Clone, Copy, Default, Debug)]
 pub struct MemLines {
-    pub rd_data: Option<u32>,
+    pub mem_data: Option<u32>,
 
     // data memory interface
     pub data_req_o: bool,  // Output signal requesting a data memory operation.
@@ -79,10 +77,10 @@ pub struct MemLines {
 
 #[derive(Clone, Copy, Default, Debug)]
 pub struct MemWbBuffer {
-    pub wb_control: FiveStageControl,
-    pub wb_pc: u32,
+    pub wb_pc: Option<u32>,
     pub alu: Option<u32>,
     pub lsu: Option<u32>,
+    pub rd: Option<u8>,
 }
 
 #[derive(Clone, Copy, Default, Debug)]

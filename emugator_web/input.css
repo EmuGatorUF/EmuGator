@@ -3,20 +3,37 @@
 @layer base, components, utilities;
 
 @layer utilities {
-    .if-pc-decoration {
+    .pc-decoration {
         box-sizing: border-box;
         pointer-events: none;
-        outline: #3b82f6 2px solid;
+        outline-width: 2px;
+        outline-style: solid;
         outline-offset: -2px;
+    }
+
+    .pc-decoration.if {
+        outline-color: #3b82f6;
         z-index: 9000;
     }
 
-    .id-pc-decoration {
-        box-sizing: border-box;
-        pointer-events: none;
-        outline: #d97706 2px solid;
-        outline-offset: -2px;
+    .pc-decoration.id {
+        outline-color: #d97706;
         z-index: 9001;
+    }
+
+    .pc-decoration.ex {
+        outline-color: #dc2626;
+        z-index: 9002;
+    }
+
+    .pc-decoration.mem {
+        outline-color: #4ade80;
+        z-index: 9003;
+    }
+
+    .pc-decoration.wb {
+        outline-color: #9333ea;
+        z-index: 9004;
     }
 
     .monaco-breakpoint {
@@ -28,13 +45,7 @@
         cursor: pointer;
     }
 
-    .monaco-breakpoint-preview {
-        width: 8px !important;
-        height: 8px !important;
-        border-radius: 100%;
-        background-color: #e51400;
-        margin: 4px 0 0 8px;
-        cursor: pointer;
+    .monaco-breakpoint.preview {
         opacity: 0.4 !important;
     }
 }

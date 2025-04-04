@@ -21,8 +21,8 @@ pub enum ALUOp {
 impl ALUOp {
     pub fn apply(self, a: u32, b: u32) -> u32 {
         match self {
-            ALUOp::ADD => ((a as i32) + (b as i32)) as u32,
-            ALUOp::SUB => ((a as i32) - (b as i32)) as u32,
+            ALUOp::ADD => ((a as i32).wrapping_add(b as i32)) as u32,
+            ALUOp::SUB => ((a as i32).wrapping_sub(b as i32)) as u32,
             ALUOp::XOR => a ^ b,
             ALUOp::OR => a | b,
             ALUOp::AND => a & b,

@@ -80,7 +80,7 @@ pub fn App() -> Element {
                         if let Some(line) = get_pc_line(pc_pos.pc, &assembled_program) {
                             Some(LineHighlight {
                                 line,
-                                css_class: format!("{}-pc-decoration", pc_pos.name),
+                                css_class: pc_pos.name,
                             })
                         } else {
                             None

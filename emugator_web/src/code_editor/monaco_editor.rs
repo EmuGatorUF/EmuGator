@@ -19,7 +19,7 @@ type MouseEventHandler = DisposableClosure<dyn FnMut(IEditorMouseEvent)>;
 #[derive(Clone, PartialEq, Debug)]
 pub struct LineHighlight {
     pub line: usize,
-    pub css_class: String,
+    pub css_class: &'static str,
 }
 
 /// The monaco editor directly wrapped
@@ -77,7 +77,7 @@ pub fn MonacoEditor(
 
                 // find new highlights
                 for line_highlight in line_highlights.read().iter() {
-                    new_decor.push(&line_decoration(
+                    new_decor.push(&line_highlight_decoration(
                         line_highlight.line,
                         &line_highlight.css_class,
                     ));
@@ -86,7 +86,7 @@ pub fn MonacoEditor(
                 // add breakpoint hover dot
                 if let Some(line) = *breakpoint_hover_line.read() {
                     if !breakpoints.read().contains(&line) {
-                        new_decor.push(&breakpoint_decoration(line, "monaco-breakpoint-preview"));
+                        new_decor.push(&breakpoint_decoration(line, "monaco-breakpoint .preview"));
                     }
                 }
 
@@ -138,7 +138,7 @@ fn on_mouse_click(e: IEditorMouseEvent, mut breakpoints: Signal<BTreeSet<usize>>
     }
 }
 
-fn line_decoration(line_number: usize, class: &str) -> IModelDeltaDecoration {
+fn line_highlight_decoration(line_number: usize, class: &str) -> IModelDeltaDecoration {
     let decoration: IModelDeltaDecoration = new_object().into();
     let range = Range::new(line_number as f64, 0.0, line_number as f64, 1.0);
     decoration.set_range(&IRange::from(range.dyn_into::<JsValue>().unwrap()));
@@ -146,7 +146,7 @@ fn line_decoration(line_number: usize, class: &str) -> IModelDeltaDecoration {
     let options: IModelDecorationOptions = new_object().into();
     options.set_is_whole_line(Some(true));
     options.set_z_index(Some(9999.0));
-    options.set_class_name(Some(class));
+    options.set_class_name(Some(&format!("pc-decoration .{}", class)));
 
     decoration.set_options(&options);
 
