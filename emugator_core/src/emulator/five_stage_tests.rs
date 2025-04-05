@@ -78,12 +78,12 @@ fn test_AUIPC() {
     let mut state = EmulatorState::<FiveStagePipeline>::new(&program);
 
     state = state.clock(&program); //IF
+    let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program); //ID
     state = state.clock(&program); //EX
     state = state.clock(&program); //MEM
 
     // After AUIPC, x1 should hold the value (PC + 0x12345000)
-    let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program);
     assert_eq!(state.x[1], pc + 0x12345000);
 }
@@ -121,23 +121,95 @@ fn test_JAL() {
 
     state = state.clock(&program); //IF
     state = state.clock(&program); //ID
+    let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program); //EX
     state = state.clock(&program); //MEM
+    assert_eq!(state.pipeline.if_pc, pc + 0x8);
+    assert_eq!(state.pipeline.if_pc, 12);
 
     // Padding Instruction
-    state = state.clock(&program);
+    state = state.clock(&program); //WB
 
     // After JAL, x1 should contain PC + 4, and the PC should jump to PC + 0x8
-    let pc = state.pipeline.if_id.id_pc.unwrap();
-    state = state.clock(&program);
-    assert_eq!(state.pipeline.if_pc, pc + 0x8);
     state = state.clock(&program);
     assert_eq!(state.x[1], pc + 4);
 
     // ADDI that it jumps to
+    state = state.clock(&program); //EX
+    state = state.clock(&program); //MEM
     assert_eq!(state.x[5], 0);
-    state = state.clock(&program);
+    state = state.clock(&program); //WB
     assert_eq!(state.x[5], 2);
+}
+
+#[test]
+fn test_JAL_bigger_jump() {
+    // JAL ( x1 := PC + 4, jump to PC + 0x100)
+    let program = populate(&[
+        ISA::ADDI.build(Operands {
+            rd: 9,
+            rs1: 0,
+            imm: 0,
+            ..Default::default()
+        }),
+        ISA::JAL.build(Operands {
+            rd: 1,
+            imm: 16,
+            ..Default::default()
+        }),
+        ISA::ADDI.build(Operands {
+            rd: 5,
+            rs1: 0,
+            imm: 1,
+            ..Default::default()
+        }),
+        ISA::ADDI.build(Operands {
+            rd: 5,
+            rs1: 0,
+            imm: 2,
+            ..Default::default()
+        }),
+        ISA::ADDI.build(Operands {
+            rd: 6,
+            rs1: 0,
+            imm: 2,
+            ..Default::default()
+        }),
+        ISA::ADDI.build(Operands {
+            rd: 7,
+            rs1: 0,
+            imm: 10,
+            ..Default::default()
+        }),
+    ]);
+
+    let mut state = EmulatorState::<FiveStagePipeline>::new(&program);
+
+    state = state.clock(&program); //IF
+    state = state.clock(&program); //ID
+    let pc = state.pipeline.if_id.id_pc.unwrap();
+    state = state.clock(&program); //EX
+    state = state.clock(&program); //MEM
+    assert_eq!(state.pipeline.if_pc, pc + 0x8);
+    assert_eq!(state.pipeline.if_pc, 12);
+
+    // Padding Instruction
+    state = state.clock(&program); //WB
+
+    // After JAL, x1 should contain PC + 4, and the PC should jump to PC + 16
+    state = state.clock(&program);
+    assert_eq!(state.x[1], pc + 4);
+
+    // ADDI that it jumps to
+    state = state.clock(&program); //EX
+    state = state.clock(&program); //MEM
+    assert_eq!(state.x[5], 0);
+    assert_eq!(state.x[6], 0);
+    assert_eq!(state.x[7], 0);
+    state = state.clock(&program); //WB
+    assert_eq!(state.x[5], 0);
+    assert_eq!(state.x[6], 0);
+    assert_eq!(state.x[7], 10);
 }
 
 #[test]
@@ -173,10 +245,13 @@ fn test_JAL_neg_offset() {
     // ADDI ( x5 := x0 + 1)
     state = state.clock(&program);
     // ADDI ( x5 := x5 + 1)
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    let pc = state.pipeline.if_id.id_pc.unwrap();
+    state = state.clock(&program);
     state = state.clock(&program);
 
     // After JAL, x1 should contain PC + 4, and the PC should jump to PC + 0x04
-    let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program);
     assert_eq!(state.pipeline.if_pc, pc - 0x04);
     state = state.clock(&program);
@@ -184,7 +259,11 @@ fn test_JAL_neg_offset() {
 
     // ADDI ( x5 := x5 + 1)
     assert_eq!(state.x[5], 2);
-    state = state.clock(&program);
+    state = state.clock(&program); //IF
+    state = state.clock(&program); //ID
+    state = state.clock(&program); //EX
+    state = state.clock(&program); //MEM
+    state = state.clock(&program); //WB
     assert_eq!(state.x[5], 3);
 }
 
@@ -254,16 +333,21 @@ fn test_JALR() {
 
     // After ADDI, x2 should be loaded with 0b100
     state = state.clock(&program);
+    let pc = state.pipeline.if_id.id_pc.unwrap();
     assert_eq!(state.x[2], 0x4);
 
-    // After JALR, x1 should contain PC + 4, and the PC should jump to (x4 + 0x2) & ~1
-    let pc = state.pipeline.if_id.id_pc.unwrap();
+    // After JALR, x1 should contain PC + 4, and the PC should jump to (x2 + 0x8) & ~1
+    state = state.clock(&program); //extra clock cycles because of hazard
     state = state.clock(&program);
     assert_eq!(state.pipeline.if_pc, (state.x[2] + 0x8) & !1);
+    state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[1], pc + 4);
 
     // After ADDI
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[4], 2);
 
@@ -301,16 +385,23 @@ fn test_JALR_neg_offset() {
     state = state.clock(&program); //EX
     state = state.clock(&program); //MEM
     // ADDI ( x5 := x0 + 1)
-    state = state.clock(&program);
+    state = state.clock(&program); //WB
     // ADDI ( x5 := x0 + 1)
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
     state = state.clock(&program);
 
     // After JALR, x1 should contain PC + 4, and the PC should jump to x2 (12) - 4
     let pc = state.pipeline.if_id.id_pc.unwrap();
+    state = state.clock(&program); //extra clock cycles because of hazard
     state = state.clock(&program);
     assert_eq!(state.pipeline.if_pc, (state.x[2] as i32 - 4) as u32 & !1);
+    assert_eq!(8, state.pipeline.if_pc);
+    state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[1], pc + 4);
+    assert_eq!(state.x[1], 12);
 }
 
 #[test]
@@ -354,27 +445,30 @@ fn test_BEQ() {
     state = state.clock(&program); //ID
     state = state.clock(&program); //EX
     state = state.clock(&program); //MEM
-
     // ADDI ( x1 := x0 + 1)
-    state = state.clock(&program);
+    state = state.clock(&program); //WB
     assert_eq!(state.x[1], 1);
 
     // BEQ (branch if x1 == x2) - should not branch because x1 != x2
     let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program);
     state = state.clock(&program);
-    state = state.clock(&program);
     assert_eq!(state.pipeline.if_id.id_pc.unwrap(), pc + 0x4);
-
-    // BEQ (branch if x0 == x2) - should branch because x0 == x2
+    
+    state = state.clock(&program);
     let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program);
-    state = state.clock(&program);
+
+    // BEQ (branch if x0 == x2) - should branch because x0 == x2
     state = state.clock(&program);
     assert_eq!(state.pipeline.if_id.id_pc.unwrap(), pc + 0x8);
+    state = state.clock(&program);
+    //assert_eq!(state.pipeline.if_pc, pc + 0x8);
+    state = state.clock(&program);
 
     // ADDI ( x5 := x0 + 2)
     assert_eq!(state.x[5], 0);
+    state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[5], 2);
 }
@@ -428,18 +522,21 @@ fn test_BNE() {
     let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program);
     state = state.clock(&program);
-    state = state.clock(&program);
     assert_eq!(state.pipeline.if_id.id_pc.unwrap(), pc + 0x4);
 
-    // BNE (branch if x1 != x2) - should branch because x1 != x2
     let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program);
-    state = state.clock(&program);
+
+    // BNE (branch if x1 != x2) - should branch because x1 != x2
     state = state.clock(&program);
     assert_eq!(state.pipeline.if_id.id_pc.unwrap(), pc + 0x8);
+    assert_eq!(16, pc + 0x8);
+    state = state.clock(&program);
+    state = state.clock(&program);
 
     // ADDI ( x5 := x0 + 2)
     assert_eq!(state.x[5], 0);
+    state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[5], 2);
 }
@@ -783,6 +880,9 @@ fn test_LB() {
     state = state.clock(&program);
 
     // LB ( x5 := MEM[x1 + 0x8])
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[5], 0xFFFFFFFB);
@@ -832,6 +932,9 @@ fn test_LH() {
     state = state.clock(&program);
 
     // LB ( x5 := MEM[x1 + 0x8])
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[5], 0xFFFFFCFB);
@@ -875,6 +978,9 @@ fn test_LW() {
     state = state.clock(&program);
 
     // LB ( x5 := MEM[x1 + 0x8])
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[5], 0x7E7DFCFB);
@@ -922,11 +1028,17 @@ fn test_SB() {
     // Set x1 := 0xFEFDFCFB
     state = state.clock(&program);
     state = state.clock(&program);
-
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
+    
     // Set x2 := 100
     state = state.clock(&program);
 
     // SH -> Write first byte of x1 to address x2 (100) + 5
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.data_memory.get(105), 0xFB);
@@ -977,11 +1089,17 @@ fn test_SH() {
     // Set x1 := 0xFEFDFCFB (lowest byte )
     state = state.clock(&program);
     state = state.clock(&program);
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
 
     // Set x2 := 100
     state = state.clock(&program);
 
     // SH -> Write x1 to address x2 (100) + 5
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.data_memory.get(105), 0xFB);
@@ -1032,11 +1150,17 @@ fn test_SW() {
     // Set x1 := 0xFEFDFCFB
     state = state.clock(&program);
     state = state.clock(&program);
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
 
     // Set x2 := 100
     state = state.clock(&program);
 
     // SW -> Write x1 to address x2 (100) + 5
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.data_memory.get(105), 0xFB);
@@ -1082,6 +1206,9 @@ fn test_ADDI() {
     state = state.clock(&program);
     assert_eq!(state.x[1], 1);
     // ADDI ( x1 := x1 + 1)
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[1], 0);
     // ADDI ( x0 := x0 + 1) <= special case should be a noop
@@ -1126,6 +1253,9 @@ fn test_SLTI() {
     state = state.clock(&program);
     assert_eq!(state.x[1], 1);
     // SLTI ( x1 := x1 < (-1))
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[1], 0);
     // SLTI ( x0 := x0 < 1 ) <= Should not change x0
@@ -1170,6 +1300,9 @@ fn test_SLTIU() {
     state = state.clock(&program);
     assert_eq!(state.x[1], 1);
     // SLTI ( x1 := x1 < (-1))
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[1], 1);
     // SLTI ( x0 := x0 < 1 ) <= Should not change x0
@@ -1214,6 +1347,9 @@ fn test_XORI() {
     state = state.clock(&program);
     assert_eq!(state.x[1], 4);
     // XORI ( x1 := x1 ^ (-1))
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[1] as i32, -5);
     // XORI ( x0 := x0 ^ 100 ) <= Should not change x0
@@ -1258,6 +1394,9 @@ fn test_ORI() {
     state = state.clock(&program);
     assert_eq!(state.x[1], 12);
     // ORI ( x1 := x1 ^ (-10))
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[1] as i32, -2);
     // ORI ( x0 := x0 ^ 100 ) <= Should not change x0
@@ -1306,10 +1445,16 @@ fn test_ANDI() {
     assert_eq!(state.x[1], 37);
 
     // ANDI ( x1 := x1 & 5)
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[1], 5);
 
     // ANDI ( x1 := x1 & (-10))
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[1], 4);
 
@@ -1359,6 +1504,9 @@ fn test_SLLI() {
     assert_eq!(state.x[1], 10);
 
     // SLLI ( x2 := x1 << 4)
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[2], 160);
 
@@ -1412,6 +1560,9 @@ fn test_SRLI() {
     assert_eq!(state.x[1], 10);
 
     // SRLI ( x2 := x1 >> 1)
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[2], 5);
 
@@ -1465,6 +1616,9 @@ fn test_SRAI() {
     assert_eq!(state.x[1] as i32, -10);
 
     // SRAI ( x2 := x1 >> -1)
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[2] as i32, -1);
 
@@ -1533,6 +1687,9 @@ fn test_ADD() {
     assert_eq!(state.x[2] as i32, -10);
 
     // ADD (x3 := x1 + x2)
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[3] as i32, 5);
 
@@ -1608,6 +1765,9 @@ fn test_SUB() {
     assert_eq!(state.x[2] as i32, 5);
 
     // SUB (x3 := x1 - x2)
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[3] as i32, 15);
 
@@ -1694,6 +1854,9 @@ fn test_SLL() {
     assert_eq!(state.x[2] as i32, 2);
 
     // SLL (x3 := x1 << x2)
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[3] as i32, 4);
 
@@ -1701,6 +1864,9 @@ fn test_SLL() {
     state = state.clock(&program);
 
     // SLL (x4 := x1 << x2, with x2 effectively 0)
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[4] as i32, 1);
 
@@ -1763,6 +1929,9 @@ fn test_SLT() {
 
     state = state.clock(&program); // Set x1 = 5
     state = state.clock(&program); // Set x2 = 10
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[3], 1); // x3 = 1 (5 < 10)
 
@@ -1808,9 +1977,15 @@ fn test_SLTU() {
 
     let mut state = EmulatorState::<FiveStagePipeline>::new(&program);
 
-    state = state.clock(&program);
+    state = state.clock(&program); //IF
+    state = state.clock(&program); //ID
+    state = state.clock(&program); //EX
+    state = state.clock(&program); //MEM
     state = state.clock(&program); // Set x1 = -1 (0xFFFFFFFF unsigned)
     state = state.clock(&program); // Set x2 = 1
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[3], 1); // x3 = 1 (1 < 0xFFFFFFFF true)
 
@@ -1853,6 +2028,9 @@ fn test_XOR() {
     state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
 
     assert_eq!(state.x[3], 0b0110); // x3 = 6 (0b1100 ^ 0b1010)
 }
@@ -1890,6 +2068,9 @@ fn test_SRL() {
     state = state.clock(&program); //EX
     state = state.clock(&program); //MEM
     state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program); //extra clock cycles because of hazard
     state = state.clock(&program);
     state = state.clock(&program);
 
@@ -1931,6 +2112,9 @@ fn test_SRA() {
     state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
 
     assert_eq!(state.x[3] as i32, -4); // x3 = -4 (-16 >> 2, arithmetic)
 }
@@ -1970,6 +2154,9 @@ fn test_OR() {
     state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
 
     assert_eq!(state.x[3], 0b1110); // x3 = 14 (0b1100 | 0b1010)
 }
@@ -2006,7 +2193,10 @@ fn test_AND() {
     state = state.clock(&program); //ID
     state = state.clock(&program); //EX
     state = state.clock(&program); //MEM
+    state = state.clock(&program); //WB
     state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program); //extra clock cycles because of hazard
     state = state.clock(&program);
     state = state.clock(&program);
 
