@@ -257,7 +257,7 @@ impl FiveStagePipeline {
             rd: self.id_ex.rd,
         };
 
-        if !self.id_lines.hazard_detected {
+        if !self.id_lines.hazard_detected.stop_ex {
             self.id_ex = IdExBuffer {
                 ex_pc: self.if_id.id_pc,
                 rs1_v: self.id_lines.rs1_v,
@@ -265,14 +265,16 @@ impl FiveStagePipeline {
                 imm: self.id_lines.imm,
                 rd: Some(self.id_lines.rd),
             };
+        } else {
+            // to stall, clear the ID-EX buffer to send a no op
+            self.id_ex = IdExBuffer::default();
+        }
 
+        if !self.id_lines.hazard_detected.stop_id {
             self.if_id = IfIdBuffer {
                 id_pc: Some(self.if_pc),
                 id_inst: self.if_lines.instr,
             };
-        } else {
-            // to stall, clear the ID-EX buffer to send a no op
-            self.id_ex = IdExBuffer::default();
         }
     }
 
@@ -280,7 +282,7 @@ impl FiveStagePipeline {
         self.wb_control = self.mem_control;
         self.mem_control = self.ex_control;
 
-        if !self.id_lines.hazard_detected {
+        if !self.id_lines.hazard_detected.stop_ex {
             self.ex_control = self.id_control;
         } else {
             // to stall, clear the ID-EX buffer to send a no op
@@ -289,7 +291,7 @@ impl FiveStagePipeline {
     }
 
     fn run_pc_reg(&mut self) {
-        if !self.id_lines.hazard_detected {
+        if !self.id_lines.hazard_detected.stop_if {
             if let Some(next_pc) = self.if_lines.next_pc {
                 if next_pc & 0x00000003 != 0x00 {
                     panic!("PC must be on a 4-byte boundary");

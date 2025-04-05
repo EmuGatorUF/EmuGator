@@ -190,8 +190,8 @@ fn test_JAL_bigger_jump() {
     let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program); //EX
     state = state.clock(&program); //MEM
-    assert_eq!(state.pipeline.if_pc, pc + 0x8);
-    assert_eq!(state.pipeline.if_pc, 12);
+    assert_eq!(state.pipeline.if_pc, pc + 16);
+    assert_eq!(state.pipeline.if_pc, 20);
 
     // Padding Instruction
     state = state.clock(&program); //WB
@@ -454,7 +454,7 @@ fn test_BEQ() {
     state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.pipeline.if_id.id_pc.unwrap(), pc + 0x4);
-    
+
     state = state.clock(&program);
     let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program);
@@ -1031,7 +1031,7 @@ fn test_SB() {
     state = state.clock(&program); //extra clock cycles because of hazard
     state = state.clock(&program);
     state = state.clock(&program);
-    
+
     // Set x2 := 100
     state = state.clock(&program);
 
