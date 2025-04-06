@@ -240,6 +240,14 @@ impl FiveStageControl {
                 };
                 Some(FiveStageControl::register(op))
             }
+            0b1110011 => match instr.raw() {
+                0b0000_0000_0000_00000_000_00000_1110011 => Some(FiveStageControl::default()), // ECALL
+                0b0000_0000_0001_00000_000_00000_1110011 => Some(FiveStageControl {
+                    debug_req: true,
+                    ..Default::default()
+                }), // EBREAK
+                _ => Some(FiveStageControl::default()), // CSR (no-op),
+            },
             _ => None,
         }
     }

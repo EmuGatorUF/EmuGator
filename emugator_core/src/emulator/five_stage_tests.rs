@@ -955,6 +955,7 @@ fn test_LB() {
 
     // ADDI ( x1 := x0 + 0x8)
     state = state.clock(&program);
+    assert_eq!(state.x[1], 8);
 
     // LB ( x5 := MEM[x1 + 0x8])
     state = state.clock(&program); //extra clock cycles because of hazard
@@ -967,7 +968,108 @@ fn test_LB() {
     // LB ( x5 := MEM[x1 + 0xA])
     state = state.clock(&program);
     state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
     assert_eq!(state.x[5], 0x0000007D);
+}
+
+#[test]
+fn test_LB_with_JAL() {
+    let program = populate(&[
+        ISA::LB.build(Operands {
+            rd: 2,
+            rs1: 0,
+            imm: 0x0,
+            ..Default::default()
+        }),
+        ISA::JAL.build(Operands {
+            rd: 10,
+            imm: -4,
+            ..Default::default()
+        }),
+        ISA::ADDI.build(Operands {
+            rd: 1,
+            rs1: 0,
+            imm: 0x8,
+            ..Default::default()
+        }),
+    ]);
+
+    let mut state = EmulatorState::<FiveStagePipeline>::new(&program);
+
+    state.data_memory.set(0x00, 0xDE);
+    state.data_memory.set(0x01, 0xAD);
+    state.data_memory.set(0x02, 0xBE);
+    state.data_memory.set(0x03, 0xEF);
+
+    state = state.clock(&program); //IF
+    state = state.clock(&program); //ID
+    state = state.clock(&program); //EX
+    state = state.clock(&program); //MEM1
+    let pc = state.pipeline.if_id.id_pc.unwrap();
+    state = state.clock(&program); //MEM2
+
+    // LB ( x2 := MEM[x0 + 0x0])
+    assert_eq!(state.x[2], 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[2], 0xFFFFFFDE);
+    assert_eq!(state.pipeline.if_pc, 0);
+    assert_eq!(pc - 4, 0);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+}
+
+#[test]
+fn test_LB_with_ADDI() {
+    let program = populate(&[
+        ISA::LB.build(Operands {
+            rd: 2,
+            rs1: 0,
+            imm: 0x0,
+            ..Default::default()
+        }),
+        ISA::ADDI.build(Operands {
+            rd: 1,
+            rs1: 0,
+            imm: 0x8,
+            ..Default::default()
+        }),
+        ISA::ADDI.build(Operands {
+            rd: 3,
+            rs1: 0,
+            imm: 0x8,
+            ..Default::default()
+        }),
+    ]);
+
+    let mut state = EmulatorState::<FiveStagePipeline>::new(&program);
+
+    state.data_memory.set(0x00, 0xDE);
+    state.data_memory.set(0x01, 0xAD);
+    state.data_memory.set(0x02, 0xBE);
+    state.data_memory.set(0x03, 0xEF);
+
+    state = state.clock(&program); //IF
+    state = state.clock(&program); //ID
+    let pc = state.pipeline.if_id.id_pc.unwrap();
+    state = state.clock(&program); //EX
+    state = state.clock(&program); //MEM1
+    state = state.clock(&program); //MEM2
+
+    // LB ( x2 := MEM[x0 + 0x0])
+    assert_eq!(state.x[2], 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[2], 0xFFFFFFDE);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
 }
 
 #[test]
@@ -1007,6 +1109,7 @@ fn test_LH() {
 
     // ADDI ( x1 := x0 + 0x8)
     state = state.clock(&program);
+    assert_eq!(state.x[1], 8);
 
     // LB ( x5 := MEM[x1 + 0x8])
     state = state.clock(&program); //extra clock cycles because of hazard
@@ -1017,6 +1120,8 @@ fn test_LH() {
     assert_eq!(state.x[5], 0xFFFFFCFB);
 
     // LB ( x5 := MEM[x1 + 0xA])
+    state = state.clock(&program);
+    state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[5], 0x00007E7D);
@@ -1053,6 +1158,7 @@ fn test_LW() {
 
     // ADDI ( x1 := x0 + 0x8)
     state = state.clock(&program);
+    assert_eq!(state.x[1], 8);
 
     // LB ( x5 := MEM[x1 + 0x8])
     state = state.clock(&program); //extra clock cycles because of hazard

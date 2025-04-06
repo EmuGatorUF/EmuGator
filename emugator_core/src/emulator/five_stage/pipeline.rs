@@ -9,7 +9,7 @@ use super::controller::FiveStageControl;
 use super::datapath::{
     ExLines, ExMemBuffer, IdExBuffer, IdLines, IfIdBuffer, IfLines, MemLines, MemWbBuffer, WbLines,
 };
-use super::hazard_detection::HazardDetector;
+use super::hazard_detection::{Hazard, HazardDetector};
 
 #[derive(Clone, Default, Debug)]
 pub struct FiveStagePipeline {
@@ -250,12 +250,14 @@ impl FiveStagePipeline {
             rd: self.ex_mem.rd,
         };
 
-        self.ex_mem = ExMemBuffer {
-            mem_pc: self.id_ex.ex_pc,
-            alu_o: self.ex_lines.alu_out,
-            rs2_v: self.id_ex.rs2_v,
-            rd: self.id_ex.rd,
-        };
+        if !self.hazard_detector.hazard_detected.stop_mem{
+            self.ex_mem = ExMemBuffer {
+                mem_pc: self.id_ex.ex_pc,
+                alu_o: self.ex_lines.alu_out,
+                rs2_v: self.id_ex.rs2_v,
+                rd: self.id_ex.rd,
+            };
+        }
 
         if !self.hazard_detector.hazard_detected.stop_ex {
             self.id_ex = IdExBuffer {
@@ -280,7 +282,9 @@ impl FiveStagePipeline {
 
     fn run_control_buffers(&mut self) {
         self.wb_control = self.mem_control;
-        self.mem_control = self.ex_control;
+        if !self.hazard_detector.hazard_detected.stop_mem{
+            self.mem_control = self.ex_control;
+        }
 
         if !self.hazard_detector.hazard_detected.stop_ex {
             self.ex_control = self.id_control;
