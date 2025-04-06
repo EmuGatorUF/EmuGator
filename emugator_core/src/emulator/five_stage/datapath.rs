@@ -26,9 +26,6 @@ pub struct IdLines {
     // register reads
     pub rs1_v: u32,
     pub rs2_v: u32,
-
-    // hazard detection
-    pub hazard_detected: Hazard,
 }
 
 #[derive(Clone, Copy, Default, Debug)]

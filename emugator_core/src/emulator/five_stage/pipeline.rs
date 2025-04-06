@@ -55,6 +55,9 @@ impl Pipeline for FiveStagePipeline {
         self.run_ex();
         self.run_mem();
         self.run_wb();
+
+        // run hazard detection
+        self.hazard_detector.detect_hazards(&self.if_id.id_inst, self.ex_lines.alu_out.is_some_and(|x| x == 0) && self.ex_control.jump_cond);
     }
 
     fn requesting_debug(&mut self) -> bool {
@@ -127,9 +130,6 @@ impl FiveStagePipeline {
 
         // get control signals
         self.id_control = FiveStageControl::for_instr(instr).unwrap_or_default();
-
-        // run hazard detection
-        self.id_lines.hazard_detected = self.hazard_detector.detect_hazards(&instr);
 
         // run decoder
         self.id_lines.rs1 = instr.rs1();
@@ -257,7 +257,7 @@ impl FiveStagePipeline {
             rd: self.id_ex.rd,
         };
 
-        if !self.id_lines.hazard_detected.stop_ex {
+        if !self.hazard_detector.hazard_detected.stop_ex {
             self.id_ex = IdExBuffer {
                 ex_pc: self.if_id.id_pc,
                 rs1_v: self.id_lines.rs1_v,
@@ -270,7 +270,7 @@ impl FiveStagePipeline {
             self.id_ex = IdExBuffer::default();
         }
 
-        if !self.id_lines.hazard_detected.stop_id {
+        if !self.hazard_detector.hazard_detected.stop_id {
             self.if_id = IfIdBuffer {
                 id_pc: Some(self.if_pc),
                 id_inst: self.if_lines.instr,
@@ -282,16 +282,16 @@ impl FiveStagePipeline {
         self.wb_control = self.mem_control;
         self.mem_control = self.ex_control;
 
-        if !self.id_lines.hazard_detected.stop_ex {
+        if !self.hazard_detector.hazard_detected.stop_ex {
             self.ex_control = self.id_control;
         } else {
-            // to stall, clear the ID-EX buffer to send a no op
-            self.id_ex = IdExBuffer::default();
+            // to stall, clear the ex_control buffer
+            self.ex_control = FiveStageControl::default();
         }
     }
 
     fn run_pc_reg(&mut self) {
-        if !self.id_lines.hazard_detected.stop_if {
+        if !self.hazard_detector.hazard_detected.stop_if {
             if let Some(next_pc) = self.if_lines.next_pc {
                 if next_pc & 0x00000003 != 0x00 {
                     panic!("PC must be on a 4-byte boundary");

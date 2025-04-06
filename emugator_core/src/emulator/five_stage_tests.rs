@@ -241,30 +241,26 @@ fn test_JAL_neg_offset() {
     state = state.clock(&program); //ID
     state = state.clock(&program); //EX
     state = state.clock(&program); //MEM
-
-    // ADDI ( x5 := x0 + 1)
-    state = state.clock(&program);
-    // ADDI ( x5 := x5 + 1)
+    state = state.clock(&program); //WB
+    assert_eq!(state.x[5], 1); // ADDI ( x5 := x5 + 1)
     state = state.clock(&program); //extra clock cycles because of hazard
-    state = state.clock(&program);
     let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program);
     state = state.clock(&program);
-
     // After JAL, x1 should contain PC + 4, and the PC should jump to PC + 0x04
-    state = state.clock(&program);
     assert_eq!(state.pipeline.if_pc, pc - 0x04);
+    assert_eq!(state.pipeline.if_pc, 4);
+    assert_eq!(state.x[5], 1);
+    state = state.clock(&program);
+    assert_eq!(state.x[5], 2);
     state = state.clock(&program);
     assert_eq!(state.x[1], pc + 4);
 
-    // ADDI ( x5 := x5 + 1)
-    assert_eq!(state.x[5], 2);
-    state = state.clock(&program); //IF
-    state = state.clock(&program); //ID
     state = state.clock(&program); //EX
     state = state.clock(&program); //MEM
+    assert_eq!(state.x[5], 2);
     state = state.clock(&program); //WB
-    assert_eq!(state.x[5], 3);
+    assert_eq!(state.x[5], 3); // ADDI ( x5 := x5 + 1)
 }
 
 #[test]
@@ -332,7 +328,7 @@ fn test_JALR() {
     state = state.clock(&program); //MEM
 
     // After ADDI, x2 should be loaded with 0b100
-    state = state.clock(&program);
+    state = state.clock(&program); //WB
     let pc = state.pipeline.if_id.id_pc.unwrap();
     assert_eq!(state.x[2], 0x4);
 
@@ -343,15 +339,18 @@ fn test_JALR() {
     state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[1], pc + 4);
+    assert_eq!(state.x[1], 8);
 
     // After ADDI
-    state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[4], 2);
 
     state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.x[3], 0);
     assert_eq!(state.x[5], 7);
 }
 
@@ -416,7 +415,7 @@ fn test_BEQ() {
         ISA::BEQ.build(Operands {
             rs1: 1,
             rs2: 2,
-            imm: 0x8,
+            imm: 20,
             ..Default::default()
         }), // BEQ (branch if x1 == x2)
         ISA::BEQ.build(Operands {
@@ -452,23 +451,22 @@ fn test_BEQ() {
     // BEQ (branch if x1 == x2) - should not branch because x1 != x2
     let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program);
-    state = state.clock(&program);
-    assert_eq!(state.pipeline.if_id.id_pc.unwrap(), pc + 0x4);
-
-    state = state.clock(&program);
-    let pc = state.pipeline.if_id.id_pc.unwrap();
+    assert_eq!(state.pipeline.if_pc, pc + 0x4);
     state = state.clock(&program);
 
     // BEQ (branch if x0 == x2) - should branch because x0 == x2
+    let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program);
-    assert_eq!(state.pipeline.if_id.id_pc.unwrap(), pc + 0x8);
     state = state.clock(&program);
-    //assert_eq!(state.pipeline.if_pc, pc + 0x8);
-    state = state.clock(&program);
+    assert_eq!(state.pipeline.if_pc, pc + 0x8);
+    assert_eq!(state.pipeline.if_pc, 16);
 
     // ADDI ( x5 := x0 + 2)
-    assert_eq!(state.x[5], 0);
     state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.x[5], 0);
     state = state.clock(&program);
     assert_eq!(state.x[5], 2);
 }
@@ -491,9 +489,99 @@ fn test_BNE() {
         ISA::BNE.build(Operands {
             rs1: 1,
             rs2: 2,
-            imm: 0x8,
+            imm: 12,
             ..Default::default()
         }), // BNE (branch if x1 != x2)
+        ISA::ADDI.build(Operands {
+            rd: 7,
+            rs1: 0,
+            imm: 7,
+            ..Default::default()
+        }),
+        ISA::ADDI.build(Operands {
+            rd: 5,
+            rs1: 0,
+            imm: 1,
+            ..Default::default()
+        }), // ADDI ( x5 := x0 + 1)
+        ISA::ADDI.build(Operands {
+            rd: 5,
+            rs1: 0,
+            imm: 2,
+            ..Default::default()
+        }),
+    ]);
+
+    let mut state = EmulatorState::<FiveStagePipeline>::new(&program);
+
+    state = state.clock(&program); //IF
+    state = state.clock(&program); //ID
+    let pc = state.pipeline.if_id.id_pc.unwrap();
+    state = state.clock(&program); //EX
+    // EX for BNE should finish and set if_pc (branch if x0 != x2) - should not branch because x0 == x2
+    assert_eq!(state.pipeline.if_pc, pc + 0x4);
+    state = state.clock(&program); //MEM
+
+    // ADDI ( x1 := x0 + 1)
+    state = state.clock(&program);
+    let pc = state.pipeline.if_id.id_pc.unwrap();
+    assert_eq!(state.x[1], 1);
+    
+    // BNE (branch if x1 != x2) - should branch because x1 != x2
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.pipeline.if_pc, 20);
+    assert_eq!(20, pc + 12);
+
+    // ADDI ( x5 := x0 + 2)
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.x[5], 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[5], 2);
+}
+
+#[test]
+fn test_BNE_single_branch() {
+    let program = populate(&[
+        ISA::ADDI.build(Operands {
+            rd: 1,
+            rs1: 0,
+            imm: 1,
+            ..Default::default()
+        }), // ADDI ( x1 := x0 + 1)
+        ISA::ADDI.build(Operands {
+            rd: 3,
+            rs1: 0,
+            imm: 1,
+            ..Default::default()
+        }), // ADDI ( x3 := x0 + 1)
+        ISA::ADDI.build(Operands {
+            rd: 4,
+            rs1: 0,
+            imm: 1,
+            ..Default::default()
+        }), // ADDI ( x4 := x0 + 1)
+        ISA::ADDI.build(Operands {
+            rd: 6,
+            rs1: 0,
+            imm: 2,
+            ..Default::default()
+        }), // ADDI ( x4 := x0 + 1)
+        ISA::BNE.build(Operands {
+            rs1: 1,
+            rs2: 2,
+            imm: 12,
+            ..Default::default()
+        }), // BNE (branch if x1 != x2)
+        ISA::ADDI.build(Operands {
+            rd: 7,
+            rs1: 0,
+            imm: 7,
+            ..Default::default()
+        }),
         ISA::ADDI.build(Operands {
             rd: 5,
             rs1: 0,
@@ -514,29 +602,23 @@ fn test_BNE() {
     state = state.clock(&program); //ID
     state = state.clock(&program); //EX
     state = state.clock(&program); //MEM
-
-    // ADDI ( x1 := x0 + 1)
-    state = state.clock(&program);
-
-    // BNE (branch if x0 != x2) - should not branch because x0 == x2
+    state = state.clock(&program); //WB
     let pc = state.pipeline.if_id.id_pc.unwrap();
+    assert_eq!(state.x[1], 1);
     state = state.clock(&program);
+    assert_eq!(state.x[3], 1);
     state = state.clock(&program);
-    assert_eq!(state.pipeline.if_id.id_pc.unwrap(), pc + 0x4);
+    assert_eq!(state.x[4], 1);
+    assert_eq!(state.pipeline.if_pc, 28);
+    assert_eq!(28, pc + 12);
 
-    let pc = state.pipeline.if_id.id_pc.unwrap();
+    // IF for ADDI ( x5 := x0 + 2)
     state = state.clock(&program);
-
-    // BNE (branch if x1 != x2) - should branch because x1 != x2
-    state = state.clock(&program);
-    assert_eq!(state.pipeline.if_id.id_pc.unwrap(), pc + 0x8);
-    assert_eq!(16, pc + 0x8);
+    assert_eq!(state.x[6], 2);
     state = state.clock(&program);
     state = state.clock(&program);
-
-    // ADDI ( x5 := x0 + 2)
+    state = state.clock(&program);
     assert_eq!(state.x[5], 0);
-    state = state.clock(&program);
     state = state.clock(&program);
     assert_eq!(state.x[5], 2);
 }
@@ -580,27 +662,26 @@ fn test_BLT() {
 
     state = state.clock(&program); //IF
     state = state.clock(&program); //ID
+    let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program); //EX
     state = state.clock(&program); //MEM
+    state = state.clock(&program); //WB
+    assert_eq!(state.x[1], u32::MAX); // ADDI ( x1 := x0 - 1)
+    state = state.clock(&program); 
+    assert_eq!(state.pipeline.if_pc, pc + 0x4); // BLT (branch if x0 < x1) - should not branch because x0 > x1
 
-    // ADDI ( x1 := x0 - 1)
-    state = state.clock(&program);
-    assert_eq!(state.x[1], u32::MAX);
-
-    // BLT (branch if x0 < x1) - should not branch because x0 > x1
+    state = state.clock(&program); 
     let pc = state.pipeline.if_id.id_pc.unwrap();
-    state = state.clock(&program);
-    state = state.clock(&program);
-    state = state.clock(&program);
-    assert_eq!(state.pipeline.if_id.id_pc.unwrap(), pc + 0x4);
 
-    // BLT (branch if x1 < x0) - should branch because x1 < x0
-    let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program);
     state = state.clock(&program);
-    state = state.clock(&program);
-    assert_eq!(state.pipeline.if_id.id_pc.unwrap(), pc + 0x8);
+    assert_eq!(state.pipeline.if_pc, pc + 0x8); // BLT (branch if x1 < x0) - should branch because x1 < x0
+    assert_eq!(16, pc + 0x8);
 
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
     // ADDI ( x5 := x0 + 2)
     assert_eq!(state.x[5], 0);
     state = state.clock(&program);
@@ -652,39 +733,37 @@ fn test_BGE() {
 
     state = state.clock(&program); //IF
     state = state.clock(&program); //ID
+    let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program); //EX
     state = state.clock(&program); //MEM
-
-    // ADDI ( x1 := x0 - 1)
-    state = state.clock(&program);
+    state = state.clock(&program); //WB, ADDI ( x1 := x0 - 1)
     assert_eq!(state.x[1], u32::MAX);
-
-    // BGE (branch if x1 >= x0) - should not branch because x0 > x1
-    let pc = state.pipeline.if_id.id_pc.unwrap();
-    state = state.clock(&program);
-    state = state.clock(&program);
-    state = state.clock(&program);
-    assert_eq!(state.pipeline.if_id.id_pc.unwrap(), pc + 0x4);
+    state = state.clock(&program); // BGE (branch if x1 >= x0) - should not branch because x0 > x1
+    assert_eq!(state.pipeline.if_pc, pc + 0x4);
 
     // BLT (branch if x0 >= x1) - should branch because x1 < x0
+    state = state.clock(&program);
     let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program);
     state = state.clock(&program);
-    state = state.clock(&program);
-    assert_eq!(state.pipeline.if_id.id_pc.unwrap(), pc + 0x8);
+    assert_eq!(state.pipeline.if_pc, pc + 0x8);
+    assert_eq!(16, pc + 0x8);
 
+    state = state.clock(&program);
+    state = state.clock(&program);
+    let pc = state.pipeline.if_id.id_pc.unwrap();
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.pipeline.if_pc, pc - 0x8); // BGE (branch if x0 >= x2) - should branch because x0 == x2
+    assert_eq!(12, pc - 0x8);
     // ADDI ( x5 := x0 + 2)
     assert_eq!(state.x[5], 0);
     state = state.clock(&program);
     assert_eq!(state.x[5], 2);
 
-    // BGE (branch if x0 >= x2) - should branch because x0 == x2
-    let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
-    assert_eq!(state.pipeline.if_id.id_pc.unwrap(), pc - 0x8);
-
     // ADDI ( x5 := x0 + 1)
     assert_eq!(state.x[5], 2);
     state = state.clock(&program);
@@ -730,27 +809,25 @@ fn test_BLTU() {
 
     state = state.clock(&program); //IF
     state = state.clock(&program); //ID
+    let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program); //EX
     state = state.clock(&program); //MEM
-
-    // ADDI ( x1 := x0 - 1)
-    state = state.clock(&program);
+    state = state.clock(&program); // ADDI ( x1 := x0 - 1)
     assert_eq!(state.x[1], u32::MAX);
+    state = state.clock(&program);
+    assert_eq!(state.pipeline.if_pc, pc + 0x4); // BLTU (branch if x1 < x0) - should not branch because x1 > x0
 
-    // BLTU (branch if x1 < x0) - should not branch because x1 > x0
+    state = state.clock(&program); 
     let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program);
     state = state.clock(&program);
-    state = state.clock(&program);
-    assert_eq!(state.pipeline.if_id.id_pc.unwrap(), pc + 0x4);
+    assert_eq!(state.pipeline.if_pc, pc + 0x8); // BLTU (branch if x0 < x1) - should branch because x0 < x1
+    assert_eq!(state.pipeline.if_pc, 16);
 
-    // BLTU (branch if x0 < x1) - should branch because x0 < x1
-    let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
-    assert_eq!(state.pipeline.if_id.id_pc.unwrap(), pc + 0x8);
-
+    state = state.clock(&program);
     // ADDI ( x5 := x0 + 2)
     assert_eq!(state.x[5], 0);
     state = state.clock(&program);
@@ -802,39 +879,39 @@ fn test_BGEU() {
 
     state = state.clock(&program); //IF
     state = state.clock(&program); //ID
+    let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program); //EX
     state = state.clock(&program); //MEM
-
-    // ADDI ( x1 := x0 - 1)
-    state = state.clock(&program);
-    assert_eq!(state.x[1], u32::MAX);
-
-    // BGEU (branch if x0 >= x1) - should not branch because x0 < x1
-    let pc = state.pipeline.if_id.id_pc.unwrap();
-    state = state.clock(&program);
-    state = state.clock(&program);
-    state = state.clock(&program);
-    assert_eq!(state.pipeline.if_id.id_pc.unwrap(), pc + 0x4);
+    state = state.clock(&program); //WB
+    assert_eq!(state.x[1], u32::MAX); // ADDI ( x1 := x0 - 1)
+    state = state.clock(&program); // BGEU (branch if x0 >= x1) - should not branch because x0 < x1
+    assert_eq!(state.pipeline.if_pc, pc + 0x4);
 
     // BLT (branch if x1 >= x0) - should branch because x1 > x0
+    state = state.clock(&program);
     let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program);
     state = state.clock(&program);
+    assert_eq!(state.pipeline.if_pc, pc + 0x8);
+    assert_eq!(16, pc + 0x8);
+
+
     state = state.clock(&program);
-    assert_eq!(state.pipeline.if_id.id_pc.unwrap(), pc + 0x8);
+    state = state.clock(&program);
+    let pc = state.pipeline.if_id.id_pc.unwrap();
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.pipeline.if_pc, pc - 0x8); // BGEU (branch if x0 >= x2) - should branch because x0 == x2
+    assert_eq!(12, pc - 0x8);
 
     // ADDI ( x5 := x0 + 2)
     assert_eq!(state.x[5], 0);
     state = state.clock(&program);
     assert_eq!(state.x[5], 2);
 
-    // BGEU (branch if x0 >= x2) - should branch because x0 == x2
-    let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
-    assert_eq!(state.pipeline.if_id.id_pc.unwrap(), pc - 0x8);
-
     // ADDI ( x5 := x0 + 1)
     assert_eq!(state.x[5], 2);
     state = state.clock(&program);
