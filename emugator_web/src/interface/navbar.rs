@@ -91,7 +91,38 @@ pub fn Navbar(
                                 clip_rule: "evenodd",
                             }
                         }
-                        "Step"
+                        "Tick Clock"
+                    }
+                    button {
+                        class: format!(
+                            "{} text-white font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex items-center",
+                            if is_started {
+                                "bg-indigo-600 hover:bg-indigo-700 text-white"
+                            } else {
+                                "bg-gray-600 text-gray-300 cursor-not-allowed"
+                            },
+                        ),
+                        disabled: !is_started,
+                        onclick: move |_| {
+                            if let Some(mut program) = assembled_program.as_mut() {
+                                let new_state = emulator_state
+                                    .read()
+                                    .as_ref()
+                                    .map(|e| { e.clock_until_next_instruction(&mut program, 1000) });
+                                emulator_state.set(new_state);
+                            }
+                        },
+                        svg {
+                            class: "w-4 h-4 mr-1 fill-current",
+                            xmlns: "http://www.w3.org/2000/svg",
+                            view_box: "0 0 20 20",
+                            path {
+                                d: "M10 3.5l8 6.5-8 6.5V3.5zM2 4h5v12H2V4z",
+                                fill_rule: "evenodd",
+                                clip_rule: "evenodd",
+                            }
+                        }
+                        "Next Instruction"
                     }
                     button {
                         class: format!(
@@ -124,7 +155,7 @@ pub fn Navbar(
                                 clip_rule: "evenodd",
                             }
                         }
-                        "Run to Break"
+                        "Until Break"
                     }
                 }
             }

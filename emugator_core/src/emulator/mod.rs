@@ -64,18 +64,33 @@ impl AnyEmulatorState {
         }
     }
 
+    pub fn clock_until_next_instruction(
+        &self,
+        program: &AssembledProgram,
+        max_clocks: usize,
+    ) -> Self {
+        match self {
+            AnyEmulatorState::CVE2(state) => {
+                AnyEmulatorState::CVE2(state.clock_until_next_instruction(program, max_clocks))
+            }
+            AnyEmulatorState::FiveStage(state) => {
+                AnyEmulatorState::FiveStage(state.clock_until_next_instruction(program, max_clocks))
+            }
+        }
+    }
+
     pub fn clock_until_break(
         &self,
         program: &mut AssembledProgram,
         breakpoints: &BTreeSet<usize>,
-        max_cycles: usize,
+        max_clocks: usize,
     ) -> Self {
         match self {
             AnyEmulatorState::CVE2(state) => {
-                AnyEmulatorState::CVE2(state.clock_until_break(program, breakpoints, max_cycles))
+                AnyEmulatorState::CVE2(state.clock_until_break(program, breakpoints, max_clocks))
             }
             AnyEmulatorState::FiveStage(state) => AnyEmulatorState::FiveStage(
-                state.clock_until_break(program, breakpoints, max_cycles),
+                state.clock_until_break(program, breakpoints, max_clocks),
             ),
         }
     }
@@ -163,6 +178,26 @@ impl<P: Pipeline + Clone + Default> EmulatorState<P> {
             uart: self.uart,
             pipeline: FiveStagePipeline::default(),
         }
+    }
+
+    pub fn clock_until_next_instruction(
+        &self,
+        program: &AssembledProgram,
+        max_clocks: usize,
+    ) -> Self {
+        // clock until ID PC changes
+        let mut state = self.clone();
+        let mut num_cycles = 0;
+        let old_id_pc = state.pipeline.id_pc();
+        while state.pipeline.id_pc() == old_id_pc {
+            state = state.clock(program);
+
+            num_cycles += 1;
+            if num_cycles > max_clocks {
+                break;
+            }
+        }
+        state
     }
 
     pub fn clock_until_break(
