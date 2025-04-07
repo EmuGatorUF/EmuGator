@@ -4,7 +4,7 @@ use std::{collections::BTreeSet, ops::Deref};
 use super::format_pc;
 use emugator_core::emulator::{
     AnyEmulatorState,
-    controller_common::{OpASel, OpBSel},
+    controller_common::{DataDestSel, LSUDataType, OpASel, OpBSel, PCSel},
     cve2::{CVE2Control, CVE2Pipeline},
 };
 
@@ -19,6 +19,7 @@ enum CVE2Element {
     Rs2,
     Rd,
     Imm,
+    BranchUnit,
     Rs1V,
     Rs2V,
     OpAMux,
@@ -33,13 +34,104 @@ enum CVE2Element {
     LsuOut,
     WriteMux,
     PcMux,
+    PCMuxControlSignal,
+    OpAMuxControlSignal,
+    OpBMuxControlSignal,
+    WriteMuxControlSignal,
+    LsuRequestControlSignal,
+    LsuWriteEnableControlSignal,
+    LsuDataTypeControlSignal,
+    LsuSignExtControlSignal,
+    RegWriteControlSignal,
+    PCSetControlSignal,
+    IfIdBuffer,
+    Decoder,
+    RegisterFile,
+    DataMemory,
 }
 
 impl CVE2Element {
     fn tooltip_text(&self, pipeline: &CVE2Pipeline) -> String {
         match self {
+            CVE2Element::IfIdBuffer => {
+                format!("IF/ID Buffer")
+            }
+            CVE2Element::Decoder => {
+                format!("Decoder")
+            }
+            CVE2Element::RegisterFile => {
+                format!("Register File")
+            }
+            CVE2Element::DataMemory => {
+                format!("Data Memory")
+            }
             CVE2Element::IfPc => {
                 format!("IF PC: {}", format_pc(pipeline.IF_pc))
+            }
+            CVE2Element::PCMuxControlSignal => match pipeline.control.next_pc_sel {
+                PCSel::JMP => "Next PC Select: JMP".to_string(),
+                PCSel::PC4 => "Next PC Select: PC+4".to_string(),
+            },
+            CVE2Element::OpAMuxControlSignal => match pipeline.control.alu_op_a_sel {
+                Some(OpASel::PC) => "OpA Mux: PC",
+                Some(OpASel::RF) => "OpA Mux: Register File",
+                None => "OpA Mux: DON'T CARE",
+            }
+            .to_string(),
+            CVE2Element::OpBMuxControlSignal => match pipeline.control.alu_op_b_sel {
+                Some(OpBSel::IMM) => "OpB Mux: Immediate",
+                Some(OpBSel::RF) => "OpB Mux: Register File",
+                Some(OpBSel::Four) => "OpB Mux: Four",
+                None => "OpB Mux: DON'T CARE",
+            }
+            .to_string(),
+            CVE2Element::WriteMuxControlSignal => match pipeline.control.data_dest_sel {
+                Some(DataDestSel::ALU) => "Write Mux: ALU",
+                Some(DataDestSel::LSU) => "Write Mux: LSU",
+                None => "Write Mux: DON'T CARE",
+            }
+            .to_string(),
+            CVE2Element::LsuRequestControlSignal => match pipeline.control.lsu_request {
+                true => "LSU Request: Enabled".to_string(),
+                false => "LSU Request: Disabled".to_string(),
+            },
+            CVE2Element::LsuWriteEnableControlSignal => {
+                let is_active = pipeline.control.lsu_write_enable;
+                format!(
+                    "LSU Write Enable: {}",
+                    if is_active { "Enabled" } else { "Disabled" }
+                )
+            }
+            CVE2Element::LsuDataTypeControlSignal => match pipeline.control.lsu_data_type {
+                Some(LSUDataType::Word) => "LSU Data Type: Word (32-bit)".to_string(),
+                Some(LSUDataType::HalfWord) => "LSU Data Type: Half Word (16-bit)".to_string(),
+                Some(LSUDataType::Byte) => "LSU Data Type: Byte (8-bit)".to_string(),
+                None => "LSU Data Type: DON'T CARE".to_string(),
+            },
+            CVE2Element::LsuSignExtControlSignal => {
+                let sign_ext = pipeline.control.lsu_sign_ext;
+                format!(
+                    "LSU Sign Extension: {}",
+                    if sign_ext { "Enabled" } else { "Disabled" }
+                )
+            }
+            CVE2Element::RegWriteControlSignal => {
+                let is_active = pipeline.control.reg_write;
+                format!(
+                    "Register Write: {}",
+                    if is_active { "Enabled" } else { "Disabled" }
+                )
+            }
+            CVE2Element::PCSetControlSignal => {
+                let is_active = pipeline.control.pc_set;
+                format!("PC Set: {}", if is_active { "Enabled" } else { "Disabled" })
+            }
+            CVE2Element::BranchUnit => {
+                let target_address = match pipeline.datapath.alu_out {
+                    Some(value) => format!("JMP: {}", format_pc(value)),
+                    None => "JMP: None".to_string(),
+                };
+                target_address
             }
             CVE2Element::InstructionMemory => match pipeline.IF_inst {
                 Some(inst) => format!("Instruction: {}", format!("0x{:08X}", inst)),
@@ -162,7 +254,11 @@ fn find_active_elements(control: CVE2Control) -> BTreeSet<CVE2Element> {
 
     let mut active_elements = BTreeSet::new();
 
-    // TODO: IF stage
+    if control.pc_set {
+        active_elements.insert(IfPc);
+    }
+
+    active_elements.insert(InstructionMemory);
 
     if let Some(op_a_sel) = control.alu_op_a_sel {
         active_elements.insert(OpAMux);
@@ -176,6 +272,16 @@ fn find_active_elements(control: CVE2Control) -> BTreeSet<CVE2Element> {
                 active_elements.insert(Rs1V);
             }
         }
+    }
+
+    if let PCSel::JMP = control.next_pc_sel {
+        active_elements.insert(Alu);
+        active_elements.insert(BranchUnit);
+        active_elements.insert(PcMux);
+    } else {
+        // PC+4 path is active
+        active_elements.insert(PCPlus4);
+        active_elements.insert(PcMux);
     }
 
     if let Some(op_b_sel) = control.alu_op_b_sel {
@@ -205,7 +311,36 @@ fn find_active_elements(control: CVE2Control) -> BTreeSet<CVE2Element> {
         active_elements.insert(LsuReq);
     }
 
-    // TODO: more LSU lines
+    if control.lsu_request {
+        active_elements.insert(LsuRequestControlSignal);
+        active_elements.insert(LsuAddr);
+        active_elements.insert(LsuReq);
+        active_elements.insert(LsuOut);
+        active_elements.insert(DataMemory);
+
+        if control.lsu_write_enable {
+            active_elements.insert(LsuWriteEnableControlSignal);
+            active_elements.insert(LsuWr);
+            active_elements.insert(LsuData);
+        } else {
+            active_elements.insert(LsuData);
+        }
+
+        if control.lsu_data_type.is_some() {
+            active_elements.insert(LsuDataTypeControlSignal);
+            active_elements.insert(LsuByteEn);
+        }
+
+        if control.lsu_sign_ext {
+            active_elements.insert(LsuSignExtControlSignal);
+        }
+
+        active_elements.insert(LsuValid);
+    }
+
+    if matches!(control.data_dest_sel, Some(DataDestSel::LSU)) {
+        active_elements.insert(LsuOut);
+    }
 
     if control.reg_write {
         active_elements.insert(WriteMux);
@@ -224,11 +359,12 @@ pub fn CVE2Visualization(
     tooltip_text: Signal<Option<String>>,
 ) -> Element {
     const HOVER_STROKE: &'static str = "rgba(66, 133, 244, 1)";
-    const ACTIVE_STROKE: &'static str = "rgba(66, 133, 244, 0.7)";
+    const ACTIVE_STROKE: &'static str = "rgba(147, 112, 219, 1)";
     const HOVER_FILL: &'static str = "rgba(66, 133, 244, 0.1)";
 
     let mut hovered_element = use_signal(|| Option::<CVE2Element>::None);
     let mut active_elements = use_signal(|| BTreeSet::<CVE2Element>::new());
+    let mut show_control_signals = use_signal(|| true);
 
     // Update active elements based on control signals
     use_effect(move || match &*emulator_state.read() {
@@ -275,8 +411,369 @@ pub fn CVE2Visualization(
     }
 
     rsx! {
+        if *show_control_signals.read() {
+            g {
+                id: "pc_mux_control_signal_group",
+                style: "pointer-events: all;",
+                onmouseenter: move |_| {
+                    hovered_element.set(Some(CVE2Element::PCMuxControlSignal));
+                },
+                onmouseleave: move |_| {
+                    hovered_element.set(None);
+                },
+                transform: "translate(42, 105)",
+                path {
+                    d: "M8.70709 0.292924C8.31656 -0.0976006 7.6834 -0.0976005 7.29287 0.292924L0.928912 6.65689C0.538387 7.04741 0.538387 7.68057 0.928912 8.0711C1.31944 8.46162 1.9526 8.46162 2.34313 8.0711L7.99998 2.41424L13.6568 8.0711C14.0474 8.46162 14.6805 8.46162 15.071 8.0711C15.4616 7.68057 15.4616 7.04741 15.071 6.65688L8.70709 0.292924ZM9 475L8.99998 1.00003L6.99998 1.00003L7 475L9 475Z",
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::CVE2(state)) => {
+                            match (state.pipeline.control.next_pc_sel, *hovered_element.read()) {
+                                (PCSel::JMP, Some(CVE2Element::PCMuxControlSignal)) => "green",
+                                (PCSel::JMP, _) => "rgba(0, 200, 0, 0.4)",
+                                (PCSel::PC4, Some(CVE2Element::PCMuxControlSignal)) => "red",
+                                (PCSel::PC4, _) => "rgba(200, 0, 0, 0.4)",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                }
+            }
+            g {
+                id: "pc_set_control_signal_group",
+                style: "pointer-events: all;",
+                onmouseenter: move |_| {
+                    hovered_element.set(Some(CVE2Element::PCSetControlSignal));
+                },
+                onmouseleave: move |_| {
+                    hovered_element.set(None);
+                },
+                path {
+                    d: "M8.7071 0.292893C8.31657 -0.0976311 7.68341 -0.0976311 7.29288 0.292893L0.928923 6.65685C0.538398 7.04738 0.538398 7.68054 0.928923 8.07107C1.31945 8.46159 1.95261 8.46159 2.34314 8.07107L7.99999 2.41421L13.6568 8.07107C14.0474 8.46159 14.6805 8.46159 15.0711 8.07107C15.4616 7.68054 15.4616 7.04738 15.0711 6.65685L8.7071 0.292893ZM9 162L8.99999 1L6.99999 1L7 162L9 162Z",
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::CVE2(state)) => {
+                            match (state.pipeline.control.pc_set, *hovered_element.read()) {
+                                (true, Some(CVE2Element::PCSetControlSignal)) => "green",
+                                (true, _) => "rgba(0, 200, 0, 0.4)",
+                                (false, Some(CVE2Element::PCSetControlSignal)) => "red",
+                                (false, _) => "rgba(200, 0, 0, 0.4)",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                    transform: "translate(70, 420)",
+                }
+                text {
+                    id: "PC_E",
+                    x: "65",
+                    y: "410",
+                    "text-anchor": "start",
+                    "dominant-baseline": "middle",
+                    "font-size": "12",
+                    "font-weight": "bold",
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::CVE2(state)) => {
+                            match (state.pipeline.control.pc_set, *hovered_element.read()) {
+                                (true, Some(CVE2Element::PCSetControlSignal)) => "green",
+                                (true, _) => "rgba(0, 200, 0, 0.4)",
+                                (false, Some(CVE2Element::PCSetControlSignal)) => "red",
+                                (false, _) => "rgba(200, 0, 0, 0.4)",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                    "PC_E"
+                }
+            }
+            g {
+                id: "opa_mux_control_signal_group",
+                style: "pointer-events: all;",
+                onmouseenter: move |_| {
+                    hovered_element.set(Some(CVE2Element::OpAMuxControlSignal));
+                },
+                onmouseleave: move |_| {
+                    hovered_element.set(None);
+                },
+                path {
+                    d: "M8.7071 0.292893C8.31657 -0.0976311 7.68341 -0.0976311 7.29288 0.292893L0.928923 6.65685C0.538398 7.04738 0.538398 7.68054 0.928923 8.07107C1.31945 8.46159 1.95261 8.46159 2.34314 8.07107L7.99999 2.41421L13.6568 8.07107C14.0474 8.46159 14.6805 8.46159 15.0711 8.07107C15.4616 7.68054 15.4616 7.04738 15.0711 6.65685L8.7071 0.292893ZM9 25L8.99999 1L6.99999 1L7 25L9 25Z",
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::CVE2(state)) => {
+                            match (state.pipeline.control.alu_op_a_sel, *hovered_element.read()) {
+                                (Some(OpASel::PC), Some(CVE2Element::OpAMuxControlSignal)) => "green",
+                                (Some(OpASel::PC), _) => "rgba(0, 200, 0, 0.4)",
+                                (Some(OpASel::RF), Some(CVE2Element::OpAMuxControlSignal)) => "red",
+                                (Some(OpASel::RF), _) => "rgba(200, 0, 0, 0.4)",
+                                _ => "gray",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                    transform: "translate(843, 213)",
+                }
+                line {
+                    id: "opamux_controlsignal_horizontal_line",
+                    x1: "850",
+                    y1: "239",
+                    x2: "898",
+                    y2: "239",
+                    stroke: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::CVE2(state)) => {
+                            match (state.pipeline.control.alu_op_a_sel, *hovered_element.read()) {
+                                (Some(OpASel::PC), Some(CVE2Element::OpAMuxControlSignal)) => "green",
+                                (Some(OpASel::PC), _) => "rgba(0, 200, 0, 0.4)",
+                                (Some(OpASel::RF), Some(CVE2Element::OpAMuxControlSignal)) => "red",
+                                (Some(OpASel::RF), _) => "rgba(200, 0, 0, 0.4)",
+                                _ => "gray",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                    "stroke-width": "2",
+                }
+                line {
+                    id: "opamux_controlsignal_vertical_line",
+                    x1: "899",
+                    y1: "238",
+                    x2: "899",
+                    y2: "581",
+                    stroke: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::CVE2(state)) => {
+                            match (state.pipeline.control.alu_op_a_sel, *hovered_element.read()) {
+                                (Some(OpASel::PC), Some(CVE2Element::OpAMuxControlSignal)) => "green",
+                                (Some(OpASel::PC), _) => "rgba(0, 200, 0, 0.4)",
+                                (Some(OpASel::RF), Some(CVE2Element::OpAMuxControlSignal)) => "red",
+                                (Some(OpASel::RF), _) => "rgba(200, 0, 0, 0.4)",
+                                _ => "gray",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                    "stroke-width": "2",
+                }
+            }
+            g {
+                id: "opb_mux_control_signal_group",
+                style: "pointer-events: all;",
+                onmouseenter: move |_| {
+                    hovered_element.set(Some(CVE2Element::OpBMuxControlSignal));
+                },
+                onmouseleave: move |_| {
+                    hovered_element.set(None);
+                },
+                transform: "translate(839, 200)",
+                path {
+                    d: "M8.7071 0.292893C8.31657 -0.0976311 7.68341 -0.0976311 7.29288 0.292893L0.928923 6.65685C0.538398 7.04738 0.538398 7.68054 0.928923 8.07107C1.31945 8.46159 1.95261 8.46159 2.34314 8.07107L7.99999 2.41421L13.6568 8.07107C14.0474 8.46159 14.6805 8.46159 15.0711 8.07107C15.4616 7.68054 15.4616 7.04738 15.0711 6.65685L8.7071 0.292893ZM9 230L8.99999 1L6.99999 1L7 230L9 230Z",
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::CVE2(state)) => {
+                            match (state.pipeline.control.alu_op_b_sel, *hovered_element.read()) {
+                                (Some(OpBSel::IMM), Some(CVE2Element::OpBMuxControlSignal)) => "green",
+                                (Some(OpBSel::IMM), _) => "rgba(0, 200, 0, 0.4)",
+                                (Some(OpBSel::RF), Some(CVE2Element::OpBMuxControlSignal)) => "red",
+                                (Some(OpBSel::RF), _) => "rgba(200, 0, 0, 0.4)",
+                                (Some(OpBSel::Four), Some(CVE2Element::OpBMuxControlSignal)) => "blue",
+                                (Some(OpBSel::Four), _) => "rgba(0, 0, 200, 0.4)",
+                                _ => "gray",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                    transform: "translate(4, 150)",
+                }
+            }
+            g {
+                id: "write_mux_control_signal_group",
+                style: "pointer-events: all;",
+                onmouseenter: move |_| {
+                    hovered_element.set(Some(CVE2Element::WriteMuxControlSignal));
+                },
+                onmouseleave: move |_| {
+                    hovered_element.set(None);
+                },
+                transform: "translate(1300, 200)",
+                path {
+                    d: "M8.7071 0.292893C8.31657 -0.0976311 7.68341 -0.0976311 7.29288 0.292893L0.928923 6.65685C0.538398 7.04738 0.538398 7.68054 0.928923 8.07107C1.31945 8.46159 1.95261 8.46159 2.34314 8.07107L7.99999 2.41421L13.6568 8.07107C14.0474 8.46159 14.6805 8.46159 15.0711 8.07107C15.4616 7.68054 15.4616 7.04738 15.0711 6.65685L8.7071 0.292893ZM9 230L8.99999 1L6.99999 1L7 230L9 230Z",
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::CVE2(state)) => {
+                            match (state.pipeline.control.data_dest_sel, *hovered_element.read()) {
+                                (Some(DataDestSel::ALU), Some(CVE2Element::WriteMuxControlSignal)) => {
+                                    "green"
+                                }
+                                (Some(DataDestSel::ALU), _) => "rgba(0, 200, 0, 0.4)",
+                                (Some(DataDestSel::LSU), Some(CVE2Element::WriteMuxControlSignal)) => {
+                                    "red"
+                                }
+                                (Some(DataDestSel::LSU), _) => "rgba(200, 0, 0, 0.4)",
+                                _ => "gray",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                    transform: "translate(27, 150)",
+                }
+            }
+            g {
+                id: "lsu_request_control_signal_group",
+                style: "pointer-events: all;",
+                onmouseenter: move |_| {
+                    hovered_element.set(Some(CVE2Element::LsuRequestControlSignal));
+                },
+                onmouseleave: move |_| {
+                    hovered_element.set(None);
+                },
+                transform: "translate(839, 200)",
+                path {
+                    d: "M8.7071 0.292893C8.31657 -0.0976311 7.68341 -0.0976311 7.29288 0.292893L0.928923 6.65685C0.538398 7.04738 0.538398 7.68054 0.928923 8.07107C1.31945 8.46159 1.95261 8.46159 2.34314 8.07107L7.99999 2.41421L13.6568 8.07107C14.0474 8.46159 14.6805 8.46159 15.0711 8.07107C15.4616 7.68054 15.4616 7.04738 15.0711 6.65685L8.7071 0.292893ZM9 185L8.99999 1L6.99999 1L7 185L9 185Z",
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::CVE2(state)) => {
+                            match (state.pipeline.control.lsu_request, *hovered_element.read()) {
+                                (true, Some(CVE2Element::LsuRequestControlSignal)) => "green",
+                                (true, _) => "rgba(0, 200, 0, 0.4)",
+                                (false, Some(CVE2Element::LsuRequestControlSignal)) => "red",
+                                (false, _) => "rgba(200, 0, 0, 0.4)",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                    transform: "translate(229, 197)",
+                }
+            }
+            g {
+                id: "lsu_write_enable_control_signal_group",
+                style: "pointer-events: all;",
+                onmouseenter: move |_| {
+                    hovered_element.set(Some(CVE2Element::LsuWriteEnableControlSignal));
+                },
+                onmouseleave: move |_| {
+                    hovered_element.set(None);
+                },
+                transform: "translate(839, 200)",
+                path {
+                    d: "M8.7071 0.292893C8.31657 -0.0976311 7.68341 -0.0976311 7.29288 0.292893L0.928923 6.65685C0.538398 7.04738 0.538398 7.68054 0.928923 8.07107C1.31945 8.46159 1.95261 8.46159 2.34314 8.07107L7.99999 2.41421L13.6568 8.07107C14.0474 8.46159 14.6805 8.46159 15.0711 8.07107C15.4616 7.68054 15.4616 7.04738 15.0711 6.65685L8.7071 0.292893ZM9 185L8.99999 1L6.99999 1L7 185L9 185Z",
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::CVE2(state)) => {
+                            match (state.pipeline.control.lsu_write_enable, *hovered_element.read()) {
+                                (true, Some(CVE2Element::LsuWriteEnableControlSignal)) => "green",
+                                (true, _) => "rgba(0, 200, 0, 0.4)",
+                                (false, Some(CVE2Element::LsuWriteEnableControlSignal)) => "red",
+                                (false, _) => "rgba(200, 0, 0, 0.4)",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                    transform: "translate(269, 197)",
+                }
+            }
+            g {
+                id: "lsu_data_type_control_signal_group",
+                style: "pointer-events: all;",
+                onmouseenter: move |_| {
+                    hovered_element.set(Some(CVE2Element::LsuDataTypeControlSignal));
+                },
+                onmouseleave: move |_| {
+                    hovered_element.set(None);
+                },
+                transform: "translate(839, 200)",
+                path {
+                    d: "M8.7071 0.292893C8.31657 -0.0976311 7.68341 -0.0976311 7.29288 0.292893L0.928923 6.65685C0.538398 7.04738 0.538398 7.68054 0.928923 8.07107C1.31945 8.46159 1.95261 8.46159 2.34314 8.07107L7.99999 2.41421L13.6568 8.07107C14.0474 8.46159 14.6805 8.46159 15.0711 8.07107C15.4616 7.68054 15.4616 7.04738 15.0711 6.65685L8.7071 0.292893ZM9 185L8.99999 1L6.99999 1L7 185L9 185Z",
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::CVE2(state)) => {
+                            match (state.pipeline.control.lsu_data_type, *hovered_element.read()) {
+                                (
+                                    Some(LSUDataType::Word),
+                                    Some(CVE2Element::LsuDataTypeControlSignal),
+                                ) => "green",
+                                (Some(LSUDataType::Word), _) => "rgba(0, 200, 0, 0.4)",
+                                (
+                                    Some(LSUDataType::HalfWord),
+                                    Some(CVE2Element::LsuDataTypeControlSignal),
+                                ) => "blue",
+                                (Some(LSUDataType::HalfWord), _) => "rgba(0, 0, 200, 0.4)",
+                                (
+                                    Some(LSUDataType::Byte),
+                                    Some(CVE2Element::LsuDataTypeControlSignal),
+                                ) => "red",
+                                (Some(LSUDataType::Byte), _) => "rgba(200, 0, 0, 0.4)",
+                                (None, _) => "gray",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                    transform: "translate(309, 197)",
+                }
+            }
+            g {
+                id: "lsu_sign_ext_control_signal_group",
+                style: "pointer-events: all;",
+                onmouseenter: move |_| {
+                    hovered_element.set(Some(CVE2Element::LsuSignExtControlSignal));
+                },
+                onmouseleave: move |_| {
+                    hovered_element.set(None);
+                },
+                transform: "translate(839, 200)",
+                path {
+                    d: "M8.7071 0.292893C8.31657 -0.0976311 7.68341 -0.0976311 7.29288 0.292893L0.928923 6.65685C0.538398 7.04738 0.538398 7.68054 0.928923 8.07107C1.31945 8.46159 1.95261 8.46159 2.34314 8.07107L7.99999 2.41421L13.6568 8.07107C14.0474 8.46159 14.6805 8.46159 15.0711 8.07107C15.4616 7.68054 15.4616 7.04738 15.0711 6.65685L8.7071 0.292893ZM9 185L8.99999 1L6.99999 1L7 185L9 185Z",
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::CVE2(state)) => {
+                            match (state.pipeline.control.lsu_sign_ext, *hovered_element.read()) {
+                                (true, Some(CVE2Element::LsuSignExtControlSignal)) => "green",
+                                (true, _) => "rgba(0, 200, 0, 0.4)",
+                                (false, Some(CVE2Element::LsuSignExtControlSignal)) => "red",
+                                (false, _) => "rgba(200, 0, 0, 0.4)",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                    transform: "translate(349, 197)",
+                }
+            }
+            g {
+                id: "reg_write_control_signal_group",
+                style: "pointer-events: all;",
+                onmouseenter: move |_| {
+                    hovered_element.set(Some(CVE2Element::RegWriteControlSignal));
+                },
+                onmouseleave: move |_| {
+                    hovered_element.set(None);
+                },
+                path {
+                    d: "M8.7071 0.292893C8.31657 -0.0976311 7.68341 -0.0976311 7.29288 0.292893L0.928923 6.65685C0.538398 7.04738 0.538398 7.68054 0.928923 8.07107C1.31945 8.46159 1.95261 8.46159 2.34314 8.07107L7.99999 2.41421L13.6568 8.07107C14.0474 8.46159 14.6805 8.46159 15.0711 8.07107C15.4616 7.68054 15.4616 7.04738 15.0711 6.65685L8.7071 0.292893ZM9 82L8.99999 1L6.99999 1L7 82L9 82Z",
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::CVE2(state)) => {
+                            match (state.pipeline.control.reg_write, *hovered_element.read()) {
+                                (true, Some(CVE2Element::RegWriteControlSignal)) => "green",
+                                (true, _) => "rgba(0, 200, 0, 0.4)",
+                                (false, Some(CVE2Element::RegWriteControlSignal)) => "red",
+                                (false, _) => "rgba(200, 0, 0, 0.4)",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                    transform: "translate(590, 500)",
+                }
+                text {
+                    id: "rw_e",
+                    x: "585",
+                    y: "491",
+                    "text-anchor": "start",
+                    "dominant-baseline": "middle",
+                    "font-size": "12",
+                    "font-weight": "bold",
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::CVE2(state)) => {
+                            match (state.pipeline.control.reg_write, *hovered_element.read()) {
+                                (true, Some(CVE2Element::RegWriteControlSignal)) => "green",
+                                (true, _) => "rgba(0, 200, 0, 0.4)",
+                                (false, Some(CVE2Element::RegWriteControlSignal)) => "red",
+                                (false, _) => "rgba(200, 0, 0, 0.4)",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                    "RW_E"
+                }
+            }
+        }
         g {
-            id: "ifpc",
+            id: "ifpc_group",
             style: "pointer-events: all;",
             onmouseenter: move |_| {
                 hovered_element.set(Some(CVE2Element::IfPc));
@@ -284,6 +781,15 @@ pub fn CVE2Visualization(
             onmouseleave: move |_| {
                 hovered_element.set(None);
             },
+            rect {
+                x: "21",
+                y: "261",
+                width: "31",
+                height: "158",
+                stroke: "none",
+                "stroke-width": "2",
+                fill: "white",
+            }
             // PC rectangle
             rect {
                 x: "21",
@@ -413,7 +919,7 @@ pub fn CVE2Visualization(
                 "font-size": "20",
                 "font-weight": "bold",
                 fill: element_stroke!(InstructionMemory),
-                "Instruction"
+                "INSTRUCTION"
             }
             // Instruction Memory label 2
             text {
@@ -425,7 +931,7 @@ pub fn CVE2Visualization(
                 "font-size": "20",
                 "font-weight": "bold",
                 fill: element_stroke!(InstructionMemory),
-                "Memory"
+                "MEMORY"
             }
             // Horizontal line out of instruction memory
             line {
@@ -455,81 +961,62 @@ pub fn CVE2Visualization(
             }
         }
         g {
-            id: "id_pc_group",
+            id: "register_file_group",
             style: "pointer-events: all;",
             onmouseenter: move |_| {
-                hovered_element.set(Some(CVE2Element::IdPc));
+                hovered_element.set(Some(CVE2Element::RegisterFile));
+                tooltip_text.set(Some("CPU Register File".to_string()));
             },
             onmouseleave: move |_| {
                 hovered_element.set(None);
+                tooltip_text.set(None);
             },
-            // ID PC rectangle
+            // Register File rectangle
             rect {
-                id: "idpc",
-                x: "421",
-                y: "101",
-                width: "78",
-                height: "78",
-                stroke: element_stroke!(IdPc),
+                id: "register_file",
+                x: "581",
+                y: "341",
+                width: "158",
+                height: "158",
+                stroke: match &*hovered_element.read() {
+                    Some(CVE2Element::RegisterFile) => HOVER_STROKE,
+                    _ => "black",
+                },
                 "stroke-width": "2",
-                fill: element_fill!(IdPc),
+                fill: match &*hovered_element.read() {
+                    Some(CVE2Element::RegisterFile) => HOVER_FILL,
+                    _ => "none",
+                },
             }
-            // ID PC label
+            // Register File label (first line)
             text {
-                id: "idpc_label",
-                x: "460",
-                y: "140",
+                id: "register_file_label",
+                x: "660",
+                y: "408",
                 "text-anchor": "middle",
                 "dominant-baseline": "middle",
                 "font-size": "20",
                 "font-weight": "bold",
-                fill: element_stroke!(IdPc),
-                "ID PC"
+                fill: match &*hovered_element.read() {
+                    Some(CVE2Element::RegisterFile) => HOVER_STROKE,
+                    _ => "black",
+                },
+                "Register"
             }
-            // IFID PC to OPA Mux arrow
-            path {
-                id: "idpc_to_opa_mux_arrow",
-                d: "M819.707 140.707C820.098 140.317 820.098 139.683 819.707 139.293L813.343 132.929C812.953 132.538 812.319 132.538 811.929 132.929C811.538 133.319 811.538 133.953 811.929 134.343L817.586 140L811.929 145.657C811.538 146.047 811.538 146.681 811.929 147.071C812.319 147.462 812.953 147.462 813.343 147.071L819.707 140.707ZM500 141H819V139H500V141Z",
-                fill: element_stroke!(IdPc),
-            }
-        }
-        g {
-            id: "id_ir_group",
-            style: "pointer-events: all;",
-            onmouseenter: move |_| {
-                hovered_element.set(Some(CVE2Element::IdIr));
-            },
-            onmouseleave: move |_| {
-                hovered_element.set(None);
-            },
-            // ID IR rectangle
-            rect {
-                id: "id_ir",
-                x: "421",
-                y: "179",
-                width: "78",
-                height: "78",
-                stroke: element_stroke!(IdIr),
-                "stroke-width": "2",
-                fill: element_fill!(IdIr),
-            }
-            // ID IR label
+            // Register File label (second line)
             text {
-                id: "id_ir_label",
-                x: "460",
-                y: "218",
+                id: "register_file_label2",
+                x: "660",
+                y: "432",
                 "text-anchor": "middle",
                 "dominant-baseline": "middle",
                 "font-size": "20",
                 "font-weight": "bold",
-                fill: element_stroke!(IdIr),
-                "ID IR"
-            }
-            // IM to IF/ID arrow
-            path {
-                id: "ir_to_decoder_arrow",
-                d: "M579.707 218.707C580.098 218.317 580.098 217.683 579.707 217.293L573.343 210.929C572.953 210.538 572.319 210.538 571.929 210.929C571.538 211.319 571.538 211.953 571.929 212.343L577.586 218L571.929 223.657C571.538 224.047 571.538 224.681 571.929 225.071C572.319 225.462 572.953 225.462 573.343 225.071L579.707 218.707ZM500 219H579V217H500V219Z",
-                fill: element_stroke!(IdIr),
+                fill: match &*hovered_element.read() {
+                    Some(CVE2Element::RegisterFile) => HOVER_STROKE,
+                    _ => "black",
+                },
+                "File"
             }
         }
         g {
@@ -654,6 +1141,7 @@ pub fn CVE2Visualization(
                 "text-anchor": "start",
                 "dominant-baseline": "middle",
                 "font-size": "12",
+                "font-weight": "bold",
                 fill: element_stroke!(Rs1V),
                 "RS1_V"
             }
@@ -738,6 +1226,7 @@ pub fn CVE2Visualization(
                 "text-anchor": "start",
                 "dominant-baseline": "middle",
                 "font-size": "12",
+                "font-weight": "bold",
                 fill: element_stroke!(Rs2V),
                 "RS2_V"
             }
@@ -767,6 +1256,7 @@ pub fn CVE2Visualization(
                 "text-anchor": "start",
                 "dominant-baseline": "middle",
                 "font-size": "12",
+                "font-weight": "bold",
                 fill: element_stroke!(OpAMux),
                 "PC"
             }
@@ -778,6 +1268,7 @@ pub fn CVE2Visualization(
                 "text-anchor": "start",
                 "dominant-baseline": "middle",
                 "font-size": "12",
+                "font-weight": "bold",
                 fill: element_stroke!(OpAMux),
                 "RS1"
             }
@@ -813,8 +1304,21 @@ pub fn CVE2Visualization(
                 "text-anchor": "start",
                 "dominant-baseline": "middle",
                 "font-size": "12",
+                "font-weight": "bold",
                 fill: element_stroke!(OpBMux),
                 "IMM"
+            }
+            // +4 mux input1 label
+            text {
+                id: "imm_mux_input1_label",
+                x: "824",
+                y: "312",
+                "text-anchor": "start",
+                "dominant-baseline": "middle",
+                "font-size": "12",
+                "font-weight": "bold",
+                fill: element_stroke!(OpBMux),
+                "+4"
             }
             // rs2 mux input1 label
             text {
@@ -824,6 +1328,7 @@ pub fn CVE2Visualization(
                 "text-anchor": "start",
                 "dominant-baseline": "middle",
                 "font-size": "12",
+                "font-weight": "bold",
                 fill: element_stroke!(OpBMux),
                 "RS2"
             }
@@ -855,6 +1360,31 @@ pub fn CVE2Visualization(
             }
         }
         g {
+            id: "branch_unit_group",
+            style: "pointer-events: all;",
+            onmouseenter: move |_| {
+                hovered_element.set(Some(CVE2Element::BranchUnit));
+            },
+            onmouseleave: move |_| {
+                hovered_element.set(None);
+            },
+            path {
+                id: "branch_unit_arrow",
+                d: "M80.2929 38.293C79.9024 38.6835 79.9024 39.3167 80.2929 39.7072L86.6569 46.0711C87.0474 46.4617 87.6805 46.4617 88.0711 46.0711C88.4616 45.6806 88.4616 45.0474 88.0711 44.6569L82.4142 39.0001L88.0711 33.3432C88.4616 32.9527 88.4616 32.3195 88.0711 31.929C87.6805 31.5385 87.0474 31.5385 86.6569 31.929L80.2929 38.293ZM1220 38L81 38.0001L81 40.0001L1220 40L1220 38Z",
+                fill: element_stroke!(BranchUnit),
+            }
+            // Junction to mux vertical line
+            line {
+                id: "junction_to_branch_line",
+                x1: "1220",
+                y1: "38",
+                x2: "1220",
+                y2: "178",
+                stroke: element_stroke!(BranchUnit),
+                "stroke-width": "2",
+            }
+        }
+        g {
             id: "alu_group",
             style: "pointer-events: all;",
             onmouseenter: move |_| {
@@ -873,6 +1403,28 @@ pub fn CVE2Visualization(
                 stroke: element_stroke!(Alu),
                 "stroke-width": "2",
                 fill: element_fill!(Alu),
+            }
+            text {
+                id: "opa_alu_input_label",
+                x: "965",
+                y: "168",
+                "text-anchor": "start",
+                "dominant-baseline": "middle",
+                "font-size": "12",
+                "font-weight": "bold",
+                fill: element_stroke!(Alu),
+                "OPA"
+            }
+            text {
+                id: "opb_alu_input_label",
+                x: "965",
+                y: "200",
+                "text-anchor": "start",
+                "dominant-baseline": "middle",
+                "font-size": "12",
+                "font-weight": "bold",
+                fill: element_stroke!(Alu),
+                "OPB"
             }
             // ALU label
             text {
@@ -912,9 +1464,17 @@ pub fn CVE2Visualization(
                 d: "M1300.71 279.707C1301.1 279.317 1301.1 278.683 1300.71 278.293L1294.34 271.929C1293.95 271.538 1293.32 271.538 1292.93 271.929C1292.54 272.319 1292.54 272.953 1292.93 273.343L1298.59 279L1292.93 284.657C1292.54 285.047 1292.54 285.681 1292.93 286.071C1293.32 286.462 1293.95 286.462 1294.34 286.071L1300.71 279.707ZM1220 280H1300V278H940V280Z",
                 fill: element_stroke!(Alu),
             }
-            // ALU mux node
+            // ALU mux node 1
             circle {
-                id: "alu_mux_node",
+                id: "alu_mux_node1",
+                cx: "1220",
+                cy: "179",
+                r: "3",
+                fill: element_stroke!(Alu),
+            }
+            // ALU mux node 2
+            circle {
+                id: "alu_mux_node2",
                 cx: "1220",
                 cy: "279",
                 r: "3",
@@ -935,6 +1495,68 @@ pub fn CVE2Visualization(
                 id: "alu_out_to_lsu_arrow_upper",
                 d: "M959.707 333.707C960.098 333.317 960.098 332.683 959.707 332.293L953.343 325.929C952.953 325.538 952.319 325.538 951.929 325.929C951.538 326.319 951.538 326.953 951.929 327.343L957.586 333L951.929 338.657C951.538 339.047 951.538 339.681 951.929 340.071C952.319 340.462 952.953 340.462 953.343 340.071L959.707 333.707ZM940 334H959V332H940V334Z",
                 fill: element_stroke!(Alu),
+            }
+        }
+        g {
+            id: "data_memory_group",
+            style: "pointer-events: all;",
+            onmouseenter: move |_| {
+                hovered_element.set(Some(CVE2Element::DataMemory));
+                tooltip_text.set(Some("System Data Memory".to_string()));
+            },
+            onmouseleave: move |_| {
+                hovered_element.set(None);
+                tooltip_text.set(None);
+            },
+            rect {
+                id: "data_memory",
+                x: "961",
+                y: "423",
+                width: "282",
+                height: "78",
+                fill: "white",
+            }
+            // Data Memory rectangle
+            rect {
+                id: "data_memory",
+                x: "961",
+                y: "423",
+                width: "282",
+                height: "78",
+                stroke: match &*hovered_element.read() {
+                    Some(CVE2Element::DataMemory) => HOVER_STROKE,
+                    _ => {
+                        match &active_elements.read().contains(&CVE2Element::DataMemory) {
+                            true => ACTIVE_STROKE,
+                            false => "black",
+                        }
+                    }
+                },
+                "stroke-width": "2",
+                fill: match &*hovered_element.read() {
+                    Some(CVE2Element::DataMemory) => HOVER_FILL,
+                    _ => "white",
+                },
+            }
+            // Data Memory label
+            text {
+                id: "data_memory_label",
+                x: "1102",
+                y: "462",
+                "text-anchor": "middle",
+                "dominant-baseline": "middle",
+                "font-size": "20",
+                "font-weight": "bold",
+                fill: match &*hovered_element.read() {
+                    Some(CVE2Element::DataMemory) => HOVER_STROKE,
+                    _ => {
+                        match &active_elements.read().contains(&CVE2Element::DataMemory) {
+                            true => ACTIVE_STROKE,
+                            false => "black",
+                        }
+                    }
+                },
+                "Data Memory"
             }
         }
         g {
@@ -959,6 +1581,7 @@ pub fn CVE2Visualization(
                 "text-anchor": "middle",
                 "dominant-baseline": "middle",
                 "font-size": "12",
+                "font-weight": "bold",
                 fill: element_stroke!(LsuAddr),
                 "ADDR"
             }
@@ -986,6 +1609,7 @@ pub fn CVE2Visualization(
                 "text-anchor": "middle",
                 "dominant-baseline": "middle",
                 "font-size": "12",
+                "font-weight": "bold",
                 fill: element_stroke!(LsuData),
                 "DATA"
             }
@@ -1019,6 +1643,7 @@ pub fn CVE2Visualization(
                 "text-anchor": "middle",
                 "dominant-baseline": "middle",
                 "font-size": "12",
+                "font-weight": "bold",
                 fill: element_stroke!(LsuReq),
                 "REQ"
             }
@@ -1046,6 +1671,7 @@ pub fn CVE2Visualization(
                 "text-anchor": "middle",
                 "dominant-baseline": "middle",
                 "font-size": "12",
+                "font-weight": "bold",
                 fill: element_stroke!(LsuWr),
                 "WR"
             }
@@ -1073,6 +1699,7 @@ pub fn CVE2Visualization(
                 "text-anchor": "middle",
                 "dominant-baseline": "middle",
                 "font-size": "12",
+                "font-weight": "bold",
                 fill: element_stroke!(LsuByteEn),
                 "BEN"
             }
@@ -1100,6 +1727,7 @@ pub fn CVE2Visualization(
                 "text-anchor": "middle",
                 "dominant-baseline": "middle",
                 "font-size": "12",
+                "font-weight": "bold",
                 fill: element_stroke!(LsuValid),
                 "VALID"
             }
@@ -1127,7 +1755,7 @@ pub fn CVE2Visualization(
             // LSU label
             text {
                 id: "lsu_label",
-                x: "1040",
+                x: "1102",
                 y: "357",
                 "text-anchor": "middle",
                 "dominant-baseline": "middle",
@@ -1135,6 +1763,28 @@ pub fn CVE2Visualization(
                 "font-weight": "bold",
                 fill: element_stroke!(LsuOut),
                 "LSU"
+            }
+            text {
+                id: "opa_alu_input_label",
+                x: "965",
+                y: "334",
+                "text-anchor": "start",
+                "dominant-baseline": "middle",
+                "font-size": "12",
+                "font-weight": "bold",
+                fill: element_stroke!(LsuOut),
+                "ALU"
+            }
+            text {
+                id: "opb_alu_input_label",
+                x: "965",
+                y: "374",
+                "text-anchor": "start",
+                "dominant-baseline": "middle",
+                "font-size": "12",
+                "font-weight": "bold",
+                fill: element_stroke!(LsuOut),
+                "RS2"
             }
             // LSU to write mux arrow
             path {
@@ -1168,6 +1818,7 @@ pub fn CVE2Visualization(
                 "text-anchor": "start",
                 "dominant-baseline": "middle",
                 "font-size": "12",
+                "font-weight": "bold",
                 fill: element_stroke!(WriteMux),
                 "ALU"
             }
@@ -1179,6 +1830,7 @@ pub fn CVE2Visualization(
                 "text-anchor": "start",
                 "dominant-baseline": "middle",
                 "font-size": "12",
+                "font-weight": "bold",
                 fill: element_stroke!(WriteMux),
                 "LSU"
             }
@@ -1196,7 +1848,7 @@ pub fn CVE2Visualization(
             line {
                 id: "writemux_out_line2",
                 x1: "1382",
-                y1: "39",
+                y1: "305",
                 x2: "1382",
                 y2: "522",
                 stroke: element_stroke!(WriteMux),
@@ -1228,12 +1880,6 @@ pub fn CVE2Visualization(
                 d: "M580.707 444.707C581.098 444.317 581.098 443.683 580.707 443.293L574.343 436.929C573.953 436.538 573.319 436.538 572.929 436.929C572.538 437.319 572.538 437.953 572.929 438.343L578.586 444L572.929 449.657C572.538 450.047 572.538 450.681 572.929 451.071C573.319 451.462 573.953 451.462 574.343 451.071L580.707 444.707ZM538 445H580V443H538V445Z",
                 fill: element_stroke!(WriteMux),
             }
-            // Write mux to pc mux arrow
-            path {
-                id: "writemux_to_pcmux_arrow",
-                d: "M79.2928 38.2928C78.9023 38.6833 78.9023 39.3165 79.2928 39.707L85.6569 46.071C86.0474 46.4615 86.6805 46.4615 87.071 46.071C87.4615 45.6804 87.4615 45.0473 87.071 44.6568L81.4142 38.9999L87.071 33.343C87.4615 32.9525 87.4615 32.3194 87.071 31.9288C86.6805 31.5383 86.0474 31.5383 85.6569 31.9288L79.2928 38.2928ZM1383 38L80 37.9999L80 39.9999L1383 40L1383 38Z",
-                fill: element_stroke!(WriteMux),
-            }
             // Write mux node
             circle {
                 id: "writemux_node",
@@ -1249,6 +1895,7 @@ pub fn CVE2Visualization(
                 "text-anchor": "start",
                 "dominant-baseline": "middle",
                 "font-size": "12",
+                "font-weight": "bold",
                 fill: element_stroke!(WriteMux),
                 "RD_V"
             }
@@ -1278,8 +1925,9 @@ pub fn CVE2Visualization(
                 "text-anchor": "end",
                 "dominant-baseline": "middle",
                 "font-size": "12",
+                "font-weight": "bold",
                 fill: element_stroke!(PcMux),
-                "PC+IMM"
+                "JMP"
             }
             // PC Mux input 2 label
             text {
@@ -1289,6 +1937,7 @@ pub fn CVE2Visualization(
                 "text-anchor": "end",
                 "dominant-baseline": "middle",
                 "font-size": "12",
+                "font-weight": "bold",
                 fill: element_stroke!(PcMux),
                 "PC+4"
             }
@@ -1336,6 +1985,7 @@ pub fn CVE2Visualization(
                 "text-anchor": "start",
                 "dominant-baseline": "middle",
                 "font-size": "12",
+                "font-weight": "bold",
                 fill: element_stroke!(Rs1),
                 "RS1"
             }
@@ -1365,6 +2015,7 @@ pub fn CVE2Visualization(
                 "text-anchor": "start",
                 "dominant-baseline": "middle",
                 "font-size": "12",
+                "font-weight": "bold",
                 fill: element_stroke!(Rs2),
                 "RS2"
             }
@@ -1394,6 +2045,7 @@ pub fn CVE2Visualization(
                 "text-anchor": "start",
                 "dominant-baseline": "middle",
                 "font-size": "12",
+                "font-weight": "bold",
                 fill: element_stroke!(Rd),
                 "RD"
             }
@@ -1407,26 +2059,49 @@ pub fn CVE2Visualization(
             }
         }
         // Rectangles & their labels
-        rect {
-            id: "decoder",
-            x: "581",
-            y: "181",
-            width: "158",
-            height: "78",
-            stroke: "black",
-            "stroke-width": "2",
-            fill: "none",
-        }
-        text {
-            id: "decoder_label",
-            x: "660",
-            y: "220",
-            "text-anchor": "middle",
-            "dominant-baseline": "middle",
-            "font-size": "20",
-            "font-weight": "bold",
-            fill: "black",
-            "Decoder"
+        g {
+            id: "decoder_group",
+            style: "pointer-events: all;",
+            onmouseenter: move |_| {
+                hovered_element.set(Some(CVE2Element::Decoder));
+                tooltip_text.set(Some("Instruction Decoder".to_string()));
+            },
+            onmouseleave: move |_| {
+                hovered_element.set(None);
+                tooltip_text.set(None);
+            },
+            // Decoder rectangle
+            rect {
+                id: "decoder",
+                x: "581",
+                y: "181",
+                width: "158",
+                height: "78",
+                stroke: match &*hovered_element.read() {
+                    Some(CVE2Element::Decoder) => HOVER_STROKE,
+                    _ => "black",
+                },
+                "stroke-width": "2",
+                fill: match &*hovered_element.read() {
+                    Some(CVE2Element::Decoder) => HOVER_FILL,
+                    _ => "none",
+                },
+            }
+            // Decoder label
+            text {
+                id: "decoder_label",
+                x: "660",
+                y: "220",
+                "text-anchor": "middle",
+                "dominant-baseline": "middle",
+                "font-size": "20",
+                "font-weight": "bold",
+                fill: match &*hovered_element.read() {
+                    Some(CVE2Element::Decoder) => HOVER_STROKE,
+                    _ => "black",
+                },
+                "Decoder"
+            }
         }
         rect {
             id: "controller",
@@ -1449,79 +2124,207 @@ pub fn CVE2Visualization(
             fill: "black",
             "Controller"
         }
-        rect {
-            id: "if_id_buffer",
-            x: "421",
-            y: "101",
-            width: "78",
-            height: "438",
-            stroke: "black",
-            "stroke-width": "2",
-            fill: "none",
+        g {
+            id: "if_id_buffer_group",
+            style: "pointer-events: all;",
+            onmouseenter: move |_| {
+                hovered_element.set(Some(CVE2Element::IfIdBuffer));
+                tooltip_text.set(Some("IF/ID Buffer".to_string()));
+            },
+            onmouseleave: move |_| {
+                hovered_element.set(None);
+                tooltip_text.set(None);
+            },
+            // IF/ID buffer rectangle
+            rect {
+                id: "if_id_buffer",
+                x: "421",
+                y: "101",
+                width: "78",
+                height: "438",
+                stroke: match &*hovered_element.read() {
+                    Some(CVE2Element::IfIdBuffer) => HOVER_STROKE,
+                    _ => "black",
+                },
+                "stroke-width": "2",
+                fill: match &*hovered_element.read() {
+                    Some(CVE2Element::IfIdBuffer) => HOVER_FILL,
+                    _ => "none",
+                },
+            }
+            // IF/ID buffer label with two lines
+            text {
+                id: "if_id_buffer_label_line1",
+                x: "460",
+                y: "510",
+                "text-anchor": "middle",
+                "dominant-baseline": "middle",
+                "font-size": "20",
+                "font-weight": "bold",
+                fill: match &*hovered_element.read() {
+                    Some(CVE2Element::IfIdBuffer) => HOVER_STROKE,
+                    _ => "black",
+                },
+                "IF"
+            }
+            text {
+                id: "if_id_buffer_label_line2",
+                x: "460",
+                y: "530",
+                "text-anchor": "middle",
+                "dominant-baseline": "middle",
+                "font-size": "20",
+                "font-weight": "bold",
+                fill: match &*hovered_element.read() {
+                    Some(CVE2Element::IfIdBuffer) => HOVER_STROKE,
+                    _ => "black",
+                },
+                "ID"
+            }
         }
-        text {
-            id: "if_id_buffer_label",
-            x: "460",
-            y: "520",
-            "text-anchor": "middle",
-            "dominant-baseline": "middle",
-            "font-size": "20",
-            "font-weight": "bold",
-            fill: "black",
-            "IF / ID"
+        g {
+            id: "id_pc_group",
+            style: "pointer-events: all;",
+            onmouseenter: move |_| {
+                hovered_element.set(Some(CVE2Element::IdPc));
+            },
+            onmouseleave: move |_| {
+                hovered_element.set(None);
+            },
+            // ID PC rectangle
+            rect {
+                id: "idpc",
+                x: "421",
+                y: "101",
+                width: "78",
+                height: "78",
+                stroke: match &*emulator_state.read() {
+                    Some(AnyEmulatorState::CVE2(state)) => {
+                        if *hovered_element.read() == Some(CVE2Element::IdPc) {
+                            HOVER_STROKE
+                        } else if state.pipeline.control.if_id_set {
+                            ACTIVE_STROKE
+                        } else {
+                            "black"
+                        }
+                    }
+                    _ => "black",
+                },
+                "stroke-width": "2",
+                fill: element_fill!(IdPc),
+            }
+            // ID PC label
+            text {
+                id: "idpc_label",
+                x: "460",
+                y: "140",
+                "text-anchor": "middle",
+                "dominant-baseline": "middle",
+                "font-size": "20",
+                "font-weight": "bold",
+                fill: match &*emulator_state.read() {
+                    Some(AnyEmulatorState::CVE2(state)) => {
+                        if *hovered_element.read() == Some(CVE2Element::IdPc) {
+                            HOVER_STROKE
+                        } else if state.pipeline.control.if_id_set {
+                            ACTIVE_STROKE
+                        } else {
+                            "black"
+                        }
+                    }
+                    _ => "black",
+                },
+                "ID PC"
+            }
+            // IFID PC to OPA Mux arrow
+            path {
+                id: "idpc_to_opa_mux_arrow",
+                d: "M819.707 140.707C820.098 140.317 820.098 139.683 819.707 139.293L813.343 132.929C812.953 132.538 812.319 132.538 811.929 132.929C811.538 133.319 811.538 133.953 811.929 134.343L817.586 140L811.929 145.657C811.538 146.047 811.538 146.681 811.929 147.071C812.319 147.462 812.953 147.462 813.343 147.071L819.707 140.707ZM500 141H819V139H500V141Z",
+                fill: match &*emulator_state.read() {
+                    Some(AnyEmulatorState::CVE2(state)) => {
+                        if *hovered_element.read() == Some(CVE2Element::IdPc) {
+                            HOVER_STROKE
+                        } else if state.pipeline.control.if_id_set {
+                            ACTIVE_STROKE
+                        } else {
+                            "black"
+                        }
+                    }
+                    _ => "black",
+                },
+            }
         }
-        rect {
-            id: "register_file",
-            x: "581",
-            y: "341",
-            width: "158",
-            height: "158",
-            stroke: "black",
-            "stroke-width": "2",
-            fill: "none",
-        }
-        text {
-            id: "register_file_label",
-            x: "660",
-            y: "408",
-            "text-anchor": "middle",
-            "dominant-baseline": "middle",
-            "font-size": "20",
-            "font-weight": "bold",
-            fill: "black",
-            "Register"
-        }
-        text {
-            id: "register_file_label2",
-            x: "660",
-            y: "432",
-            "text-anchor": "middle",
-            "dominant-baseline": "middle",
-            "font-size": "20",
-            "font-weight": "bold",
-            fill: "black",
-            "File"
-        }
-        rect {
-            id: "data_memory",
-            x: "961",
-            y: "423",
-            width: "282",
-            height: "78",
-            stroke: "black",
-            "stroke-width": "2",
-            fill: "none",
-        }
-        text {
-            id: "data_memory_label",
-            x: "1080",
-            y: "462",
-            "text-anchor": "middle",
-            "dominant-baseline": "middle",
-            "font-size": "20",
-            "font-weight": "bold",
-            fill: "black",
-            "Data Memory"
+        g {
+            id: "id_ir_group",
+            style: "pointer-events: all;",
+            onmouseenter: move |_| {
+                hovered_element.set(Some(CVE2Element::IdIr));
+            },
+            onmouseleave: move |_| {
+                hovered_element.set(None);
+            },
+            // ID IR rectangle
+            rect {
+                id: "id_ir",
+                x: "421",
+                y: "179",
+                width: "78",
+                height: "78",
+                stroke: match &*emulator_state.read() {
+                    Some(AnyEmulatorState::CVE2(state)) => {
+                        if *hovered_element.read() == Some(CVE2Element::IdIr) {
+                            HOVER_STROKE
+                        } else if state.pipeline.control.if_id_set {
+                            ACTIVE_STROKE
+                        } else {
+                            "black"
+                        }
+                    }
+                    _ => "black",
+                },
+                "stroke-width": "2",
+                fill: element_fill!(IdIr),
+            }
+            // ID IR label
+            text {
+                id: "id_ir_label",
+                x: "460",
+                y: "218",
+                "text-anchor": "middle",
+                "dominant-baseline": "middle",
+                "font-size": "20",
+                "font-weight": "bold",
+                fill: match &*emulator_state.read() {
+                    Some(AnyEmulatorState::CVE2(state)) => {
+                        if *hovered_element.read() == Some(CVE2Element::IdIr) {
+                            HOVER_STROKE
+                        } else if state.pipeline.control.if_id_set {
+                            ACTIVE_STROKE
+                        } else {
+                            "black"
+                        }
+                    }
+                    _ => "black",
+                },
+                "ID IR"
+            }
+            // IM to IF/ID arrow
+            path {
+                id: "ir_to_decoder_arrow",
+                d: "M579.707 218.707C580.098 218.317 580.098 217.683 579.707 217.293L573.343 210.929C572.953 210.538 572.319 210.538 571.929 210.929C571.538 211.319 571.538 211.953 571.929 212.343L577.586 218L571.929 223.657C571.538 224.047 571.538 224.681 571.929 225.071C572.319 225.462 572.953 225.462 573.343 225.071L579.707 218.707ZM500 219H579V217H500V219Z",
+                fill: match &*emulator_state.read() {
+                    Some(AnyEmulatorState::CVE2(state)) => {
+                        if *hovered_element.read() == Some(CVE2Element::IdIr) {
+                            HOVER_STROKE
+                        } else if state.pipeline.control.if_id_set {
+                            ACTIVE_STROKE
+                        } else {
+                            "black"
+                        }
+                    }
+                    _ => "black",
+                },
+            }
         }
     }
 }

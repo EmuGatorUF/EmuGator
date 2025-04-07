@@ -24,6 +24,7 @@ pub fn PipelineVisualization(
     let mut start_pan = use_signal(|| (0.0, 0.0, 0.0, 0.0));
     let mut scale = use_signal(|| 1.0);
     let tooltip_text: Signal<Option<String>> = use_signal(|| None);
+    let mut show_control_signals = use_signal(|| true);
 
     rsx! {
         div { class: "w-full h-full rounded bg-white overflow-hidden relative",
@@ -46,6 +47,36 @@ pub fn PipelineVisualization(
                     path { d: "M3 3v5h5" }
                 }
             }
+            button {
+                class: format!(
+                    "absolute top-2 left-12 p-1 rounded z-10 {}",
+                    if *show_control_signals.read() {
+                        "bg-blue-500 text-white"
+                    } else {
+                        "bg-gray-200 text-white"
+                    },
+                ),
+                onclick: move |_| {
+                    let current = *show_control_signals.read();
+                    show_control_signals.set(!current);
+                },
+                title: if *show_control_signals.read() { "Hide Control Signals" } else { "Show Control Signals" },
+                svg {
+                    width: "16",
+                    height: "16",
+                    view_box: "0 0 24 24",
+                    stroke: "currentColor",
+                    fill: "none",
+                    "stroke-width": "2",
+                    "stroke-linecap": "round",
+                    "stroke-linejoin": "round",
+                    path { d: "M22 12H2" }
+                    path { d: "M5 12V4" }
+                    path { d: "M19 12v7" }
+                    path { d: "M5 19v1" }
+                    path { d: "M19 5V4" }
+                }
+            }
             svg {
                 width: "100%",
                 height: "100%",
@@ -62,6 +93,8 @@ pub fn PipelineVisualization(
                     if *is_panning.read() { "grabbing" } else { "default" },
                 ),
                 onwheel: move |e| {
+                    e.stop_propagation();
+                    e.prevent_default();
                     let delta = e.delta();
                     let scale_change = match delta {
                         WheelDelta::Pixels(y) => if y.y < 0.0 { 1.25 } else { 0.8 }
