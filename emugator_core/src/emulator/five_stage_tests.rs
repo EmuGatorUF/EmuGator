@@ -1053,7 +1053,6 @@ fn test_LB_with_ADDI() {
 
     state = state.clock(&program); //IF
     state = state.clock(&program); //ID
-    let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program); //EX
     state = state.clock(&program); //MEM1
     state = state.clock(&program); //MEM2
@@ -1062,10 +1061,6 @@ fn test_LB_with_ADDI() {
     assert_eq!(state.x[2], 0);
     state = state.clock(&program);
     assert_eq!(state.x[2], 0xFFFFFFDE);
-    state = state.clock(&program);
-    state = state.clock(&program);
-    state = state.clock(&program);
-    state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
     state = state.clock(&program);
