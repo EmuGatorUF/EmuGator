@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, fmt::Display};
+use std::fmt::Display;
 
 // UART Module for EmuGator
 
@@ -15,6 +15,7 @@ pub struct Uart {
     lsr: u8,
     tx_delay: u32,
     rx_delay: u32,
+    rx_cursor: usize,
 
     output_buffer: Vec<u8>,
     input_buffer: Vec<u8>,
@@ -33,6 +34,7 @@ impl Uart {
 
             tx_delay: 0,
             rx_delay: 0,
+            rx_cursor: 0,
 
             output_buffer: vec![],
             input_buffer: vec![].into(),
@@ -61,10 +63,6 @@ impl Uart {
         &self.output_buffer
     }
 
-    pub fn push_input(&mut self, data: &[u8]) {
-        self.input_buffer.extend(data);
-    }
-
     pub fn get_input(&self) -> &[u8] {
         &self.input_buffer
     }
@@ -72,6 +70,10 @@ impl Uart {
     pub fn set_input(&mut self, data: &[u8]) {
         self.input_buffer.clear();
         self.input_buffer.extend(data);
+    }
+
+    pub fn get_cursor(&self) -> usize {
+        self.rx_cursor
     }
 
     pub fn clock(&self) -> Self {
@@ -97,9 +99,9 @@ impl Uart {
         if self.rx_delay == 0 {
             if self.lsr & LSRBitmask::ReceiveComplete as u8 == 0 {
                 // If data has been read, move the byte into the rx_buffer"
-                if !next_uart.input_buffer.is_empty() {
-                    let data = next_uart.input_buffer.remove(0);
+                if let Some(&data) = next_uart.input_buffer.get(self.rx_cursor) {
                     next_uart.rx_buffer = data;
+                    next_uart.rx_cursor += 1;
                     next_uart.lsr |= LSRBitmask::ReceiveComplete as u8; // Receive buffer has new data
                     next_uart.rx_delay = next_uart.uart_cycle_count;
                 }

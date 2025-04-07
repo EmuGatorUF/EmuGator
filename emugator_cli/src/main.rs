@@ -221,7 +221,7 @@ fn run_tests(args: TestArgs) {
             let mut starting_state = EmulatorState::<CVE2Pipeline>::new(&program);
             starting_state
                 .data_memory
-                .set_serial_in(input.as_ref().map_or(&vec![], |v| v.as_bytes()));
+                .set_serial_input(input.as_ref().map_or(&vec![], |v| v.as_bytes()));
             let starting_state = starting_state;
 
             let mut ending_state =
@@ -259,7 +259,7 @@ fn run_tests(args: TestArgs) {
 
                 // Check UART output
                 let expected_output = expected_state_ref.output_buffer.as_bytes();
-                let actual_output = ending_state.data_memory.get_serial_out();
+                let actual_output = ending_state.data_memory.get_serial_output();
                 if actual_output != expected_output {
                     pass = false;
                     let count = zip(expected_output, actual_output)

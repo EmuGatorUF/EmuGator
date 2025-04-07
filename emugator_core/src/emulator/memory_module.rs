@@ -74,11 +74,15 @@ impl MemoryMappedIO {
     }
 
     pub fn set_serial_input(&mut self, data: &[u8]) {
-        self.uart.push_input(data);
+        self.uart.set_input(data);
     }
 
     pub fn get_serial_input(&self) -> &[u8] {
         self.uart.get_input()
+    }
+
+    pub fn get_serial_cursor(&self) -> usize {
+        self.uart.get_cursor()
     }
 
     pub fn get_serial_output(&self) -> &[u8] {

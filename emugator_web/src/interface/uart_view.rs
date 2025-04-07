@@ -42,26 +42,29 @@ pub fn UartView(
                     hr {}
                 }
             }
-            if let Some(uart) = state.as_ref().map(|e| e.uart()) {
+            if let Some(memory_io) = emulator_state.read().as_ref().map(|e| e.memory_io()) {
                 div { class: if *minimize_console.read() { "h-0" } else { "p-3" },
                     div { class: "relative rounded-sm hover:outline",
-                        div { class: "absolute inset-0 bg-inherit p-1 w-full leading-none break-words min-h-[3rem]",
-                            "{uart.get_characters_read_in()}"
-                        }
                         textarea {
                             class: "relative leading-none w-full p-1 min-h-[3rem] resize-y z-10 focus:outline-none",
                             placeholder: "> Type here",
                             oninput: move |event| {
-                                let value = event.value().clone();
-                                if let Some(uart_mut) = emulator_state.write().as_mut().map(|e| e.uart_mut()) {
-                                    uart_mut.set_input_string(value.as_str());
+                                let value = event.value();
+                                let old_value = memory_io.get_serial_input();
+                                if let Some(memory_io_mut) = emulator_state.write().as_mut().map(|e| e.memory_io_mut()) {
+                                    let i = memory_io.get_serial_cursor();
+                                    let new_value = String::from_utf8_lossy(&old_value[..i]).into_owned() + &value[i..];
+                                    memory_io_mut.set_serial_input(new_value.as_bytes());
+                                    input_text.set(new_value);
                                 }
-                                input_text.set(value + "5");
+                                else {
+                                    input_text.set(String::from_utf8_lossy(old_value).to_string());
+                                }
                             },
                             "{input_text}"
                         }
+
                     }
-                    div { class: "whitespace-pre", "{uart}" }
                 }
             }
         }
