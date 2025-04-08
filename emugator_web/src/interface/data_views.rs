@@ -21,7 +21,7 @@ pub fn DataView(
         };
     };
 
-    let data_memory = state.data_memory();
+    let data_memory = state.memory_io();
     let data_start = program.get_section_start(Section::Data) as usize;
 
     // changed this to fix a bug where partial words did not show in data view
