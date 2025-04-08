@@ -3,19 +3,19 @@ use std::collections::BTreeMap;
 use super::uart::Uart;
 
 #[derive(Clone, Debug)]
-pub struct MemoryMappedIO {
+pub struct MemoryModule {
     ram: BTreeMap<u32, u8>,
     uart_address: u32,
     uart: Uart,
 }
 
-impl MemoryMappedIO {
+impl MemoryModule {
     pub fn new(initial: &BTreeMap<u32, u8>, uart_address: u32) -> Self {
         let ram = initial.clone();
         let uart = Uart::default();
 
         // insert uart addresses
-        MemoryMappedIO {
+        MemoryModule {
             ram,
             uart_address,
             uart,
@@ -103,7 +103,7 @@ mod tests {
 
     #[test]
     fn test_memory_mapped_io() {
-        let mut memory = MemoryMappedIO::new(&BTreeMap::new(), 0x1000);
+        let mut memory = MemoryModule::new(&BTreeMap::new(), 0x1000);
         memory.set_serial_input(b"Hello");
 
         // Simulate a write to the UART data register

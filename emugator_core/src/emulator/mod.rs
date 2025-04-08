@@ -14,7 +14,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::assembler::{AssembledProgram, Section};
 use five_stage::FiveStagePipeline;
-use memory_module::MemoryMappedIO;
+use memory_module::MemoryModule;
 
 use cve2::CVE2Pipeline;
 use register_file::RegisterFile;
@@ -108,14 +108,14 @@ impl AnyEmulatorState {
         }
     }
 
-    pub fn memory_io(&self) -> &MemoryMappedIO {
+    pub fn memory_io(&self) -> &MemoryModule {
         match self {
             AnyEmulatorState::CVE2(state) => &state.data_memory,
             AnyEmulatorState::FiveStage(state) => &state.data_memory,
         }
     }
-    
-    pub fn memory_io_mut(&mut self) -> &mut MemoryMappedIO {
+
+    pub fn memory_io_mut(&mut self) -> &mut MemoryModule {
         match self {
             AnyEmulatorState::CVE2(state) => &mut state.data_memory,
             AnyEmulatorState::FiveStage(state) => &mut state.data_memory,
@@ -140,14 +140,14 @@ impl AnyEmulatorState {
 #[derive(Clone, Debug)]
 pub struct EmulatorState<P: Pipeline> {
     pub x: RegisterFile,
-    pub data_memory: MemoryMappedIO,
+    pub data_memory: MemoryModule,
     pub pipeline: P,
 }
 
 impl<P: Pipeline + Clone + Default> EmulatorState<P> {
     pub fn new(program: &AssembledProgram) -> Self {
         let mut pipeline = P::default();
-        let data_memory = MemoryMappedIO::new(&program.initial_data_memory, 0xF0);
+        let data_memory = MemoryModule::new(&program.initial_data_memory, 0xF0);
 
         // set starting address to start
         let start_addr = program.get_section_start(Section::Text);
@@ -242,7 +242,7 @@ pub trait Pipeline: Clone {
         &mut self,
         program: &AssembledProgram,
         registers: &mut RegisterFile,
-        data_memory: &mut MemoryMappedIO,
+        data_memory: &mut MemoryModule,
     );
 
     /// Set the initial address of the instruction fetch stage

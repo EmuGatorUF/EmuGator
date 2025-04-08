@@ -6,7 +6,7 @@ use crate::{
     emulator::{
         PcPos, Pipeline, RegisterFile,
         controller_common::{DataDestSel, OpASel, OpBSel, PCSel},
-        memory_module::MemoryMappedIO,
+        memory_module::MemoryModule,
         read_instruction,
     },
     isa::Instruction,
@@ -34,7 +34,7 @@ impl Pipeline for CVE2Pipeline {
         &mut self,
         program: &AssembledProgram,
         registers: &mut RegisterFile,
-        data_memory: &mut MemoryMappedIO,
+        data_memory: &mut MemoryModule,
     ) {
         // Run the registers that had stuff to write in the last cycle
         // (this is done first to represent it taking a clock edge to write)
@@ -189,7 +189,7 @@ impl CVE2Pipeline {
         };
     }
 
-    fn run_data_memory(&mut self, data_memory: &mut MemoryMappedIO) {
+    fn run_data_memory(&mut self, data_memory: &mut MemoryModule) {
         // Perform any requested memory read/write
         if self.datapath.data_req_o {
             if self.datapath.data_we_o {
