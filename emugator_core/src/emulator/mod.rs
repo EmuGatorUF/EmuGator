@@ -15,7 +15,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::assembler::{AssembledProgram, Section};
 use five_stage::FiveStagePipeline;
 use memory_module::MemoryMappedIO;
-use uart::Uart;
 
 use cve2::CVE2Pipeline;
 use register_file::RegisterFile;

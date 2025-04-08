@@ -28,8 +28,7 @@ impl Uart {
 
             tx_buffer: 0u8,
             rx_buffer: 0u8,
-            lsr: LSRBitmask::ReceiveComplete as u8
-                | LSRBitmask::TransmitComplete as u8
+            lsr: LSRBitmask::TransmitComplete as u8
                 | LSRBitmask::DataRegisterEmpty as u8,
 
             tx_delay: 0,

@@ -216,6 +216,25 @@ fn parse_directive<'a>(
 
                     Directive::Alignment(alignment)
                 }
+                "zero" => {
+                    let expression = parse_expression(lexer)?;
+                    let expression_err = AssemblerError::from_expression("".into(), &expression);
+                    let skip: u32 = expression
+                        .evaluate(|_| {
+                            Err(AssemblerError {
+                                error_message: "Cannot use symbols in '.zero' directive.".into(),
+                                ..expression_err.clone()
+                            })
+                        })?
+                        .1
+                        .try_into()
+                        .map_err(|_| AssemblerError {
+                            error_message: "Skip is too large.".into(),
+                            ..expression_err
+                        })?;
+                    
+                    Directive::Data(vec![0u8; skip as usize], 0)
+                }
                 "byte" | "2byte" | "4byte" | "8byte" | "half" | "word" | "dword" => {
                     let (width, alignment) = match directive_str {
                         "byte" => (1, 0),

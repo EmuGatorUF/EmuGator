@@ -12,7 +12,7 @@ pub struct MemoryMappedIO {
 impl MemoryMappedIO {
     pub fn new(initial: &BTreeMap<u32, u8>, uart_address: u32) -> Self {
         let ram = initial.clone();
-        let uart = Uart::new(20);
+        let uart = Uart::default();
 
         // insert uart addresses
         MemoryMappedIO {
@@ -35,8 +35,9 @@ impl MemoryMappedIO {
     pub fn set(&mut self, address: u32, value: u8) {
         if address == self.uart_address {
             self.uart.tx_write(value);
+        } else {
+            self.ram.insert(address, value);
         }
-        self.ram.insert(address, value);
     }
 
     /// View memory without side effects (used by the UI)
@@ -91,5 +92,49 @@ impl MemoryMappedIO {
 
     pub fn clock(&mut self) {
         self.uart = self.uart.clock();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::emulator::uart::LSRBitmask;
+
+    use super::*;
+
+    #[test]
+    fn test_memory_mapped_io() {
+        let mut memory = MemoryMappedIO::new(&BTreeMap::new(), 0x1000);
+        memory.set_serial_input(b"Hello");
+
+        // Simulate a write to the UART data register
+        memory.set(0x1000, 42);
+
+        // Wait for the UART to process the data
+        while memory.get(0x1004) & LSRBitmask::DataRegisterEmpty as u8 == 0 {
+            memory.clock();
+        }
+        memory.set(0x1000, 0);
+
+        while memory.get(0x1004) & LSRBitmask::DataRegisterEmpty as u8 == 0 {
+            memory.clock();
+        }
+
+        assert!(memory.get_serial_output() == &[42, 0]);
+
+        while memory.get(0x1004) & LSRBitmask::ReceiveComplete as u8 == 0 {
+            memory.clock();
+        }
+        assert_eq!(memory.get(0x1000), b'H');
+        while memory.get(0x1004) & LSRBitmask::ReceiveComplete as u8 == 0 {
+            memory.clock();
+        }
+        assert_eq!(memory.get(0x1000), b'e');
+        while memory.get(0x1004) & LSRBitmask::ReceiveComplete as u8 == 0 {
+            memory.clock();
+        }
+        assert_eq!(memory.get(0x1000), b'l');
+
+        assert_eq!(memory.get_serial_input(), b"Hello");
+        assert_eq!(memory.get_serial_cursor(), 3);
     }
 }
