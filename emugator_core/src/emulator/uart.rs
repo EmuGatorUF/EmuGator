@@ -28,8 +28,7 @@ impl Uart {
 
             tx_buffer: 0u8,
             rx_buffer: 0u8,
-            lsr: LSRBitmask::TransmitComplete as u8
-                | LSRBitmask::DataRegisterEmpty as u8,
+            lsr: LSRBitmask::TransmitComplete as u8 | LSRBitmask::TransmitReady as u8,
 
             tx_delay: 0,
             rx_delay: 0,
@@ -45,12 +44,12 @@ impl Uart {
     }
 
     pub fn tx_write(&mut self, data: u8) {
-        self.lsr &= !(LSRBitmask::DataRegisterEmpty as u8);
+        self.lsr &= !(LSRBitmask::TransmitReady as u8);
         self.tx_buffer = data;
     }
 
     pub fn rx_read(&mut self) -> u8 {
-        self.lsr &= !(LSRBitmask::ReceiveComplete as u8);
+        self.lsr &= !(LSRBitmask::ReceiveReady as u8);
         self.rx_buffer
     }
 
@@ -81,12 +80,12 @@ impl Uart {
         next_uart.tx_delay = self.tx_delay.saturating_sub(1);
         next_uart.rx_delay = self.rx_delay.saturating_sub(1);
         if self.tx_delay == 0 {
-            if self.lsr & LSRBitmask::DataRegisterEmpty as u8 == 0 {
+            if self.lsr & LSRBitmask::TransmitReady as u8 == 0 {
                 // If data has been written to the UART,
                 // Move the byte into the "transmit shift register"
                 next_uart.output_buffer.push(next_uart.tx_buffer);
                 next_uart.tx_buffer = 0;
-                next_uart.lsr |= LSRBitmask::DataRegisterEmpty as u8; // Data Register is empty now
+                next_uart.lsr |= LSRBitmask::TransmitReady as u8; // Data Register is empty now
                 next_uart.lsr &= !(LSRBitmask::TransmitComplete as u8); // Transmit shift register is non-empty
                 next_uart.tx_delay = next_uart.uart_cycle_count;
             } else {
@@ -96,12 +95,12 @@ impl Uart {
         }
 
         if self.rx_delay == 0 {
-            if self.lsr & LSRBitmask::ReceiveComplete as u8 == 0 {
+            if self.lsr & LSRBitmask::ReceiveReady as u8 == 0 {
                 // If data has been read, move the byte into the rx_buffer"
                 if let Some(&data) = next_uart.input_buffer.get(self.rx_cursor) {
                     next_uart.rx_buffer = data;
                     next_uart.rx_cursor += 1;
-                    next_uart.lsr |= LSRBitmask::ReceiveComplete as u8; // Receive buffer has new data
+                    next_uart.lsr |= LSRBitmask::ReceiveReady as u8; // Receive buffer has new data
                     next_uart.rx_delay = next_uart.uart_cycle_count;
                 }
             }
@@ -127,9 +126,9 @@ impl Display for Uart {
 /// Bitmask enum for the Line Status Register
 pub enum LSRBitmask {
     /// '1' if the rx_buffer has unread contents
-    ReceiveComplete = 1 << 0,
-    /// ''' if the tx_buffer is ready to accept data
-    DataRegisterEmpty = 1 << 2,
+    ReceiveReady = 1 << 0,
+    /// '1' if the tx_buffer is ready to accept data
+    TransmitReady = 1 << 2,
     /// '1' if the transmission is complete
     TransmitComplete = 1 << 3,
     Error = 1 << 7, // Probably not used

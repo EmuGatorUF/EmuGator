@@ -110,26 +110,26 @@ mod tests {
         memory.set(0x1000, 42);
 
         // Wait for the UART to process the data
-        while memory.get(0x1004) & LSRBitmask::DataRegisterEmpty as u8 == 0 {
+        while memory.get(0x1004) & LSRBitmask::TransmitReady as u8 == 0 {
             memory.clock();
         }
         memory.set(0x1000, 0);
 
-        while memory.get(0x1004) & LSRBitmask::DataRegisterEmpty as u8 == 0 {
+        while memory.get(0x1004) & LSRBitmask::TransmitReady as u8 == 0 {
             memory.clock();
         }
 
         assert!(memory.get_serial_output() == &[42, 0]);
 
-        while memory.get(0x1004) & LSRBitmask::ReceiveComplete as u8 == 0 {
+        while memory.get(0x1004) & LSRBitmask::ReceiveReady as u8 == 0 {
             memory.clock();
         }
         assert_eq!(memory.get(0x1000), b'H');
-        while memory.get(0x1004) & LSRBitmask::ReceiveComplete as u8 == 0 {
+        while memory.get(0x1004) & LSRBitmask::ReceiveReady as u8 == 0 {
             memory.clock();
         }
         assert_eq!(memory.get(0x1000), b'e');
-        while memory.get(0x1004) & LSRBitmask::ReceiveComplete as u8 == 0 {
+        while memory.get(0x1004) & LSRBitmask::ReceiveReady as u8 == 0 {
             memory.clock();
         }
         assert_eq!(memory.get(0x1000), b'l');
