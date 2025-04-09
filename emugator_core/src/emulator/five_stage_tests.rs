@@ -1068,6 +1068,72 @@ fn test_LB_with_ADDI() {
 }
 
 #[test]
+fn test_LB_and_SB() {
+    let program = populate(&[
+        ISA::ADDI.build(Operands {
+            rd: 10,
+            rs1: 0,
+            imm: 0x8,
+            ..Default::default()
+        }),
+        ISA::LB.build(Operands {
+            rd: 2,
+            rs1: 10,
+            imm: 0x8,
+            ..Default::default()
+        }),
+        ISA::SB.build(Operands {
+            rs1: 1,
+            rs2: 2,
+            imm: 0x0,
+            ..Default::default()
+        }),
+        ISA::ADDI.build(Operands {
+            rd: 1,
+            rs1: 1,
+            imm: 0x1,
+            ..Default::default()
+        }),
+    ]);
+
+    let mut state = EmulatorState::<FiveStagePipeline>::new(&program);
+
+    state.data_memory.set(0x10, 0xFB);
+    state.data_memory.set(0x11, 0xFC);
+    state.data_memory.set(0x12, 0x7D);
+    state.data_memory.set(0x13, 0x7E);
+
+    state = state.clock(&program); //IF
+    state = state.clock(&program); //ID
+    state = state.clock(&program); //EX
+    state = state.clock(&program); //MEM
+
+    // ADDI ( x10 := x0 + 0x8)
+    state = state.clock(&program);
+    assert_eq!(state.x[10], 8);
+
+    // LB ( x2 := MEM[x10 + 0x8] )
+    state = state.clock(&program); //extra clock cycles because of hazard
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.x[2], 0xFFFFFFFB);
+
+    // SB ( MEM[x1 + 0x0] := x2 )
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.data_memory.get(0x0), 0xFB);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    state = state.clock(&program);
+    assert_eq!(state.x[1], 0);
+    state = state.clock(&program);
+    assert_eq!(state.x[1], 1);
+}
+
+#[test]
 fn test_LH() {
     let program = populate(&[
         ISA::ADDI.build(Operands {

@@ -6,6 +6,9 @@ use dioxus_logger::tracing::info;
 use std::collections::BTreeSet;
 use std::ops::Deref;
 
+use dioxus_free_icons::icons::ld_icons::{LdCircleArrowRight, LdCircleCheck, LdClock2, LdInfo, LdPlay};
+use dioxus_free_icons::Icon;
+
 #[component]
 #[allow(non_snake_case)]
 pub fn Navbar(
@@ -28,7 +31,7 @@ pub fn Navbar(
                 span { class: "text-xl font-semibold text-blue-400 mr-4", "EmuGator" }
                 div { class: "flex space-x-2",
                     button {
-                        class: "bg-green-600 hover:bg-green-700 text-white font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex items-center",
+                        class: "bg-green-600 gap-x-1 hover:bg-green-700 text-white font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex items-center",
                         onclick: move |_| {
                             info!("Start clicked");
                             match assembler::assemble(&source.read()) {
@@ -50,22 +53,16 @@ pub fn Navbar(
                                 }
                             }
                         },
-                        svg {
-                            class: "w-4 h-4 mr-1 fill-current",
-                            xmlns: "http://www.w3.org/2000/svg",
-                            view_box: "0 0 20 20",
-                            path {
-                                d: "M10 1.6a8.4 8.4 0 100 16.8 8.4 8.4 0 000-16.8zm4.3 9.6l-4 2.3a.8.8 0 01-1.2-.7V7.2a.8.8 0 011.2-.7l4 2.3a.8.8 0 010 1.4z",
-                                fill_rule: "evenodd",
-                                clip_rule: "evenodd",
-                            }
+                        Icon {
+                            width: 15,
+                            icon: LdPlay
                         }
                         "Start"
                     }
 
                     button {
                         class: format!(
-                            "{} font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex items-center",
+                            "{} font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex gap-x-1 items-center",
                             if is_started {
                                 "bg-indigo-600 hover:bg-indigo-700 text-white"
                             } else {
@@ -82,21 +79,15 @@ pub fn Navbar(
                                 emulator_state.set(new_state);
                             }
                         },
-                        svg {
-                            class: "w-4 h-4 mr-1 fill-current",
-                            xmlns: "http://www.w3.org/2000/svg",
-                            view_box: "0 0 20 20",
-                            path {
-                                d: "M13.7 10L8.3 5.5a.8.8 0 00-1.3.6v9a.8.8 0 001.3.6L13.7 10z",
-                                fill_rule: "evenodd",
-                                clip_rule: "evenodd",
-                            }
+                        Icon {
+                            width: 18,
+                            icon: LdClock2
                         }
                         "Tick Clock"
                     }
                     button {
                         class: format!(
-                            "{} text-white font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex items-center",
+                            "{} text-white font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex items-center gap-x-1",
                             if is_started {
                                 "bg-indigo-600 hover:bg-indigo-700 text-white"
                             } else {
@@ -113,21 +104,15 @@ pub fn Navbar(
                                 emulator_state.set(new_state);
                             }
                         },
-                        svg {
-                            class: "w-4 h-4 mr-1 fill-current",
-                            xmlns: "http://www.w3.org/2000/svg",
-                            view_box: "0 0 20 20",
-                            path {
-                                d: "M10 3.5l8 6.5-8 6.5V3.5zM2 4h5v12H2V4z",
-                                fill_rule: "evenodd",
-                                clip_rule: "evenodd",
-                            }
+                        Icon {
+                            width: 17,
+                            icon: LdCircleArrowRight
                         }
                         "Next Instruction"
                     }
                     button {
                         class: format!(
-                            "{} text-white font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex items-center",
+                            "{} text-white font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex items-center gap-x-1",
                             if is_started {
                                 "bg-indigo-600 hover:bg-indigo-700 text-white"
                             } else {
@@ -146,15 +131,9 @@ pub fn Navbar(
                                 emulator_state.set(new_state);
                             }
                         },
-                        svg {
-                            class: "w-4 h-4 mr-1 fill-current",
-                            xmlns: "http://www.w3.org/2000/svg",
-                            view_box: "0 0 20 20",
-                            path {
-                                d: "M10 3.5l8 6.5-8 6.5V3.5zM2 4h5v12H2V4z",
-                                fill_rule: "evenodd",
-                                clip_rule: "evenodd",
-                            }
+                        Icon {
+                            width: 17,
+                            icon: LdCircleArrowRight
                         }
                         "Until Break"
                     }
@@ -163,7 +142,7 @@ pub fn Navbar(
             div { class: "flex items-stretch space-x-2",
                 span {
                     class: format!(
-                        "text-white text-sm font-medium {} rounded py-1 px-2 flex items-center",
+                        "text-white text-sm font-medium {} rounded py-1 px-2 flex items-center gap-x-1",
                         if is_assembled {
                             "bg-green-600"
                         } else if error_count > 0 {
@@ -173,15 +152,9 @@ pub fn Navbar(
                         },
                     ),
                     if is_assembled {
-                        svg {
-                            class: "w-4 h-4 mr-1 fill-current",
-                            xmlns: "http://www.w3.org/2000/svg",
-                            view_box: "0 0 20 20",
-                            path {
-                                d: "M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z",
-                                fill_rule: "evenodd",
-                                clip_rule: "evenodd",
-                            }
+                        Icon {
+                            width: 17,
+                            icon: LdCircleCheck
                         }
                         if is_started {
                             "Program Running"
@@ -205,45 +178,28 @@ pub fn Navbar(
                     }
                 }
                 button {
-                    class: "bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex items-center",
+                    class: "bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex gap-x-1 items-center",
                     onclick: move |_| {
                         let new_selection = selected_emulator.read().other();
                         selected_emulator.set(new_selection);
                         emulator_state.set(None);
                     },
-                    svg {
-                        class: "w-4 h-4 mr-1 fill-current",
-                        xmlns: "http://www.w3.org/2000/svg",
-                        view_box: "0 0 20 20",
-                        path {
-                            d: "M4 2h12a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V4a2 2 0 012-2zm0 2v12h12V4H4z",
-                            fill_rule: "evenodd",
-                            clip_rule: "evenodd",
-                        }
+                    img {
+                        width: 20,
+                        src: "assets/pipeline.svg"
                     }
                     "{selected_emulator.read().display_string()}"
                 }
                 button {
-                    class: "bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm font-medium py-1 px-2 rounded transition duration-150 ease-in-out",
+                    class: "bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium py-1 px-2 rounded transition duration-150 ease-in-out",
                     onclick: move |_| {
-                        let help_displayed = !*help_panel_displayed.read();
-                        help_panel_displayed.set(help_displayed);
-                        info!("Help Toggled: {:?}", help_displayed);
+                        let help_panel_toggle = !*help_panel_displayed.read();
+                        help_panel_displayed.set(help_panel_toggle);
+                        info!("Help panel toggled: {:?}", help_panel_toggle);
                     },
-                    svg {
-                        class: "w-4 h-4 fill-current",
-                        xmlns: "http://www.w3.org/2000/svg",
-                        view_box: "0 0 20 20",
-                        path {
-                            d: "M10 12a2 2 0 100-4 2 2 0 000 4z",
-                            fill_rule: "evenodd",
-                            clip_rule: "evenodd",
-                        }
-                        path {
-                            d: "M10 3a7 7 0 100 14 7 7 0 000-14zm-9 7a9 9 0 1118 0 9 9 0 01-18 0z",
-                            fill_rule: "evenodd",
-                            clip_rule: "evenodd",
-                        }
+                    Icon {
+                        width: 18,
+                        icon: LdInfo
                     }
                 }
             }

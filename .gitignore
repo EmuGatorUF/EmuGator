@@ -13,3 +13,6 @@ tailwind.css
 
 **/node_modules/
 /.vscode/chrome/
+
+# Mac specific
+/.DS_Store/

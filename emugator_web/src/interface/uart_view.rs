@@ -2,6 +2,9 @@ use dioxus::prelude::*;
 use dioxus::{prelude::component, signals::Signal};
 use emugator_core::emulator::AnyEmulatorState;
 
+use dioxus_free_icons::icons::ld_icons::{LdChevronUp, LdChevronDown};
+use dioxus_free_icons::Icon;
+
 #[component]
 #[allow(non_snake_case)]
 pub fn UartView(
@@ -12,29 +15,28 @@ pub fn UartView(
 
     let state = emulator_state.read();
 
+    let icon_width = 25;
     rsx! {
         div { class: "flex-col bg-inherit text-gray-200 font-mono border-t-[0.450px] border-gray-600",
             div {
                 div { class: "flex flex-grow p-2 items-center align-center justify-between",
                     "UART Console"
                     button {
-                        class: "flex items-center justify-center text-center text-sm bg-inherit px-2 hover:outline outline-gray-400 rounded shadow "
-                            .to_owned()
-                            + { if *minimize_console.read() { "" } else { "origin-center rotate-180" } },
+                        class: "flex items-center justify-center text-center text-sm bg-inherit px-2 hover:outline outline-gray-400 rounded",
                         onclick: move |_| {
                             let is_minimized = *minimize_console.read();
                             minimize_console.set(!is_minimized);
                         },
-                        svg {
-                            width: "16",
-                            height: "16",
-                            view_box: "0 0 24 24",
-                            stroke: "currentColor",
-                            fill: "none",
-                            "stroke-width": "1",
-                            "stroke-linecap": "round",
-                            "stroke-linejoin": "round",
-                            path { d: "M12 4 L22 14 L20.6 15.4 L12 6.8 L3.4 15.4 L2 14 Z" }
+                        if *minimize_console.read() {
+                            Icon {
+                                width: icon_width,
+                                icon: LdChevronUp
+                            }
+                        } else {
+                            Icon {
+                                width: icon_width,
+                                icon: LdChevronDown
+                            }
                         }
                     }
                 }
