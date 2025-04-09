@@ -16,6 +16,7 @@ pub fn Navbar(
     selected_emulator: Signal<EmulatorOption>,
     breakpoints: ReadOnlySignal<BTreeSet<usize>>,
     minimize_console: Signal<bool>,
+    help_panel_displayed: Signal<bool>
 ) -> Element {
     let is_started = emulator_state.read().is_some();
     let is_assembled = assembled_program.read().is_some();
@@ -224,7 +225,11 @@ pub fn Navbar(
                 }
                 button {
                     class: "bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm font-medium py-1 px-2 rounded transition duration-150 ease-in-out",
-                    onclick: move |_| {},
+                    onclick: move |_| {
+                        let help_displayed = !*help_panel_displayed.read();
+                        help_panel_displayed.set(help_displayed);
+                        info!("Help Toggled: {:?}", help_displayed);
+                    },
                     svg {
                         class: "w-4 h-4 fill-current",
                         xmlns: "http://www.w3.org/2000/svg",

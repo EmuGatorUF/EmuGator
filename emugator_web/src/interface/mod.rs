@@ -3,6 +3,7 @@ mod instruction_views;
 mod memory_view;
 mod navbar;
 mod pipeline_visualization;
+mod help_panel;
 mod register_view;
 mod uart_view;
 
@@ -14,7 +15,7 @@ use dioxus_sdk::utils::timing::use_debounce;
 
 use self::{
     memory_view::MemoryView, navbar::Navbar, pipeline_visualization::PipelineVisualization,
-    register_view::RegisterView, uart_view::UartView,
+    register_view::RegisterView, uart_view::UartView, help_panel::HelpPanelView
 };
 use crate::code_editor::{CodeEditor, LineHighlight};
 use emugator_core::{
@@ -34,6 +35,7 @@ pub fn App() -> Element {
     let breakpoints: Signal<BTreeSet<usize>> = use_signal(BTreeSet::new);
 
     let minimize_console: Signal<bool> = use_signal(|| true);
+    let help_panel_displayed: Signal<bool> = use_signal(|| false);
 
     let mut assemble_debounce = use_debounce(Duration::from_secs(1), move |_| {
         info!("Assembling...");
@@ -104,6 +106,7 @@ pub fn App() -> Element {
                 selected_emulator,
                 breakpoints,
                 minimize_console,
+                help_panel_displayed
             }
             div { class: "flex flex-1 overflow-hidden",
                 div { class: "w-1/2 flex flex-col h-full bg-[#1E1E1E] overflow-hidden border-r-2 border-gray-900",
@@ -123,42 +126,47 @@ pub fn App() -> Element {
                         UartView { emulator_state, minimize_console }
                     }
                 }
-                div { class: "w-1/2 flex flex-col bg-gray-700 text-white",
-                    div { class: "h-1/3 bg-gray-700 p-2 border-b-2 border-gray-900",
-                        div { class: "bg-gray-800 rounded h-full p-2",
-                            div { class: "flex items-center mb-2",
-                                div { class: "h-4 w-1 bg-blue-500 mr-2" }
-                                span { class: "text-sm font-medium text-gray-300",
-                                    "Pipeline Visualization"
+
+                if !*help_panel_displayed.read() {
+                    div { class: "w-1/2 flex flex-col bg-gray-700 text-white",
+                        div { class: "h-1/3 bg-gray-700 p-2 border-b-2 border-gray-900",
+                            div { class: "bg-gray-800 rounded h-full p-2",
+                                div { class: "flex items-center mb-2",
+                                    div { class: "h-4 w-1 bg-blue-500 mr-2" }
+                                    span { class: "text-sm font-medium text-gray-300",
+                                        "Pipeline Visualization"
+                                    }
+                                }
+                                div { class: "h-[calc(100%-2rem)] overflow-auto",
+                                    PipelineVisualization { emulator_state, selected_emulator }
                                 }
                             }
-                            div { class: "h-[calc(100%-2rem)] overflow-auto",
-                                PipelineVisualization { emulator_state, selected_emulator }
+                        }
+                        div { class: "h-1/3 bg-gray-700 p-2 border-b-2 border-gray-900",
+                            div { class: "bg-gray-800 rounded h-full p-2",
+                                div { class: "flex items-center mb-2",
+                                    div { class: "h-4 w-1 bg-green-500 mr-2" }
+                                    span { class: "text-sm font-medium text-gray-300", "Register View" }
+                                }
+                                div { class: "h-[calc(100%-2rem)] overflow-auto",
+                                    RegisterView { emulator_state }
+                                }
+                            }
+                        }
+                        div { class: "h-1/3 bg-gray-700 p-2",
+                            div { class: "bg-gray-800 rounded h-full p-2",
+                                div { class: "flex items-center mb-2",
+                                    div { class: "h-4 w-1 bg-purple-500 mr-2" }
+                                    span { class: "text-sm font-medium text-gray-300", "Memory View" }
+                                }
+                                div { class: "h-[calc(100%-2rem)] overflow-auto",
+                                    MemoryView { assembled_program, emulator_state }
+                                }
                             }
                         }
                     }
-                    div { class: "h-1/3 bg-gray-700 p-2 border-b-2 border-gray-900",
-                        div { class: "bg-gray-800 rounded h-full p-2",
-                            div { class: "flex items-center mb-2",
-                                div { class: "h-4 w-1 bg-green-500 mr-2" }
-                                span { class: "text-sm font-medium text-gray-300", "Register View" }
-                            }
-                            div { class: "h-[calc(100%-2rem)] overflow-auto",
-                                RegisterView { emulator_state }
-                            }
-                        }
-                    }
-                    div { class: "h-1/3 bg-gray-700 p-2",
-                        div { class: "bg-gray-800 rounded h-full p-2",
-                            div { class: "flex items-center mb-2",
-                                div { class: "h-4 w-1 bg-purple-500 mr-2" }
-                                span { class: "text-sm font-medium text-gray-300", "Memory View" }
-                            }
-                            div { class: "h-[calc(100%-2rem)] overflow-auto",
-                                MemoryView { assembled_program, emulator_state }
-                            }
-                        }
-                    }
+                } else {
+                    HelpPanelView {}
                 }
             }
         }
