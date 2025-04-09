@@ -45,7 +45,16 @@ impl HazardDetector {
         // check that neither register being read is a hazard.
         let instr_def = InstructionDefinition::from_instr(instruction.clone()).unwrap();
         let instr_frmt = instr_def.format;
-        if instr_frmt != InstructionFormat::U
+        
+        if self.mem_access_track != 0 {
+            match self.mem_access_track {
+                1 => self.hazard_detected = Hazard::allow_up_to_id(),
+                2 => self.hazard_detected = Hazard::allow_ex(),
+                _ => self.hazard_detected = Hazard::all_go(),
+            }
+            self.mem_access_track -= 1;
+
+        } else if instr_frmt != InstructionFormat::U
             && instr_frmt != InstructionFormat::J
             && self.hazard_reg_track[instruction.rs1() as usize] != 0
         {
@@ -65,18 +74,15 @@ impl HazardDetector {
                 3 => self.hazard_detected = Hazard::allow_ex(),
                 _ => self.hazard_detected = Hazard::stop_up_to_ex(),
             }
-        } else if self.mem_access_track != 0 {
-            match self.mem_access_track {
-                1 => self.hazard_detected = Hazard::allow_up_to_id(),
-                2 => self.hazard_detected = Hazard::allow_ex(),
-                _ => self.hazard_detected = Hazard::all_go(),
-            }
-            self.mem_access_track -= 1;
 
             // if instruction is a memory operation, lsu will take two stages, so freeze part of the pipeline so controller information isn't overwritten.
         } else if instr_def.opcode == 0b0000011 || instr_frmt == InstructionFormat::S {
             self.hazard_detected = Hazard::allow_ex();
             self.mem_access_track = 2;
+
+            if instr_def.opcode == 0b0000011 {
+                self.hazard_reg_track[instruction.rd() as usize] = 5;
+            }
 
             // if JAL, branch instr, or JALR
         } else if instr_frmt == InstructionFormat::J

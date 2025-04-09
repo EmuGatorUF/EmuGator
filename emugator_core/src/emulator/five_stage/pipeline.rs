@@ -9,7 +9,7 @@ use super::controller::FiveStageControl;
 use super::datapath::{
     ExLines, ExMemBuffer, IdExBuffer, IdLines, IfIdBuffer, IfLines, MemLines, MemWbBuffer, WbLines,
 };
-use super::hazard_detection::{Hazard, HazardDetector};
+use super::hazard_detection::HazardDetector;
 
 #[derive(Clone, Default, Debug)]
 pub struct FiveStagePipeline {

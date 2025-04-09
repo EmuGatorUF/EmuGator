@@ -7,5 +7,6 @@
     "data_memory": {
         "00000064": "00000000",
         "00000065": "00000001"
-    }
+    },
+    "output_buffer": "Alas!\nPoor\tYorick"
 }
