@@ -6,7 +6,8 @@ use dioxus_logger::tracing::info;
 use std::collections::BTreeSet;
 use std::ops::Deref;
 
-use dioxus_free_icons::icons::ld_icons::{LdCircleArrowRight, LdCircleCheck, LdClock2, LdInfo, LdPlay};
+use dioxus_free_icons::icons::ld_icons::{LdCircleArrowRight, LdCircleCheck, LdInfo, LdPlay};
+use dioxus_free_icons::icons::ld_icons::{LdClock12, LdClock3, LdClock2, LdClock6, LdClock9};
 use dioxus_free_icons::Icon;
 
 #[component]
@@ -24,6 +25,8 @@ pub fn Navbar(
     let is_started = emulator_state.read().is_some();
     let is_assembled = assembled_program.read().is_some();
     let error_count = assembler_errors.read().len();
+
+    let mut tick = use_signal(|| 1);
 
     rsx! {
         nav { class: "bg-gray-900 text-white w-full py-2 px-4 flex items-center justify-between shadow-md border-b-2 border-gray-950",
@@ -71,6 +74,9 @@ pub fn Navbar(
                         ),
                         disabled: !is_started,
                         onclick: move |_| {
+                            let new_tick = *tick.read() + 1;
+                            tick.set(new_tick);
+
                             if let Some(mut program) = assembled_program.as_mut() {
                                 let new_state = emulator_state
                                     .read()
@@ -79,9 +85,11 @@ pub fn Navbar(
                                 emulator_state.set(new_state);
                             }
                         },
-                        Icon {
-                            width: 18,
-                            icon: LdClock2
+                        match *tick.read() % 4 {
+                            0 => rsx!(Icon { width: 18, icon: LdClock12 }),
+                            1 => rsx!(Icon { width: 18, icon: LdClock3 }),
+                            2 => rsx!(Icon { width: 18, icon: LdClock6 }),
+                            _ => rsx!(Icon { width: 18, icon: LdClock9 }),
                         }
                         "Tick Clock"
                     }
