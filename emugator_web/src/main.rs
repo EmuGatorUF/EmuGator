@@ -9,6 +9,6 @@ fn main() {
     // Init logger
     dioxus_logger::init(Level::INFO).expect("failed to init logger");
     info!("starting app");
-    code_editor::register_riscv_language();
+    code_editor::language::register_riscv_language();
     launch(App);
 }

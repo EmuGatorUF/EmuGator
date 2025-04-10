@@ -192,6 +192,6 @@ impl std::ops::Sub<Address> for Address {
 
 impl std::fmt::Display for Address {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}({})", self.1, self.0)
+        write!(f, "{} ({})", self.1, self.0)
     }
 }

@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use dioxus::prelude::*;
 
-mod highlight;
+pub mod language;
 mod monaco_editor;
 
 use emugator_core::assembler::AssemblerError;
@@ -13,7 +13,6 @@ use monaco::sys::{
 use monaco_editor::MonacoEditor;
 use wasm_bindgen::JsValue;
 
-pub use highlight::register_riscv_language;
 pub use monaco_editor::LineHighlight;
 
 /// A wrapper around the Monaco editor with our expected functionality

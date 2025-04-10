@@ -4,7 +4,7 @@ use bimap::BiBTreeMap;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::OnceLock;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AssembledProgram {
     /// Map of instruction memory addresses to instruction bytes
     pub instruction_memory: BTreeMap<u32, u8>,
