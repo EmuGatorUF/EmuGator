@@ -29,7 +29,7 @@ pub fn PipelineVisualization(
     rsx! {
         div { class: "w-full h-full rounded bg-white overflow-hidden relative",
             button {
-                class: "absolute top-2 left-2 bg-gray-200 hover:bg-gray-300 p-1 rounded z-10",
+                class: "absolute top-2 left-2 bg-gray-200 hover:bg-gray-300 p-1 rounded z-10 cursor-pointer",
                 onclick: move |_| {
                     view_box.set(initial_view);
                     scale.set(1.0);
@@ -49,7 +49,7 @@ pub fn PipelineVisualization(
             }
             button {
                 class: format!(
-                    "absolute top-2 left-12 p-1 rounded z-10 {}",
+                    "absolute top-2 left-12 p-1 rounded z-10 cursor-pointer {}",
                     if *show_control_signals.read() {
                         "bg-blue-500 text-white"
                     } else {

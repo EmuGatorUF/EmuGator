@@ -22,7 +22,7 @@ pub fn UartView(
                 div { class: "flex flex-grow p-2 items-center align-center justify-between",
                     "UART Console"
                     button {
-                        class: "flex items-center justify-center text-center text-sm bg-inherit px-2 hover:outline outline-gray-400 rounded",
+                        class: "flex items-center justify-center text-center text-sm bg-inherit px-2 hover:outline outline-gray-400 rounded cursor-pointer",
                         onclick: move |_| {
                             let is_minimized = *minimize_console.read();
                             minimize_console.set(!is_minimized);
