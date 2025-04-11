@@ -18,13 +18,11 @@ pub fn HelpPanelView() -> Element {
     rsx!{
         div { class: "flex text-gray-800 bg-gray-100 w-1/2",
             aside { class: "w-1/4 bg-gray-900 text-white p-4",
-                h2 { class: "text-xl font-semibold mb-4", "Documentation" }
+                h2 { class: "text-sm xl:text-xl font-semibold mb-4", "Documentation" }
                 nav { class: "space-y-1 text-gray-300",
-                    // For some reason, it's not complaining that there's no key
-                    // LSP also doesn't show a "key" as part of the enum
                     for subsection in subsections {
                         div { 
-                            class: "block px-2 py-1 hover:bg-gray-700 hover:text-white rounded",
+                            class: "text-sm block px-2 py-1 hover:bg-gray-700 hover:text-white rounded cursor-pointer",
                             onclick: move |_| { displayed_menu.set(subsection) },
                             "{subsection}"
                         }
