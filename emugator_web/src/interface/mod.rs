@@ -24,11 +24,13 @@ use emugator_core::{
     include_test_file,
 };
 
+// Global so this can be accessed from the hover provider
+pub static ASSEMBLED_PROGRAM: GlobalSignal<Option<AssembledProgram>> = GlobalSignal::new(|| None);
+
 #[component]
 #[allow(non_snake_case)]
 pub fn App() -> Element {
     let source = use_signal(|| include_test_file!("beta-demo.s").to_string());
-    let mut assembled_program: Signal<Option<AssembledProgram>> = use_signal(|| None);
     let mut assembler_errors: Signal<Vec<AssemblerError>> = use_signal(Vec::new);
     let selected_emulator: Signal<EmulatorOption> = use_signal(|| EmulatorOption::CVE2);
     let emulator_state: Signal<Option<AnyEmulatorState>> = use_signal(|| None);
@@ -37,17 +39,18 @@ pub fn App() -> Element {
     let minimize_console: Signal<bool> = use_signal(|| true);
     let help_panel_displayed: Signal<bool> = use_signal(|| false);
 
+    // assemble as typing to get live errors
     let mut assemble_debounce = use_debounce(Duration::from_secs(1), move |_| {
         info!("Assembling...");
         match assembler::assemble(&source.peek()) {
             Ok(assembled) => {
                 info!("Assembly succeeded.");
-                assembled_program.set(Some(assembled));
+                *ASSEMBLED_PROGRAM.write() = Some(assembled);
                 assembler_errors.set(Vec::new());
             }
             Err(errors) => {
                 info!("Assembly failed.");
-                assembled_program.set(None);
+                *ASSEMBLED_PROGRAM.write() = None;
                 assembler_errors.set(errors);
             }
         }
@@ -63,12 +66,8 @@ pub fn App() -> Element {
     use_effect(move || {
         line_highlights.write().clear();
 
-        fn get_pc_line(
-            pc: u32,
-            assembled_program: &Signal<Option<AssembledProgram>>,
-        ) -> Option<usize> {
+        fn get_pc_line(pc: u32, assembled_program: &Option<AssembledProgram>) -> Option<usize> {
             assembled_program
-                .read()
                 .as_ref()
                 .and_then(|p| p.source_map.get_by_left(&pc).copied())
         }
@@ -79,7 +78,7 @@ pub fn App() -> Element {
                     .all_pcs()
                     .iter()
                     .filter_map(|pc_pos| {
-                        if let Some(line) = get_pc_line(pc_pos.pc, &assembled_program) {
+                        if let Some(line) = get_pc_line(pc_pos.pc, &ASSEMBLED_PROGRAM.read()) {
                             Some(LineHighlight {
                                 line,
                                 css_class: pc_pos.name,
@@ -100,7 +99,7 @@ pub fn App() -> Element {
         div { class: "flex flex-col h-screen w-full bg-gray-800 m-0 p-0",
             Navbar {
                 source,
-                assembled_program,
+                assembled_program: ASSEMBLED_PROGRAM.signal(),
                 assembler_errors,
                 emulator_state,
                 selected_emulator,
@@ -142,25 +141,28 @@ pub fn App() -> Element {
                                 }
                             }
                         }
-                        div { class: "h-1/3 bg-gray-700 p-2 border-b-2 border-gray-900",
-                            div { class: "bg-gray-800 rounded h-full p-2",
-                                div { class: "flex items-center mb-2",
-                                    div { class: "h-4 w-1 bg-green-500 mr-2" }
-                                    span { class: "text-sm font-medium text-gray-300", "Register View" }
-                                }
-                                div { class: "h-[calc(100%-2rem)] overflow-auto",
-                                    RegisterView { emulator_state }
-                                }
+                    }
+                    div { class: "h-1/3 bg-gray-700 p-2 border-b-2 border-gray-900",
+                        div { class: "bg-gray-800 rounded h-full p-2",
+                            div { class: "flex items-center mb-2",
+                                div { class: "h-4 w-1 bg-green-500 mr-2" }
+                                span { class: "text-sm font-medium text-gray-300", "Register View" }
+                            }
+                            div { class: "h-[calc(100%-2rem)] overflow-auto",
+                                RegisterView { emulator_state }
                             }
                         }
-                        div { class: "h-1/3 bg-gray-700 p-2",
-                            div { class: "bg-gray-800 rounded h-full p-2",
-                                div { class: "flex items-center mb-2",
-                                    div { class: "h-4 w-1 bg-purple-500 mr-2" }
-                                    span { class: "text-sm font-medium text-gray-300", "Memory View" }
-                                }
-                                div { class: "h-[calc(100%-2rem)] overflow-auto",
-                                    MemoryView { assembled_program, emulator_state }
+                    }
+                    div { class: "h-1/3 bg-gray-700 p-2",
+                        div { class: "bg-gray-800 rounded h-full p-2",
+                            div { class: "flex items-center mb-2",
+                                div { class: "h-4 w-1 bg-purple-500 mr-2" }
+                                span { class: "text-sm font-medium text-gray-300", "Memory View" }
+                            }
+                            div { class: "h-[calc(100%-2rem)] overflow-auto",
+                                MemoryView {
+                                    assembled_program: ASSEMBLED_PROGRAM.signal(),
+                                    emulator_state,
                                 }
                             }
                         }

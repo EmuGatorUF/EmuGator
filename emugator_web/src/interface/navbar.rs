@@ -6,9 +6,9 @@ use dioxus_logger::tracing::info;
 use std::collections::BTreeSet;
 use std::ops::Deref;
 
-use dioxus_free_icons::icons::ld_icons::{LdCircleArrowRight, LdCircleCheck, LdInfo, LdPlay};
-use dioxus_free_icons::icons::ld_icons::{LdClock12, LdClock3, LdClock2, LdClock6, LdClock9};
 use dioxus_free_icons::Icon;
+use dioxus_free_icons::icons::ld_icons::{LdCircleArrowRight, LdCircleCheck, LdInfo, LdPlay};
+use dioxus_free_icons::icons::ld_icons::{LdClock2, LdClock3, LdClock6, LdClock9, LdClock12};
 
 #[component]
 #[allow(non_snake_case)]
@@ -56,10 +56,7 @@ pub fn Navbar(
                                 }
                             }
                         },
-                        Icon {
-                            width: 15,
-                            icon: LdPlay
-                        }
+                        Icon { width: 15, icon: LdPlay }
                         "Start"
                     }
 
@@ -76,7 +73,6 @@ pub fn Navbar(
                         onclick: move |_| {
                             let new_tick = *tick.read() + 1;
                             tick.set(new_tick);
-
                             if let Some(mut program) = assembled_program.as_mut() {
                                 let new_state = emulator_state
                                     .read()
@@ -86,10 +82,18 @@ pub fn Navbar(
                             }
                         },
                         match *tick.read() % 4 {
-                            0 => rsx!(Icon { width: 18, icon: LdClock12 }),
-                            1 => rsx!(Icon { width: 18, icon: LdClock3 }),
-                            2 => rsx!(Icon { width: 18, icon: LdClock6 }),
-                            _ => rsx!(Icon { width: 18, icon: LdClock9 }),
+                            0 => rsx! {
+                                Icon { width: 18, icon: LdClock12 }
+                            },
+                            1 => rsx! {
+                                Icon { width: 18, icon: LdClock3 }
+                            },
+                            2 => rsx! {
+                                Icon { width: 18, icon: LdClock6 }
+                            },
+                            _ => rsx! {
+                                Icon { width: 18, icon: LdClock9 }
+                            },
                         }
                         "Tick Clock"
                     }
@@ -112,10 +116,7 @@ pub fn Navbar(
                                 emulator_state.set(new_state);
                             }
                         },
-                        Icon {
-                            width: 17,
-                            icon: LdCircleArrowRight
-                        }
+                        Icon { width: 17, icon: LdCircleArrowRight }
                         "Next Instruction"
                     }
                     button {
@@ -139,10 +140,7 @@ pub fn Navbar(
                                 emulator_state.set(new_state);
                             }
                         },
-                        Icon {
-                            width: 17,
-                            icon: LdCircleArrowRight
-                        }
+                        Icon { width: 17, icon: LdCircleArrowRight }
                         "Until Break"
                     }
                 }
@@ -160,10 +158,7 @@ pub fn Navbar(
                         },
                     ),
                     if is_assembled {
-                        Icon {
-                            width: 17,
-                            icon: LdCircleCheck
-                        }
+                        Icon { width: 17, icon: LdCircleCheck }
                         if is_started {
                             "Program Running"
                         } else {
@@ -192,10 +187,7 @@ pub fn Navbar(
                         selected_emulator.set(new_selection);
                         emulator_state.set(None);
                     },
-                    img {
-                        width: 20,
-                        src: "assets/pipeline.svg"
-                    }
+                    img { width: 20, src: "assets/pipeline.svg" }
                     "{selected_emulator.read().display_string()}"
                 }
                 button {
