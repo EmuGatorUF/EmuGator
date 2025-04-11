@@ -1,5 +1,12 @@
+use std::ops::Deref;
+
 use dioxus::prelude::*;
-use emugator_core::emulator::AnyEmulatorState;
+
+use emugator_core::emulator::{
+    AnyEmulatorState, Pipeline,
+    controller_common::{DataDestSel, LSUDataType, OpASel, OpBSel, PCSel},
+    five_stage::{FiveStagePipeline, controller::FiveStageControl},
+};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 enum FiveStageElement {
@@ -50,15 +57,24 @@ enum FiveStageElement {
     WritebackResult,
 }
 
+fn format_pc(pc: u32) -> String {
+    format!("0x{:08X}", pc)
+}
+
 impl FiveStageElement {
-    fn tooltip_text(&self) -> String {
+    fn tooltip_text(&self, pipeline: &FiveStagePipeline) -> String {
         match self {
-            FiveStageElement::PC => "Program Counter".to_string(),
+            FiveStageElement::PC => {
+                format!("IF PC: {}", format_pc(pipeline.if_pc))
+            }
             FiveStageElement::PCMux => "PC Multiplexer".to_string(),
             FiveStageElement::PCPlus4 => "PC + 4 Adder".to_string(),
             FiveStageElement::InstructionMemory => "Instruction Memory".to_string(),
             FiveStageElement::IFIDBuffer => "IF/ID Pipeline Buffer".to_string(),
-            FiveStageElement::IFIDPC => "IF/ID PC Register".to_string(),
+            FiveStageElement::IFIDPC => match pipeline.if_id.id_pc {
+                Some(pc) => format!("ID PC: {}", format_pc(pc)),
+                None => return "None".to_string(),
+            },
             FiveStageElement::IFIDInstruction => "IF/ID Instruction Register".to_string(),
             FiveStageElement::RegisterFile => "Register File".to_string(),
             FiveStageElement::ALU => "Arithmetic Logic Unit".to_string(),
@@ -66,17 +82,26 @@ impl FiveStageElement {
             FiveStageElement::ALUMuxB => "ALU Input B Multiplexer".to_string(),
             FiveStageElement::DataMemory => "Data Memory".to_string(),
             FiveStageElement::IDEXBuffer => "ID/EX Pipeline Buffer".to_string(),
-            FiveStageElement::IDEXPC => "ID/EX PC Register".to_string(),
+            FiveStageElement::IDEXPC => match pipeline.id_ex.ex_pc {
+                Some(pc) => format!("EX PC: {}", format_pc(pc)),
+                None => return "None".to_string(),
+            },
             FiveStageElement::IDEXBranch => "ID/EX Branch Register".to_string(),
             FiveStageElement::IDEXRS1 => "ID/EX RS1 Register".to_string(),
             FiveStageElement::IDEXRS2 => "ID/EX RS2 Register".to_string(),
             FiveStageElement::IDEXImm => "ID/EX Immediate Register".to_string(),
             FiveStageElement::EXMEMBuffer => "EX/MEM Pipeline Buffer".to_string(),
-            FiveStageElement::EXMEMPC => "EX/MEM PC Register".to_string(),
+            FiveStageElement::EXMEMPC => match pipeline.ex_mem.mem_pc {
+                Some(pc) => format!("MEM PC: {}", format_pc(pc)),
+                None => return "None".to_string(),
+            },
             FiveStageElement::EXMEMAlu => "EX/MEM ALU Result Register".to_string(),
             FiveStageElement::EXMEMRS2 => "EX/MEM RS2 Register".to_string(),
             FiveStageElement::MEMWBBuffer => "MEM/WB Pipeline Buffer".to_string(),
-            FiveStageElement::MEMWBPC => "MEM/WB PC Register".to_string(),
+            FiveStageElement::MEMWBPC => match pipeline.mem_wb.wb_pc {
+                Some(pc) => format!("WB PC: {}", format_pc(pc)),
+                None => return "None".to_string(),
+            },
             FiveStageElement::MEMWBLsu => "MEM/WB LSU Result Register Value".to_string(),
             FiveStageElement::MEMWBAlu => "MEM/WB ALU Result Register Value".to_string(),
             FiveStageElement::Decoder => "Instruction Decoder".to_string(),
@@ -115,7 +140,16 @@ pub fn FiveStageVisualization(
     let mut hovered_element = use_signal(|| Option::<FiveStageElement>::None);
 
     use_effect(move || {
-        tooltip_text.set(hovered_element.read().as_ref().map(|e| e.tooltip_text()));
+        let Some(AnyEmulatorState::FiveStage(state)) = &*emulator_state.read() else {
+            dioxus_logger::tracing::error!("Expected FiveStage emulator state");
+            return;
+        };
+        tooltip_text.set(
+            hovered_element
+                .read()
+                .deref()
+                .map(|e| e.tooltip_text(&state.pipeline)),
+        );
     });
 
     // NOTE: THIS IS WHERE WE WILL ADD THE ACTIVE ELEMENTS TO MATCH LIAM's CVE2 IMPLEMENTATION
