@@ -3,9 +3,9 @@ mod instruction_views;
 mod memory_view;
 mod navbar;
 mod pipeline_visualization;
-mod help_panel;
 mod register_view;
 mod uart_view;
+mod help_panel;
 
 use std::{collections::BTreeSet, time::Duration};
 
@@ -125,7 +125,6 @@ pub fn App() -> Element {
                         UartView { emulator_state, minimize_console }
                     }
                 }
-
                 if !*help_panel_displayed.read() {
                     div { class: "w-1/2 flex flex-col bg-gray-700 text-white",
                         div { class: "h-1/3 bg-gray-700 p-2 border-b-2 border-gray-900",
@@ -141,34 +140,34 @@ pub fn App() -> Element {
                                 }
                             }
                         }
-                    }
-                    div { class: "h-1/3 bg-gray-700 p-2 border-b-2 border-gray-900",
-                        div { class: "bg-gray-800 rounded h-full p-2",
-                            div { class: "flex items-center mb-2",
-                                div { class: "h-4 w-1 bg-green-500 mr-2" }
-                                span { class: "text-sm font-medium text-gray-300", "Register View" }
-                            }
-                            div { class: "h-[calc(100%-2rem)] overflow-auto",
-                                RegisterView { emulator_state }
+                        div { class: "h-1/3 bg-gray-700 p-2 border-b-2 border-gray-900",
+                            div { class: "bg-gray-800 rounded h-full p-2",
+                                div { class: "flex items-center mb-2",
+                                    div { class: "h-4 w-1 bg-green-500 mr-2" }
+                                    span { class: "text-sm font-medium text-gray-300", "Register View" }
+                                }
+                                div { class: "h-[calc(100%-2rem)] overflow-auto",
+                                    RegisterView { emulator_state }
+                                }
                             }
                         }
-                    }
-                    div { class: "h-1/3 bg-gray-700 p-2",
-                        div { class: "bg-gray-800 rounded h-full p-2",
-                            div { class: "flex items-center mb-2",
-                                div { class: "h-4 w-1 bg-purple-500 mr-2" }
-                                span { class: "text-sm font-medium text-gray-300", "Memory View" }
-                            }
-                            div { class: "h-[calc(100%-2rem)] overflow-auto",
-                                MemoryView {
-                                    assembled_program: ASSEMBLED_PROGRAM.signal(),
-                                    emulator_state,
+                        div { class: "h-1/3 bg-gray-700 p-2",
+                            div { class: "bg-gray-800 rounded h-full p-2",
+                                div { class: "flex items-center mb-2",
+                                    div { class: "h-4 w-1 bg-purple-500 mr-2" }
+                                    span { class: "text-sm font-medium text-gray-300", "Memory View" }
+                                }
+                                div { class: "h-[calc(100%-2rem)] overflow-auto",
+                                    MemoryView {
+                                        assembled_program: ASSEMBLED_PROGRAM.signal(),
+                                        emulator_state,
+                                    }
                                 }
                             }
                         }
                     }
                 } else {
-                    HelpPanelView {}
+                   HelpPanelView {} 
                 }
             }
         }
