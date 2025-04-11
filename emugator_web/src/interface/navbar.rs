@@ -7,8 +7,8 @@ use std::collections::BTreeSet;
 use std::ops::Deref;
 
 use dioxus_free_icons::Icon;
-use dioxus_free_icons::icons::ld_icons::{LdCircleArrowRight, LdCircleCheck, LdInfo, LdPlay};
-use dioxus_free_icons::icons::ld_icons::{LdClock2, LdClock3, LdClock6, LdClock9, LdClock12};
+use dioxus_free_icons::icons::ld_icons::{LdCircleArrowRight, LdCircleCheck, LdInfo, LdPlay, LdCircleX};
+use dioxus_free_icons::icons::ld_icons::{LdClock3, LdClock6, LdClock9, LdClock12};
 
 #[component]
 #[allow(non_snake_case)]
@@ -34,7 +34,7 @@ pub fn Navbar(
                 span { class: "text-xl font-semibold text-blue-400 mr-4", "EmuGator" }
                 div { class: "flex space-x-2",
                     button {
-                        class: "bg-green-600 gap-x-1 hover:bg-green-700 text-white font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex items-center",
+                        class: "bg-green-600 gap-x-1 hover:bg-green-700 text-white font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex items-center cursor-pointer",
                         onclick: move |_| {
                             info!("Start clicked");
                             match assembler::assemble(&source.read()) {
@@ -64,7 +64,7 @@ pub fn Navbar(
                         class: format!(
                             "{} font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex gap-x-1 items-center",
                             if is_started {
-                                "bg-indigo-600 hover:bg-indigo-700 text-white"
+                                "bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer"
                             } else {
                                 "bg-gray-600 text-gray-300 cursor-not-allowed"
                             },
@@ -101,7 +101,7 @@ pub fn Navbar(
                         class: format!(
                             "{} text-white font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex items-center gap-x-1",
                             if is_started {
-                                "bg-indigo-600 hover:bg-indigo-700 text-white"
+                                "bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer"
                             } else {
                                 "bg-gray-600 text-gray-300 cursor-not-allowed"
                             },
@@ -123,7 +123,7 @@ pub fn Navbar(
                         class: format!(
                             "{} text-white font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex items-center gap-x-1",
                             if is_started {
-                                "bg-indigo-600 hover:bg-indigo-700 text-white"
+                                "bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer"
                             } else {
                                 "bg-gray-600 text-gray-300 cursor-not-allowed"
                             },
@@ -148,13 +148,13 @@ pub fn Navbar(
             div { class: "flex items-stretch space-x-2",
                 span {
                     class: format!(
-                        "text-white text-sm font-medium {} rounded py-1 px-2 flex items-center gap-x-1",
+                        "flex items-center gap-2 text-sm font-medium mr-4 {}",
                         if is_assembled {
-                            "bg-green-600"
+                            "text-green-300"
                         } else if error_count > 0 {
-                            "bg-red-600"
+                            "text-red-400"
                         } else {
-                            "bg-gray-700"
+                            "text-green-100"
                         },
                     ),
                     if is_assembled {
@@ -165,15 +165,9 @@ pub fn Navbar(
                             "Program Assembled"
                         }
                     } else if error_count > 0 {
-                        svg {
-                            class: "w-4 h-4 mr-1 fill-current",
-                            xmlns: "http://www.w3.org/2000/svg",
-                            view_box: "0 0 20 20",
-                            path {
-                                d: "M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z",
-                                fill_rule: "evenodd",
-                                clip_rule: "evenodd",
-                            }
+                        Icon {
+                            width: 17,
+                            icon: LdCircleX
                         }
                         "Errors: {error_count}"
                     } else {
@@ -181,7 +175,7 @@ pub fn Navbar(
                     }
                 }
                 button {
-                    class: "bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex gap-x-1 items-center",
+                    class: "bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex gap-x-1 items-center cursor-pointer",
                     onclick: move |_| {
                         let new_selection = selected_emulator.read().other();
                         selected_emulator.set(new_selection);
@@ -191,7 +185,7 @@ pub fn Navbar(
                     "{selected_emulator.read().display_string()}"
                 }
                 button {
-                    class: "bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium py-1 px-2 rounded transition duration-150 ease-in-out",
+                    class: "bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium py-1 px-2 rounded transition duration-150 ease-in-out cursor-pointer",
                     onclick: move |_| {
                         let help_panel_toggle = !*help_panel_displayed.read();
                         help_panel_displayed.set(help_panel_toggle);
