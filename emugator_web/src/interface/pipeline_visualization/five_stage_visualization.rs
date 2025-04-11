@@ -68,14 +68,24 @@ impl FiveStageElement {
                 format!("IF PC: {}", format_pc(pipeline.if_pc))
             }
             FiveStageElement::PCMux => "PC Multiplexer".to_string(),
-            FiveStageElement::PCPlus4 => "PC + 4 Adder".to_string(),
-            FiveStageElement::InstructionMemory => "Instruction Memory".to_string(),
+            FiveStageElement::PCPlus4 => {
+                let pc_value = pipeline.if_pc;
+                let plus4_value = pc_value.wrapping_add(4);
+                format!("PC+4: {}", format_pc(plus4_value))
+            }
+            FiveStageElement::InstructionMemory => match pipeline.if_lines.instr {
+                Some(inst) => format!("Instruction: {}", format!("0x{:08X}", inst)),
+                None => return "None".to_string(),
+            },
             FiveStageElement::IFIDBuffer => "IF/ID Pipeline Buffer".to_string(),
             FiveStageElement::IFIDPC => match pipeline.if_id.id_pc {
                 Some(pc) => format!("ID PC: {}", format_pc(pc)),
                 None => return "None".to_string(),
             },
-            FiveStageElement::IFIDInstruction => "IF/ID Instruction Register".to_string(),
+            FiveStageElement::IFIDInstruction => match pipeline.if_id.id_inst {
+                Some(inst) => format!("ID PC: {}", format_pc(inst)),
+                None => return "None".to_string(),
+            },
             FiveStageElement::RegisterFile => "Register File".to_string(),
             FiveStageElement::ALU => "Arithmetic Logic Unit".to_string(),
             FiveStageElement::ALUMuxA => "ALU Input A Multiplexer".to_string(),
