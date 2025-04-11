@@ -4,6 +4,8 @@ use dioxus_elements::geometry::WheelDelta;
 use dioxus_elements::input_data::MouseButton;
 use emugator_core::emulator::{AnyEmulatorState, EmulatorOption};
 use five_stage_visualization::FiveStageVisualization;
+use dioxus_free_icons::Icon;
+use dioxus_free_icons::icons::ld_icons::LdRotateCcw;
 
 mod cve2_visualization;
 mod five_stage_visualization;
@@ -30,21 +32,15 @@ pub fn PipelineVisualization(
         div { class: "w-full h-full rounded bg-white overflow-hidden relative",
             button {
                 class: "absolute top-2 left-2 bg-gray-200 hover:bg-gray-300 p-1 rounded z-10 cursor-pointer",
+                title: "Recenter",
                 onclick: move |_| {
                     view_box.set(initial_view);
                     scale.set(1.0);
                 },
-                svg {
-                    width: "16",
-                    height: "16",
-                    view_box: "0 0 24 24",
-                    stroke: "currentColor",
-                    fill: "none",
-                    "stroke-width": "2",
-                    "stroke-linecap": "round",
-                    "stroke-linejoin": "round",
-                    path { d: "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" }
-                    path { d: "M3 3v5h5" }
+                Icon {
+                    width: 16,
+                    height: 16,
+                    icon: LdRotateCcw
                 }
             }
             button {
