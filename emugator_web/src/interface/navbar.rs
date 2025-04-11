@@ -191,9 +191,9 @@ pub fn Navbar(
                         help_panel_displayed.set(help_panel_toggle);
                         info!("Help panel toggled: {:?}", help_panel_toggle);
                     },
-                    Icon {
-                        width: 18,
-                        icon: LdInfo
+                    match *help_panel_displayed.read() {
+                        true => rsx!(Icon { width: 18, icon: LdCircleX }),
+                        _ => rsx!(Icon { width: 18, icon: LdInfo }),                   
                     }
                 }
             }
