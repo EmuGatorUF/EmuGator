@@ -57,7 +57,10 @@ impl Pipeline for FiveStagePipeline {
         self.run_wb();
 
         // run hazard detection
-        self.hazard_detector.detect_hazards(&self.if_id.id_inst, self.ex_lines.alu_out.is_some_and(|x| x == 0) && self.ex_control.jump_cond);
+        self.hazard_detector.detect_hazards(
+            &self.if_id.id_inst,
+            self.ex_lines.alu_out.is_some_and(|x| x == 0) && self.ex_control.jump_cond,
+        );
     }
 
     fn requesting_debug(&mut self) -> bool {
@@ -215,7 +218,13 @@ impl FiveStagePipeline {
         };
 
         // pass through inputs to the data memory
-        self.mem_lines.data_req_o = self.mem_control.lsu_request;
+        if self.mem_lines.data_gnt_i {
+            // if the data memory accepted the request, don't request again here
+            // since this is two cycles, it will never be true in the first cycle
+            self.mem_lines.data_req_o = false;
+        } else {
+            self.mem_lines.data_req_o = self.mem_control.lsu_request;
+        }
         self.mem_lines.data_we_o = self.mem_control.lsu_write_enable;
         self.mem_lines.data_addr_o = self.ex_mem.alu_o.unwrap_or_default();
         self.mem_lines.data_be_o = self
