@@ -72,19 +72,23 @@ impl CVE2Element {
                 PCSel::JMP => "Next PC Select: JMP".to_string(),
                 PCSel::PC4 => "Next PC Select: PC+4".to_string(),
             },
-            CVE2Element::OpAMuxControlSignal => match pipeline.control.alu_op_a_sel {
-                Some(OpASel::PC) => "OpA Mux: PC",
-                Some(OpASel::RF) => "OpA Mux: Register File",
-                None => "OpA Mux: DON'T CARE",
-            }
-            .to_string(),
-            CVE2Element::OpBMuxControlSignal => match pipeline.control.alu_op_b_sel {
-                Some(OpBSel::IMM) => "OpB Mux: Immediate",
-                Some(OpBSel::RF) => "OpB Mux: Register File",
-                Some(OpBSel::Four) => "OpB Mux: Four",
-                None => "OpB Mux: DON'T CARE",
-            }
-            .to_string(),
+            CVE2Element::OpAMuxControlSignal => format!(
+                "ALU OP A Mux: {}",
+                match pipeline.control.alu_op_a_sel {
+                    Some(OpASel::PC) => "PC",
+                    Some(OpASel::RF) => "Register File",
+                    None => "DON'T CARE",
+                }
+            ),
+            CVE2Element::OpBMuxControlSignal => format!(
+                "ALU OP B Mux: {}",
+                match pipeline.control.alu_op_b_sel {
+                    Some(OpBSel::IMM) => "Immediate",
+                    Some(OpBSel::RF) => "Register File",
+                    Some(OpBSel::Four) => "Four",
+                    None => "DON'T CARE",
+                }
+            ),
             CVE2Element::WriteMuxControlSignal => match pipeline.control.data_dest_sel {
                 Some(DataDestSel::ALU) => "Write Mux: ALU",
                 Some(DataDestSel::LSU) => "Write Mux: LSU",
@@ -357,7 +361,7 @@ fn find_active_elements(control: CVE2Control) -> BTreeSet<CVE2Element> {
 pub fn CVE2Visualization(
     emulator_state: ReadOnlySignal<Option<AnyEmulatorState>>,
     tooltip_text: Signal<Option<String>>,
-    show_control_signals: Signal<bool>
+    show_control_signals: Signal<bool>,
 ) -> Element {
     const HOVER_STROKE: &'static str = "rgba(66, 133, 244, 1)";
     const ACTIVE_STROKE: &'static str = "rgba(147, 112, 219, 1)";

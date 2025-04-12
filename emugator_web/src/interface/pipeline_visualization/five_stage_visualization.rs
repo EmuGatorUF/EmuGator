@@ -88,32 +88,31 @@ impl FiveStageElement {
             },
             FiveStageElement::RegisterFile => "Register File".to_string(),
             FiveStageElement::ALU => "Arithmetic Logic Unit".to_string(),
-            FiveStageElement::ALUMuxA => "ALU Input A Multiplexer".to_string(),
-            FiveStageElement::ALUMuxB => "ALU Input B Multiplexer".to_string(),
+            FiveStageElement::ALUMuxA => format!(
+                "ALU OP A Mux: {}",
+                match pipeline.ex_control.alu_op_a_sel {
+                    Some(OpASel::PC) => "PC",
+                    Some(OpASel::RF) => "RF",
+                    None => return "None".to_string(),
+                }
+            ),
+            FiveStageElement::ALUMuxB => match pipeline.ex_control.alu_op_b_sel {
+                Some(sel) => format!("ALU OP B: {:?}", sel),
+                None => return "None".to_string(),
+            },
             FiveStageElement::DataMemory => "Data Memory".to_string(),
             FiveStageElement::IDEXBuffer => "ID/EX Pipeline Buffer".to_string(),
             FiveStageElement::IDEXPC => match pipeline.id_ex.ex_pc {
                 Some(pc) => format!("EX PC: {}", format_pc(pc)),
                 None => return "None".to_string(),
             },
-            FiveStageElement::IDEXBranch => "ID/EX Branch Register".to_string(),
-            FiveStageElement::IDEXRS1 => "ID/EX RS1 Register".to_string(),
-            FiveStageElement::IDEXRS2 => "ID/EX RS2 Register".to_string(),
-            FiveStageElement::IDEXImm => "ID/EX Immediate Register".to_string(),
-            FiveStageElement::EXMEMBuffer => "EX/MEM Pipeline Buffer".to_string(),
-            FiveStageElement::EXMEMPC => match pipeline.ex_mem.mem_pc {
-                Some(pc) => format!("MEM PC: {}", format_pc(pc)),
+            FiveStageElement::IDEXBranch => "".to_string(), //format!("EX Branch: {}", pipeline.id_ex.), TODO
+            FiveStageElement::IDEXRS1 => format!("EX RS1: {}", pipeline.id_ex.rs1_v),
+            FiveStageElement::IDEXRS2 => format!("EX RS2: {}", pipeline.id_ex.rs2_v),
+            FiveStageElement::IDEXImm => match pipeline.id_ex.imm {
+                Some(imm) => format!("EX IMM: {}", format_pc(imm)),
                 None => return "None".to_string(),
             },
-            FiveStageElement::EXMEMAlu => "EX/MEM ALU Result Register".to_string(),
-            FiveStageElement::EXMEMRS2 => "EX/MEM RS2 Register".to_string(),
-            FiveStageElement::MEMWBBuffer => "MEM/WB Pipeline Buffer".to_string(),
-            FiveStageElement::MEMWBPC => match pipeline.mem_wb.wb_pc {
-                Some(pc) => format!("WB PC: {}", format_pc(pc)),
-                None => return "None".to_string(),
-            },
-            FiveStageElement::MEMWBLsu => "MEM/WB LSU Result Register Value".to_string(),
-            FiveStageElement::MEMWBAlu => "MEM/WB ALU Result Register Value".to_string(),
             FiveStageElement::Decoder => "Instruction Decoder".to_string(),
             FiveStageElement::ControlUnit => "Control Unit".to_string(),
             FiveStageElement::DecoderRS1 => "Decoder RS1 Register".to_string(),
@@ -124,15 +123,89 @@ impl FiveStageElement {
             FiveStageElement::RegisterFileRS1Value => "Register File RS1 Value".to_string(),
             FiveStageElement::RegisterFileRS2Value => "Register File RS2 Value".to_string(),
             FiveStageElement::BranchUnit => "Branch Unit Value".to_string(),
+            // EX/MEM Buffer
+            FiveStageElement::EXMEMBuffer => "EX/MEM Pipeline Buffer".to_string(),
+            FiveStageElement::EXMEMPC => match pipeline.ex_mem.mem_pc {
+                Some(pc) => format!("MEM PC: {}", format_pc(pc)),
+                None => return "None".to_string(),
+            },
+            FiveStageElement::EXMEMAlu => match pipeline.ex_mem.alu_o {
+                Some(alu_o) => format!("MEM ALU Output: 0x{:08X}", alu_o),
+                None => return "None".to_string(),
+            },
+            FiveStageElement::EXMEMRS2 => format!("MEM RS2: 0x{:08X}", pipeline.ex_mem.rs2_v),
+            // LSU
             FiveStageElement::LSU => "LSU".to_string(),
-            FiveStageElement::LSUADDR => "ADDR Value".to_string(),
-            FiveStageElement::LSUDATA => "DATA Value".to_string(),
-            FiveStageElement::LSUREQ => "REQ Value".to_string(),
-            FiveStageElement::LSUWR => "WR Value".to_string(),
-            FiveStageElement::LSUBYTE_EN => "BYTE_EN Value".to_string(),
-            FiveStageElement::LSUVALID => "VALID Value".to_string(),
-            FiveStageElement::LSURDOut => "RD Write Value".to_string(),
-            FiveStageElement::WritebackResult => "Write to Reg Value".to_string(),
+            FiveStageElement::LSUADDR => {
+                format!("Memory Address: 0x{:08X}", pipeline.mem_lines.data_addr_o)
+            }
+            FiveStageElement::LSUDATA => {
+                let write_data = format!("0x{:08X}", pipeline.mem_lines.data_wdata_o);
+                let read_data = format!("0x{:08X}", pipeline.mem_lines.data_rdata_i);
+                let write_enable = pipeline.mem_lines.data_we_o;
+                if write_enable {
+                    format!("Memory Write Data: {}", write_data)
+                } else {
+                    format!("Memory Read Data: {}", read_data)
+                }
+            }
+            FiveStageElement::LSUREQ => format!(
+                "Memory Request: {}",
+                if pipeline.mem_lines.data_req_o {
+                    "1"
+                } else {
+                    "0"
+                }
+            ),
+            FiveStageElement::LSUWR => format!(
+                "Memory Write Enable: {}",
+                if pipeline.mem_lines.data_we_o {
+                    "1"
+                } else {
+                    "0"
+                }
+            ),
+            FiveStageElement::LSUBYTE_EN => {
+                let byte_en = pipeline.mem_lines.data_be_o;
+                let byte_en_str = format!(
+                    "[{}, {}, {}, {}]",
+                    if byte_en[0] { "1" } else { "0" },
+                    if byte_en[1] { "1" } else { "0" },
+                    if byte_en[2] { "1" } else { "0" },
+                    if byte_en[3] { "1" } else { "0" },
+                );
+                format!("Byte Enable: {}", byte_en_str)
+            }
+            FiveStageElement::LSUVALID => {
+                let valid_value = pipeline.mem_lines.data_rvalid_i;
+                format!("Memory Valid: {}", if valid_value { "1" } else { "0" })
+            }
+            FiveStageElement::LSURDOut => {
+                let lsu_out_value = match pipeline.mem_lines.mem_data {
+                    Some(value) => format!("LSU Output: {}", value),
+                    None => return "None".to_string(),
+                };
+                format!("LSU Output: {}", lsu_out_value)
+            }
+            // MEM/WB Buffer
+            FiveStageElement::MEMWBBuffer => "MEM/WB Pipeline Buffer".to_string(),
+            FiveStageElement::MEMWBPC => match pipeline.mem_wb.wb_pc {
+                Some(pc) => format!("WB PC: {}", format_pc(pc)),
+                None => return "None".to_string(),
+            },
+            FiveStageElement::MEMWBAlu => match pipeline.mem_wb.alu {
+                Some(value) => format!("MEM/WB ALU Output: 0x{:08X}", value),
+                None => return "None".to_string(),
+            },
+            FiveStageElement::MEMWBLsu => match pipeline.mem_wb.lsu {
+                Some(value) => format!("MEM/WB LSU Output: 0x{:08X}", value),
+                None => return "None".to_string(),
+            },
+            // Writeback
+            FiveStageElement::WritebackResult => match pipeline.wb_lines.wb_data {
+                Some(value) => format!("Register Write Data: 0x{:08X}", value),
+                None => return "None".to_string(),
+            },
         }
     }
 }
