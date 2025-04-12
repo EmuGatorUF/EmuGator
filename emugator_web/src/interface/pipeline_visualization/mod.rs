@@ -29,7 +29,7 @@ pub fn PipelineVisualization(
     let mut show_control_signals = use_signal(|| true);
 
     rsx! {
-        div { class: "w-full h-full rounded bg-white overflow-hidden relative",
+        div { class: "w-full h-full rounded bg-white overflow-hidden relative select-none",
             button {
                 class: "absolute top-2 left-2 bg-gray-200 hover:bg-gray-300 p-1 rounded z-10 cursor-pointer",
                 title: "Recenter",
