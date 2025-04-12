@@ -3,10 +3,23 @@ use std::ops::Deref;
 use dioxus::prelude::*;
 
 use emugator_core::emulator::{
-    AnyEmulatorState, Pipeline,
-    controller_common::{DataDestSel, LSUDataType, OpASel, OpBSel, PCSel},
-    five_stage::{FiveStagePipeline, controller::FiveStageControl},
+    AnyEmulatorState, controller_common::OpASel, five_stage::FiveStagePipeline,
 };
+
+macro_rules! format_opt {
+    ($fmt:literal, $val:expr) => {
+        match $val {
+            Some(value) => format!($fmt, value),
+            None => "None".to_string(),
+        }
+    };
+}
+
+macro_rules! format_bool {
+    ($fmt:literal, $val:expr) => {
+        format!($fmt, if $val { "1" } else { "0" })
+    };
+}
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 enum FiveStageElement {
@@ -24,7 +37,6 @@ enum FiveStageElement {
     DataMemory,
     IDEXBuffer,
     IDEXPC,
-    IDEXBranch,
     IDEXRS1,
     IDEXRS2,
     IDEXImm,
@@ -41,7 +53,6 @@ enum FiveStageElement {
     DecoderRS1,
     DecoderRS2,
     DecoderRD,
-    DecoderBranch,
     DecoderImm,
     RegisterFileRS1Value,
     RegisterFileRS2Value,
@@ -55,84 +66,65 @@ enum FiveStageElement {
     LSUVALID,
     LSURDOut,
     WritebackResult,
-}
-
-fn format_pc(pc: u32) -> String {
-    format!("0x{:08X}", pc)
+    IDEXRD,
+    EXMEMRD,
+    MEMWBRD,
 }
 
 impl FiveStageElement {
     fn tooltip_text(&self, pipeline: &FiveStagePipeline) -> String {
         match self {
             FiveStageElement::PC => {
-                format!("IF PC: {}", format_pc(pipeline.if_pc))
+                format!("IF PC: 0x{:08X}", pipeline.if_pc)
             }
-            FiveStageElement::PCMux => "PC Multiplexer".to_string(),
+            FiveStageElement::PCMux => format_opt!("Next PC: 0x{:08X}", pipeline.if_lines.next_pc),
             FiveStageElement::PCPlus4 => {
-                let pc_value = pipeline.if_pc;
-                let plus4_value = pc_value.wrapping_add(4);
-                format!("PC+4: {}", format_pc(plus4_value))
+                format!("PC+4: 0x{:08X}", pipeline.if_pc.wrapping_add(4))
             }
-            FiveStageElement::InstructionMemory => match pipeline.if_lines.instr {
-                Some(inst) => format!("Instruction: {}", format!("0x{:08X}", inst)),
-                None => return "None".to_string(),
-            },
+            FiveStageElement::InstructionMemory => {
+                format_opt!("Instruction: 0x{:08X}", pipeline.if_lines.instr)
+            }
             FiveStageElement::IFIDBuffer => "IF/ID Pipeline Buffer".to_string(),
-            FiveStageElement::IFIDPC => match pipeline.if_id.id_pc {
-                Some(pc) => format!("ID PC: {}", format_pc(pc)),
-                None => return "None".to_string(),
-            },
-            FiveStageElement::IFIDInstruction => match pipeline.if_id.id_inst {
-                Some(inst) => format!("ID PC: {}", format_pc(inst)),
-                None => return "None".to_string(),
-            },
+            FiveStageElement::IFIDPC => format_opt!("ID PC: 0x{:08X}", pipeline.if_id.id_pc),
+            FiveStageElement::IFIDInstruction => {
+                format_opt!("ID PC: 0x{:08X}", pipeline.if_id.id_inst)
+            }
             FiveStageElement::RegisterFile => "Register File".to_string(),
-            FiveStageElement::ALU => "Arithmetic Logic Unit".to_string(),
-            FiveStageElement::ALUMuxA => format!(
-                "ALU OP A Mux: {}",
-                match pipeline.ex_control.alu_op_a_sel {
-                    Some(OpASel::PC) => "PC",
-                    Some(OpASel::RF) => "RF",
-                    None => return "None".to_string(),
-                }
-            ),
-            FiveStageElement::ALUMuxB => match pipeline.ex_control.alu_op_b_sel {
-                Some(sel) => format!("ALU OP B: {:?}", sel),
-                None => return "None".to_string(),
-            },
             FiveStageElement::DataMemory => "Data Memory".to_string(),
-            FiveStageElement::IDEXBuffer => "ID/EX Pipeline Buffer".to_string(),
-            FiveStageElement::IDEXPC => match pipeline.id_ex.ex_pc {
-                Some(pc) => format!("EX PC: {}", format_pc(pc)),
-                None => return "None".to_string(),
-            },
-            FiveStageElement::IDEXBranch => "".to_string(), //format!("EX Branch: {}", pipeline.id_ex.), TODO
-            FiveStageElement::IDEXRS1 => format!("EX RS1: {}", pipeline.id_ex.rs1_v),
-            FiveStageElement::IDEXRS2 => format!("EX RS2: {}", pipeline.id_ex.rs2_v),
-            FiveStageElement::IDEXImm => match pipeline.id_ex.imm {
-                Some(imm) => format!("EX IMM: {}", format_pc(imm)),
-                None => return "None".to_string(),
-            },
             FiveStageElement::Decoder => "Instruction Decoder".to_string(),
             FiveStageElement::ControlUnit => "Control Unit".to_string(),
-            FiveStageElement::DecoderRS1 => "Decoder RS1 Register".to_string(),
-            FiveStageElement::DecoderRS2 => "Decoder RS2 Register".to_string(),
-            FiveStageElement::DecoderRD => "Decoder RD Register".to_string(),
-            FiveStageElement::DecoderBranch => "Decoder Branch Value".to_string(),
-            FiveStageElement::DecoderImm => "Decoder Immediate Value".to_string(),
-            FiveStageElement::RegisterFileRS1Value => "Register File RS1 Value".to_string(),
-            FiveStageElement::RegisterFileRS2Value => "Register File RS2 Value".to_string(),
-            FiveStageElement::BranchUnit => "Branch Unit Value".to_string(),
+            FiveStageElement::DecoderRS1 => format!("RS1: {}", pipeline.id_lines.rs1),
+            FiveStageElement::DecoderRS2 => format!("RS2: {}", pipeline.id_lines.rs2),
+            FiveStageElement::DecoderRD => format!("RD: {}", pipeline.id_lines.rd),
+            FiveStageElement::DecoderImm => format_opt!("IMM: 0x{:08X}", pipeline.id_lines.imm),
+            FiveStageElement::RegisterFileRS1Value => {
+                format!("RS1_V: 0x{:08X}", pipeline.id_lines.rs1_v)
+            }
+            FiveStageElement::RegisterFileRS2Value => {
+                format!("RS2_V: 0x{:08X}", pipeline.id_lines.rs2_v)
+            }
+            // ID/EX Buffer
+            FiveStageElement::IDEXBuffer => "ID/EX Pipeline Buffer".to_string(),
+            FiveStageElement::IDEXPC => format_opt!("EX PC: 0x{:08X}", pipeline.id_ex.ex_pc),
+            FiveStageElement::IDEXRD => format_opt!("EX RD: 0x{:08X}", pipeline.id_ex.rd),
+            FiveStageElement::IDEXRS1 => format!("EX RS1_V: 0x{:08X}", pipeline.id_ex.rs1_v),
+            FiveStageElement::IDEXRS2 => format!("EX RS2_V: 0x{:08X}", pipeline.id_ex.rs2_v),
+            FiveStageElement::IDEXImm => format_opt!("EX IMM: 0x{:08X}", pipeline.id_ex.imm),
+            // Branch Unit
+            FiveStageElement::BranchUnit => {
+                format_opt!("Branch PC: 0x{:08X}", pipeline.ex_lines.jmp_dst)
+            }
+            // ALU
+            FiveStageElement::ALUMuxA => format_opt!("ALU OP A: 0x{:08X}", pipeline.ex_lines.op_a),
+            FiveStageElement::ALUMuxB => format_opt!("ALU OP B: 0x{:08X}", pipeline.ex_lines.op_b),
+            FiveStageElement::ALU => format_opt!("ALU Output: 0x{:08X}", pipeline.ex_lines.alu_out),
             // EX/MEM Buffer
             FiveStageElement::EXMEMBuffer => "EX/MEM Pipeline Buffer".to_string(),
-            FiveStageElement::EXMEMPC => match pipeline.ex_mem.mem_pc {
-                Some(pc) => format!("MEM PC: {}", format_pc(pc)),
-                None => return "None".to_string(),
-            },
-            FiveStageElement::EXMEMAlu => match pipeline.ex_mem.alu_o {
-                Some(alu_o) => format!("MEM ALU Output: 0x{:08X}", alu_o),
-                None => return "None".to_string(),
-            },
+            FiveStageElement::EXMEMPC => format_opt!("MEM PC: 0x{:08X}", pipeline.ex_mem.mem_pc),
+            FiveStageElement::EXMEMAlu => {
+                format_opt!("MEM ALU Output: 0x{:08X}", pipeline.ex_mem.alu_o)
+            }
+            FiveStageElement::EXMEMRD => format_opt!("MEM RD: 0x{:08X}", pipeline.ex_mem.rd),
             FiveStageElement::EXMEMRS2 => format!("MEM RS2: 0x{:08X}", pipeline.ex_mem.rs2_v),
             // LSU
             FiveStageElement::LSU => "LSU".to_string(),
@@ -149,22 +141,12 @@ impl FiveStageElement {
                     format!("Memory Read Data: {}", read_data)
                 }
             }
-            FiveStageElement::LSUREQ => format!(
-                "Memory Request: {}",
-                if pipeline.mem_lines.data_req_o {
-                    "1"
-                } else {
-                    "0"
-                }
-            ),
-            FiveStageElement::LSUWR => format!(
-                "Memory Write Enable: {}",
-                if pipeline.mem_lines.data_we_o {
-                    "1"
-                } else {
-                    "0"
-                }
-            ),
+            FiveStageElement::LSUREQ => {
+                format_bool!("Memory Request: {}", pipeline.mem_lines.data_req_o)
+            }
+            FiveStageElement::LSUWR => {
+                format_bool!("Memory Write Enable: {}", pipeline.mem_lines.data_we_o)
+            }
             FiveStageElement::LSUBYTE_EN => {
                 let byte_en = pipeline.mem_lines.data_be_o;
                 let byte_en_str = format!(
@@ -177,35 +159,29 @@ impl FiveStageElement {
                 format!("Byte Enable: {}", byte_en_str)
             }
             FiveStageElement::LSUVALID => {
-                let valid_value = pipeline.mem_lines.data_rvalid_i;
-                format!("Memory Valid: {}", if valid_value { "1" } else { "0" })
+                format_bool!("Memory Valid: {}", pipeline.mem_lines.data_rvalid_i)
             }
             FiveStageElement::LSURDOut => {
-                let lsu_out_value = match pipeline.mem_lines.mem_data {
-                    Some(value) => format!("LSU Output: {}", value),
-                    None => return "None".to_string(),
-                };
-                format!("LSU Output: {}", lsu_out_value)
+                format_opt!("LSU Output: {}", pipeline.mem_lines.mem_data)
             }
             // MEM/WB Buffer
             FiveStageElement::MEMWBBuffer => "MEM/WB Pipeline Buffer".to_string(),
-            FiveStageElement::MEMWBPC => match pipeline.mem_wb.wb_pc {
-                Some(pc) => format!("WB PC: {}", format_pc(pc)),
-                None => return "None".to_string(),
-            },
-            FiveStageElement::MEMWBAlu => match pipeline.mem_wb.alu {
-                Some(value) => format!("MEM/WB ALU Output: 0x{:08X}", value),
-                None => return "None".to_string(),
-            },
-            FiveStageElement::MEMWBLsu => match pipeline.mem_wb.lsu {
-                Some(value) => format!("MEM/WB LSU Output: 0x{:08X}", value),
-                None => return "None".to_string(),
-            },
+            FiveStageElement::MEMWBPC => {
+                format_opt!("WB PC: 0x{:08X}", pipeline.mem_wb.wb_pc)
+            }
+            FiveStageElement::MEMWBRD => {
+                format_opt!("WB RD: 0x{:08X}", pipeline.mem_wb.rd)
+            }
+            FiveStageElement::MEMWBAlu => {
+                format_opt!("MEM/WB ALU Output: 0x{:08X}", pipeline.mem_wb.alu)
+            }
+            FiveStageElement::MEMWBLsu => {
+                format_opt!("MEM/WB LSU Output: 0x{:08X}", pipeline.mem_wb.lsu)
+            }
             // Writeback
-            FiveStageElement::WritebackResult => match pipeline.wb_lines.wb_data {
-                Some(value) => format!("Register Write Data: 0x{:08X}", value),
-                None => return "None".to_string(),
-            },
+            FiveStageElement::WritebackResult => {
+                format_opt!("Register Write Data: 0x{:08X}", pipeline.wb_lines.wb_data)
+            }
         }
     }
 }
@@ -762,21 +738,6 @@ pub fn FiveStageVisualization(
             }
         }
         g {
-            id: "decoder_branch_group",
-            style: "pointer-events: all;",
-            onmouseenter: move |_| {
-                hovered_element.set(Some(FiveStageElement::DecoderBranch));
-            },
-            onmouseleave: move |_| {
-                hovered_element.set(None);
-            },
-            path {
-                id: "decoder_branch_arrow",
-                d: "M758.707 188.707C759.098 188.317 759.098 187.683 758.707 187.293L752.343 180.929C751.953 180.538 751.319 180.538 750.929 180.929C750.538 181.319 750.538 181.953 750.929 182.343L756.586 188L750.929 193.657C750.538 194.047 750.538 194.681 750.929 195.071C751.319 195.462 751.953 195.462 752.343 195.071L758.707 188.707ZM701 189H758V187H701V189Z",
-                fill: element_stroke!(DecoderBranch),
-            }
-        }
-        g {
             id: "decoder_imm_group",
             style: "pointer-events: all;",
             onmouseenter: move |_| {
@@ -1018,50 +979,6 @@ pub fn FiveStageVisualization(
                 "text-anchor": "middle",
                 fill: element_stroke!(MEMWBLsu),
                 "LSU"
-            }
-        }
-        g {
-            id: "idex_branch_group",
-            style: "pointer-events: all;",
-            onmouseenter: move |_| {
-                hovered_element.set(Some(FiveStageElement::IDEXBranch));
-            },
-            onmouseleave: move |_| {
-                hovered_element.set(None);
-            },
-            rect {
-                id: "idex_branch_rect",
-                x: "760",
-                y: "169",
-                width: "78",
-                height: "38",
-                stroke: element_stroke!(IDEXBranch),
-                "stroke-width": "2",
-                fill: element_fill!(IDEXBranch),
-            }
-            path {
-                id: "idex_branch_arrow",
-                d: "M960.707 68.2929C960.317 67.9024 959.683 67.9024 959.293 68.2929L952.929 74.6568C952.538 75.0474 952.538 75.6805 952.929 76.0711C953.319 76.4616 953.953 76.4616 954.343 76.0711L960 70.4142L965.657 76.0711C966.047 76.4616 966.681 76.4616 967.071 76.0711C967.462 75.6805 967.462 75.0474 967.071 74.6568L960.707 68.2929ZM961 188L961 69L959 69L959 188L961 188Z",
-                fill: element_stroke!(IDEXBranch),
-            }
-            line {
-                id: "idex_branch_line",
-                x1: "838",
-                y1: "187",
-                x2: "959",
-                y2: "187",
-                stroke: element_stroke!(IDEXBranch),
-                "stroke-width": "2",
-            }
-            text {
-                x: "799",
-                y: "193",
-                "font-family": "Arial",
-                "font-size": "18",
-                "font-weight": "bold",
-                "text-anchor": "middle",
-                fill: element_stroke!(IDEXBranch),
-                "BR"
             }
         }
         g {
