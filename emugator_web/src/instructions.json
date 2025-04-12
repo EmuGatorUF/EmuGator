@@ -1,0 +1,277 @@
+{
+    ".data": {
+        "format": ".data",
+        "desc": "Declares a data section where variables can be defined.",
+        "example": ".data\n\tarray: .ascii \"test\""
+    },
+    ".text": {
+        "format": ".text",
+        "desc": "Marks the beginning of the code section.",
+        "example": ".text\nmain:\n\tADDI x2, x9, value"
+    },
+    ".section": {
+        "format": ".section (data|text)",
+        "desc": "Marks the beginning of text or data sections. See .data or .text for the same function",
+        "example": ".section text"
+    },
+    ".align": {
+        "format": ".align n",
+        "desc": "Align to the given boundary, with the size given as log2 the number of bytes to align to. (2^n) byte boundary",
+        "example": ".align 2"
+    },
+    ".equ": {
+        "format": ".equ",
+        "desc": "Defines a constant value. Supports Expressions",
+        "example": ".equ MAX, (2 * 5 - 3) << 1"
+    },
+    ".byte": {
+        "format": ".byte value1, value2...",
+        "desc": "Allocates sequence of bytes with the specified values.",
+        "example": ".byte 0x1F, 0x2F, 0x3F"
+    },
+    ".2byte": {
+        "format": ".byte value1, value2...",
+        "desc": "Allocates sequence of two bytes with the specified values.",
+        "example": ".2byte 0x1F, 0x2F, 0x3F"
+    },
+    ".4byte": {
+        "format": ".byte value1, value2...",
+        "desc": "Allocates sequence of four bytes with the specified values.",
+        "example": ".4byte 0x1F, 0x2F, 0x3F"
+    },
+    ".8byte": {
+        "format": ".byte value1, value2...",
+        "desc": "Allocates sequence of eight bytes with the specified values.",
+        "example": ".8byte 0x1F, 0x2F, 0x3F"
+    },
+    ".word": {
+        "format": ".word value1, value2...",
+        "desc": "Allocates a sequence of 32-bit words with the specified values.",
+        "example": ".word 1, 2, 3, 4"
+    },
+    ".dword": {
+        "format": ".dword value1, value2...",
+        "desc": "Allocates a sequence of 64-bit double words with the specified values.",
+        "example": ".dword 1, 2, 3, 4"
+    },
+    ".string": {
+        "format": ".string \"string\"",
+        "desc": "Stores a null-terminated string in memory.",
+        "example": ".string \"Hello, world!\""
+    },
+    ".asciz": {
+        "format": ".ascii \"string\"",
+        "desc": "Stores a null-terminated string in memory",
+        "example": ".ascii \"ABC\""
+    },
+    ".ascii": {
+        "format": ".ascii \"string\"",
+        "desc": "Stores a string in memory without a null terminator.",
+        "example": ".ascii \"ABC\""
+    },
+    ".zero": {
+        "format": ".zero n",
+        "desc": "Allocates n bytes and initializes them to zero.",
+        "example": ".zero 16"
+    },
+    "ADD": {
+        "format": "ADD rd, rs1, rs2",
+        "desc": "Adds the values stored in rs1 and rs2 and stores the result in rd.",
+        "example": "ADD x1, x2, x3"
+    },
+    "SUB": {
+        "format": "SUB rd, rs1, rs2",
+        "desc": "Subtracts the value in rs2 from rs1 and stores the result in rd.",
+        "example": "SUB x1, x2, x3"
+    },
+    "SLT": {
+        "format": "SLT rd, rs1, rs2",
+        "desc": "Sets rd to 1 if rs1 is less than rs2, else sets it to 0.",
+        "example": "SLT x1, x2, x3"
+    },
+    "SLTU": {
+        "format": "SLTU rd, rs1, rs2",
+        "desc": "Sets rd to 1 if rs1 is less than rs2, else sets it to 0. Same as SLT but treats rs2 value as unsigned.",
+        "example": "SLTU x1, x2, x3"
+    },
+    "AND": {
+        "format": "AND rd, rs1, rs2",
+        "desc": "Performs a bitwise AND on rs1 and rs2 and stores the result in rd.",
+        "example": "AND x1, x2, x3"
+    },
+    "OR": {
+        "format": "OR rd, rs1, rs2",
+        "desc": "Performs a bitwise OR on rs1 and rs2 and stores the result in rd.",
+        "example": "OR x1, x2, x3"
+    },
+    "XOR": {
+        "format": "XOR rd, rs1, rs2",
+        "desc": "Performs a bitwise XOR on rs1 and rs2 and stores the result in rd.",
+        "example": "XOR x1, x2, x3"
+    },
+    "SLL": {
+        "format": "SLL rd, rs1, rs2",
+        "desc": "Shifts rs1 left by the value in the lower 5 bits of rs2 and stores in rd.",
+        "example": "SLL x1, x2, x3"
+    },
+    "SRL": {
+        "format": "SRL rd, rs1, rs2",
+        "desc": "Logical right shift of rs1 by the value in rs2, result in rd.",
+        "example": "SRL x1, x2, x3"
+    },
+    "SRA": {
+        "format": "SRA rd, rs1, rs2",
+        "desc": "Arithmetic right shift of rs1 by the value in rs2, result in rd.",
+        "example": "SRA x1, x2, x3"
+    },
+    "ADDI": {
+        "format": "ADDI rd, rs1, imm",
+        "desc": "Adds the immediate value to rs1 and stores the result in rd.",
+        "example": "ADDI x1, x2, 10"
+    },
+    "SLTI": {
+        "format": "SLTI rd, rs1, imm",
+        "desc": "Set rd to 1 if rs1 < signed(imm), else 0.",
+        "example": "SLTI x1, x2, 5"
+    },
+    "SLTIU": {
+        "format": "SLTIU rd, rs1, imm",
+        "desc": "Set rd to 1 if rs1 < unsigned(imm), else 0",
+        "example": "SLTIU x1, x2, 5"
+    },
+    "ANDI": {
+        "format": "ANDI rd, rs1, imm",
+        "desc": "Bitwise AND between rs1 and immediate value.",
+        "example": "ANDI x1, x2, 0xFF"
+    },
+    "ORI": {
+        "format": "ORI rd, rs1, imm",
+        "desc": "Bitwise OR between rs1 and immediate value.",
+        "example": "ORI x1, x2, 0x01"
+    },
+    "XORI": {
+        "format": "XORI rd, rs1, imm",
+        "desc": "Bitwise XOR between rs1 and immediate value.",
+        "example": "XORI x1, x2, 0x01"
+    },
+    "SLLI": {
+        "format": "SLLI rd, rs1, shamt",
+        "desc": "Shift rs1 left by shamt bits, store result in rd.",
+        "example": "SLLI x1, x2, 3"
+    },
+    "SRLI": {
+        "format": "SRLI rd, rs1, shamt",
+        "desc": "Logical right shift of rs1 by shamt bits, store in rd.",
+        "example": "SRLI x1, x2, 3"
+    },
+    "SRAI": {
+        "format": "SRAI rd, rs1, shamt",
+        "desc": "Arithmetic right shift of rs1 by shamt bits, store in rd.",
+        "example": "SRAI x1, x2, 3"
+    },
+    "JALR": {
+        "format": "JALR rd, rs1, imm",
+        "desc": "Jump to rs1 + imm, store return address in rd.",
+        "example": "JALR x1, x2, 0"
+    },
+    "LW": {
+        "format": "LW rd, offset(rs1)",
+        "desc": "Load 32-bit word from memory into rd.",
+        "example": "LW x1, 0(x2)"
+    },
+    "LH": {
+        "format": "LH rd, offset(rs1)",
+        "desc": "Load 16-bit signed halfword from memory into rd.",
+        "example": "LH x1, 0(x2)"
+    },
+    "LHU": {
+        "format": "LHU rd, offset(rs1)",
+        "desc": "Load 16-bit unsigned halfword from memory into rd.",
+        "example": "LHU x1, 0(x2)"
+    },
+    "LB": {
+        "format": "LB rd, offset(rs1)",
+        "desc": "Load 8-bit signed byte from memory into rd.",
+        "example": "LB x1, 0(x2)"
+    },
+    "LBU": {
+        "format": "LBU rd, offset(rs1)",
+        "desc": "Load 8-bit unsigned byte from memory into rd.",
+        "example": "LBU x1, 0(x2)"
+    },
+    "FENCE": {
+        "format": "FENCE",
+        "desc": "Ensures memory ordering across cores and devices. Instruction gets converted to a NOP",
+        "example": "FENCE"
+    },
+    "ECALL": {
+        "format": "ECALL",
+        "desc": "Environment call (used to invoke system services). Instruction gets converted to a NOP",
+        "example": "ECALL"
+    },
+    "EBREAK": {
+        "format": "EBREAK",
+        "desc": "Used for debugging; triggers a breakpoint.",
+        "example": "EBREAK"
+    },
+    "SW": {
+        "format": "SW rs2, offset(rs1)",
+        "desc": "Store 32-bit word from rs2 into memory.",
+        "example": "SW x3, 0(x2)"
+    },
+    "SH": {
+        "format": "SH rs2, offset(rs1)",
+        "desc": "Store 16-bit halfword from rs2 into memory.",
+        "example": "SH x3, 0(x2)"
+    },
+    "SB": {
+        "format": "SB rs2, offset(rs1)",
+        "desc": "Store 8-bit byte from rs2 into memory.",
+        "example": "SB x3, 0(x2)"
+    },
+    "BEQ": {
+        "format": "BEQ rs1, rs2, offset",
+        "desc": "Branch to PC+offset if rs1 == rs2.",
+        "example": "BEQ x1, x2, 16"
+    },
+    "BNE": {
+        "format": "BNE rs1, rs2, offset",
+        "desc": "Branch to PC+offset if rs1 != rs2.",
+        "example": "BNE x1, x2, 16"
+    },
+    "BLT": {
+        "format": "BLT rs1, rs2, offset",
+        "desc": "Branch if rs1 < rs2 (signed).",
+        "example": "BLT x1, x2, 16"
+    },
+    "BLTU": {
+        "format": "BLTU rs1, rs2, offset",
+        "desc": "Branch if rs1 < rs2 (unsigned).",
+        "example": "BLTU x1, x2, 16"
+    },
+    "BGE": {
+        "format": "BGE rs1, rs2, offset",
+        "desc": "Branch if rs1 >= rs2 (signed).",
+        "example": "BGE x1, x2, 16"
+    },
+    "BGEU": {
+        "format": "BGEU rs1, rs2, offset",
+        "desc": "Branch if rs1 >= rs2 (unsigned).",
+        "example": "BGEU x1, x2, 16"
+    },
+    "LUI": {
+        "format": "LUI rd, imm",
+        "desc": "Load upper 20 bits of rd with immediate value.",
+        "example": "LUI x1, 0x12345"
+    },
+    "AUIPC": {
+        "format": "AUIPC rd, imm",
+        "desc": "Add upper immediate value to the PC and store in rd.",
+        "example": "AUIPC x1, 0x1000"
+    },
+    "JAL": {
+        "format": "JAL rd, offset",
+        "desc": "Jump to PC + offset, store return address in rd.",
+        "example": "JAL x1, 32"
+    }
+}
