@@ -357,6 +357,7 @@ fn find_active_elements(control: CVE2Control) -> BTreeSet<CVE2Element> {
 pub fn CVE2Visualization(
     emulator_state: ReadOnlySignal<Option<AnyEmulatorState>>,
     tooltip_text: Signal<Option<String>>,
+    show_control_signals: Signal<bool>
 ) -> Element {
     const HOVER_STROKE: &'static str = "rgba(66, 133, 244, 1)";
     const ACTIVE_STROKE: &'static str = "rgba(147, 112, 219, 1)";
@@ -364,7 +365,6 @@ pub fn CVE2Visualization(
 
     let mut hovered_element = use_signal(|| Option::<CVE2Element>::None);
     let mut active_elements = use_signal(|| BTreeSet::<CVE2Element>::new());
-    let mut show_control_signals = use_signal(|| true);
 
     // Update active elements based on control signals
     use_effect(move || match &*emulator_state.read() {

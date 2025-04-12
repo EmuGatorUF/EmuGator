@@ -144,7 +144,7 @@ pub fn PipelineVisualization(
                 {
                     match *selected_emulator.read() {
                         EmulatorOption::CVE2 => rsx! {
-                            CVE2Visualization { emulator_state, tooltip_text }
+                            CVE2Visualization { emulator_state, tooltip_text, show_control_signals }
                         },
                         EmulatorOption::FiveStage => rsx! {
                             FiveStageVisualization { emulator_state, tooltip_text }
