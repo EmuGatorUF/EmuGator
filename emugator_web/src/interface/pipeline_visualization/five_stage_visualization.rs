@@ -23,7 +23,7 @@ macro_rules! format_bool {
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 enum FiveStageElement {
-    PC,
+    IFPC,
     PCMux,
     PCPlus4,
     InstructionMemory,
@@ -56,7 +56,6 @@ enum FiveStageElement {
     DecoderImm,
     RegisterFileRS1Value,
     RegisterFileRS2Value,
-    BranchUnit,
     LSU,
     LSUADDR,
     LSUDATA,
@@ -69,12 +68,19 @@ enum FiveStageElement {
     IDEXRD,
     EXMEMRD,
     MEMWBRD,
+    JMPAddress,
+    JMPBaseAddress,
+    HazzardDetector,
+    IFPCWriteEnable,
+    IFIDWriteEnable,
+    IDEXWriteEnable,
 }
 
 impl FiveStageElement {
     fn tooltip_text(&self, pipeline: &FiveStagePipeline) -> String {
         match self {
-            FiveStageElement::PC => {
+            FiveStageElement::ControlUnit => "Control Unit".to_string(),
+            FiveStageElement::IFPC => {
                 format!("IF PC: 0x{:08X}", pipeline.if_pc)
             }
             FiveStageElement::PCMux => format_opt!("Next PC: 0x{:08X}", pipeline.if_lines.next_pc),
@@ -84,40 +90,63 @@ impl FiveStageElement {
             FiveStageElement::InstructionMemory => {
                 format_opt!("Instruction: 0x{:08X}", pipeline.if_lines.instr)
             }
+            // IF/ID Buffer
             FiveStageElement::IFIDBuffer => "IF/ID Pipeline Buffer".to_string(),
             FiveStageElement::IFIDPC => format_opt!("ID PC: 0x{:08X}", pipeline.if_id.id_pc),
             FiveStageElement::IFIDInstruction => {
                 format_opt!("ID PC: 0x{:08X}", pipeline.if_id.id_inst)
             }
+            // ID stage
             FiveStageElement::RegisterFile => "Register File".to_string(),
-            FiveStageElement::DataMemory => "Data Memory".to_string(),
             FiveStageElement::Decoder => "Instruction Decoder".to_string(),
-            FiveStageElement::ControlUnit => "Control Unit".to_string(),
             FiveStageElement::DecoderRS1 => format!("RS1: {}", pipeline.id_lines.rs1),
             FiveStageElement::DecoderRS2 => format!("RS2: {}", pipeline.id_lines.rs2),
             FiveStageElement::DecoderRD => format!("RD: {}", pipeline.id_lines.rd),
             FiveStageElement::DecoderImm => format_opt!("IMM: 0x{:08X}", pipeline.id_lines.imm),
             FiveStageElement::RegisterFileRS1Value => {
-                format!("RS1_V: 0x{:08X}", pipeline.id_lines.rs1_v)
+                format!("RS1 Value: 0x{:08X}", pipeline.id_lines.rs1_v)
             }
             FiveStageElement::RegisterFileRS2Value => {
-                format!("RS2_V: 0x{:08X}", pipeline.id_lines.rs2_v)
+                format!("RS2 Value: 0x{:08X}", pipeline.id_lines.rs2_v)
+            }
+            FiveStageElement::HazzardDetector => "Hazard Detector".to_string(),
+            FiveStageElement::IFPCWriteEnable => {
+                format_bool!(
+                    "IF PC Write Enable: {}",
+                    !pipeline.hazard_detector.hazard_detected.stop_if
+                )
+            }
+            FiveStageElement::IFIDWriteEnable => {
+                format_bool!(
+                    "IFID Write Enable: {}",
+                    !pipeline.hazard_detector.hazard_detected.stop_id
+                )
+            }
+            FiveStageElement::IDEXWriteEnable => {
+                format_bool!(
+                    "IDEX Write Enable: {}",
+                    !pipeline.hazard_detector.hazard_detected.stop_ex
+                )
             }
             // ID/EX Buffer
             FiveStageElement::IDEXBuffer => "ID/EX Pipeline Buffer".to_string(),
             FiveStageElement::IDEXPC => format_opt!("EX PC: 0x{:08X}", pipeline.id_ex.ex_pc),
             FiveStageElement::IDEXRD => format_opt!("EX RD: 0x{:08X}", pipeline.id_ex.rd),
-            FiveStageElement::IDEXRS1 => format!("EX RS1_V: 0x{:08X}", pipeline.id_ex.rs1_v),
-            FiveStageElement::IDEXRS2 => format!("EX RS2_V: 0x{:08X}", pipeline.id_ex.rs2_v),
+            FiveStageElement::IDEXRS1 => format!("EX RS1 Value: 0x{:08X}", pipeline.id_ex.rs1_v),
+            FiveStageElement::IDEXRS2 => format!("EX RS2 Value: 0x{:08X}", pipeline.id_ex.rs2_v),
             FiveStageElement::IDEXImm => format_opt!("EX IMM: 0x{:08X}", pipeline.id_ex.imm),
-            // Branch Unit
-            FiveStageElement::BranchUnit => {
-                format_opt!("Branch PC: 0x{:08X}", pipeline.ex_lines.jmp_dst)
-            }
+            // EX stage
             // ALU
             FiveStageElement::ALUMuxA => format_opt!("ALU OP A: 0x{:08X}", pipeline.ex_lines.op_a),
             FiveStageElement::ALUMuxB => format_opt!("ALU OP B: 0x{:08X}", pipeline.ex_lines.op_b),
             FiveStageElement::ALU => format_opt!("ALU Output: 0x{:08X}", pipeline.ex_lines.alu_out),
+            // Branch Calculation
+            FiveStageElement::JMPBaseAddress => {
+                format_opt!("JMP Base Address: 0x{:08X}", pipeline.ex_lines.jmp_base)
+            }
+            FiveStageElement::JMPAddress => {
+                format_opt!("JMP Address: 0x{:08X}", pipeline.ex_lines.jmp_dst)
+            }
             // EX/MEM Buffer
             FiveStageElement::EXMEMBuffer => "EX/MEM Pipeline Buffer".to_string(),
             FiveStageElement::EXMEMPC => format_opt!("MEM PC: 0x{:08X}", pipeline.ex_mem.mem_pc),
@@ -127,6 +156,7 @@ impl FiveStageElement {
             FiveStageElement::EXMEMRD => format_opt!("MEM RD: 0x{:08X}", pipeline.ex_mem.rd),
             FiveStageElement::EXMEMRS2 => format!("MEM RS2: 0x{:08X}", pipeline.ex_mem.rs2_v),
             // LSU
+            FiveStageElement::DataMemory => "Data Memory".to_string(),
             FiveStageElement::LSU => "LSU".to_string(),
             FiveStageElement::LSUADDR => {
                 format!("Memory Address: 0x{:08X}", pipeline.mem_lines.data_addr_o)
@@ -297,7 +327,7 @@ pub fn FiveStageVisualization(
             id: "if_pc_group",
             style: "pointer-events: all;",
             onmouseenter: move |_| {
-                hovered_element.set(Some(FiveStageElement::PC));
+                hovered_element.set(Some(FiveStageElement::IFPC));
             },
             onmouseleave: move |_| {
                 hovered_element.set(None);
@@ -308,9 +338,9 @@ pub fn FiveStageVisualization(
                 y: "157",
                 width: "78",
                 height: "158",
-                stroke: element_stroke!(PC),
+                stroke: element_stroke!(IFPC),
                 "stroke-width": "2",
-                fill: element_fill!(PC),
+                fill: element_fill!(IFPC),
             }
             text {
                 x: "58",
@@ -319,37 +349,37 @@ pub fn FiveStageVisualization(
                 "font-size": "24",
                 "font-weight": "bold",
                 "text-anchor": "middle",
-                fill: element_stroke!(PC),
+                fill: element_stroke!(IFPC),
                 "PC"
             }
             path {
                 id: "if_pc_arrow1",
                 d: "M177.707 236.707C178.098 236.317 178.098 235.683 177.707 235.293L171.343 228.929C170.953 228.538 170.319 228.538 169.929 228.929C169.538 229.319 169.538 229.953 169.929 230.343L175.586 236L169.929 241.657C169.538 242.047 169.538 242.681 169.929 243.071C170.319 243.462 170.953 243.462 171.343 243.071L177.707 236.707ZM98 237H177V235H98V237Z",
-                fill: element_stroke!(PC),
+                fill: element_stroke!(IFPC),
             }
             path {
                 id: "if_pc_arrow2",
                 d: "M137.707 94.2929C137.317 93.9024 136.683 93.9024 136.293 94.2929L129.929 100.657C129.538 101.047 129.538 101.681 129.929 102.071C130.319 102.462 130.953 102.462 131.343 102.071L137 96.4142L142.657 102.071C143.047 102.462 143.681 102.462 144.071 102.071C144.462 101.681 144.462 101.047 144.071 100.657L137.707 94.2929ZM138 236V95H136V236H138Z",
-                fill: element_stroke!(PC),
+                fill: element_stroke!(IFPC),
             }
             path {
                 id: "next_pc_arrow3",
                 d: "M402.707 109.707C403.098 109.317 403.098 108.683 402.707 108.293L396.343 101.929C395.953 101.538 395.319 101.538 394.929 101.929C394.538 102.319 394.538 102.953 394.929 103.343L400.586 109L394.929 114.657C394.538 115.047 394.538 115.681 394.929 116.071C395.319 116.462 395.953 116.462 396.343 116.071L402.707 109.707ZM137 110H402V108H137V110Z",
-                fill: element_stroke!(PC),
+                fill: element_stroke!(IFPC),
             }
             circle {
                 id: "if_pc_node1",
                 cx: "137",
                 cy: "110",
                 r: "3",
-                fill: element_stroke!(PC),
+                fill: element_stroke!(IFPC),
             }
             circle {
                 id: "if_pc_node2",
                 cx: "137",
                 cy: "236",
                 r: "3",
-                fill: element_stroke!(PC),
+                fill: element_stroke!(IFPC),
             }
         }
         g {
@@ -1123,41 +1153,6 @@ pub fn FiveStageVisualization(
                 "text-anchor": "middle",
                 fill: element_stroke!(IDEXImm),
                 "IMM"
-            }
-        }
-        g {
-            id: "branch_unit_group",
-            style: "pointer-events: all;",
-            onmouseenter: move |_| {
-                hovered_element.set(Some(FiveStageElement::BranchUnit));
-            },
-            onmouseleave: move |_| {
-                hovered_element.set(None);
-            },
-            rect {
-                id: "branch_unit_rect",
-                x: "878",
-                y: "11",
-                width: "163",
-                height: "57",
-                stroke: element_stroke!(BranchUnit),
-                "stroke-width": "2",
-                fill: element_fill!(BranchUnit),
-            }
-            path {
-                id: "branch_unit_arrow",
-                d: "M78.2929 38.293C77.9024 38.6835 77.9024 39.3167 78.2929 39.7072L84.6569 46.0711C85.0474 46.4617 85.6805 46.4617 86.0711 46.0711C86.4616 45.6806 86.4616 45.0474 86.0711 44.6569L80.4142 39.0001L86.0711 33.3432C86.4616 32.9527 86.4616 32.3195 86.0711 31.929C85.6805 31.5385 85.0474 31.5385 84.6569 31.929L78.2929 38.293ZM877 38L79 38.0001L79 40.0001L877 40L877 38Z",
-                fill: element_stroke!(BranchUnit),
-            }
-            text {
-                x: "960",
-                y: "45",
-                "font-family": "Arial",
-                "font-size": "18",
-                "font-weight": "bold",
-                "text-anchor": "middle",
-                fill: element_stroke!(BranchUnit),
-                "BRANCH UNIT"
             }
         }
         g {
