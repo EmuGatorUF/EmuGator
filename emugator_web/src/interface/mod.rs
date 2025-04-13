@@ -1,11 +1,11 @@
 mod data_views;
+mod help_panel;
 mod instruction_views;
 mod memory_view;
 mod navbar;
 mod pipeline_visualization;
 mod register_view;
 mod uart_view;
-mod help_panel;
 
 use std::{collections::BTreeSet, time::Duration};
 
@@ -14,8 +14,9 @@ use dioxus_logger::tracing::info;
 use dioxus_sdk::utils::timing::use_debounce;
 
 use self::{
-    memory_view::MemoryView, navbar::Navbar, pipeline_visualization::PipelineVisualization,
-    register_view::RegisterView, uart_view::UartView, help_panel::HelpPanelView
+    help_panel::HelpPanelView, memory_view::MemoryView, navbar::Navbar,
+    pipeline_visualization::PipelineVisualization, register_view::RegisterView,
+    uart_view::UartView,
 };
 use crate::code_editor::{CodeEditor, LineHighlight};
 use emugator_core::{
@@ -93,7 +94,10 @@ pub fn App() -> Element {
     });
 
     rsx! {
-        document::Stylesheet { href: asset!("tailwind.css") }
+        document::Title { "EmuGator" }
+        document::Stylesheet { href: asset!("/assets/tailwind.css") }
+        document::Link { rel: "icon", href: asset!("/assets/favicon.ico") }
+
         style { "html, body {{ margin: 0; padding: 0; }} #main {{ margin: 0; }}" }
 
         div { class: "flex flex-col h-screen w-full bg-gray-800 m-0 p-0",
@@ -105,7 +109,7 @@ pub fn App() -> Element {
                 selected_emulator,
                 breakpoints,
                 minimize_console,
-                help_panel_displayed
+                help_panel_displayed,
             }
             div { class: "flex flex-1 overflow-hidden",
                 div { class: "w-1/2 flex flex-col h-full bg-[#1E1E1E] overflow-hidden border-r-2 border-gray-900",
@@ -136,7 +140,10 @@ pub fn App() -> Element {
                                     }
                                 }
                                 div { class: "h-[calc(100%-2rem)] overflow-auto",
-                                    PipelineVisualization { emulator_state, selected_emulator }
+                                    PipelineVisualization {
+                                        emulator_state,
+                                        selected_emulator,
+                                    }
                                 }
                             }
                         }
@@ -144,7 +151,9 @@ pub fn App() -> Element {
                             div { class: "bg-gray-800 rounded h-full p-2",
                                 div { class: "flex items-center mb-2",
                                     div { class: "h-4 w-1 bg-green-500 mr-2" }
-                                    span { class: "text-sm font-medium text-gray-300", "Register View" }
+                                    span { class: "text-sm font-medium text-gray-300",
+                                        "Register View"
+                                    }
                                 }
                                 div { class: "h-[calc(100%-2rem)] overflow-auto",
                                     RegisterView { emulator_state }
@@ -155,7 +164,9 @@ pub fn App() -> Element {
                             div { class: "bg-gray-800 rounded h-full p-2",
                                 div { class: "flex items-center mb-2",
                                     div { class: "h-4 w-1 bg-purple-500 mr-2" }
-                                    span { class: "text-sm font-medium text-gray-300", "Memory View" }
+                                    span { class: "text-sm font-medium text-gray-300",
+                                        "Memory View"
+                                    }
                                 }
                                 div { class: "h-[calc(100%-2rem)] overflow-auto",
                                     MemoryView {
@@ -167,7 +178,7 @@ pub fn App() -> Element {
                         }
                     }
                 } else {
-                   HelpPanelView {} 
+                    HelpPanelView {}
                 }
             }
         }

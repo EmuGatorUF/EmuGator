@@ -7,7 +7,9 @@ use std::collections::BTreeSet;
 use std::ops::Deref;
 
 use dioxus_free_icons::Icon;
-use dioxus_free_icons::icons::ld_icons::{LdCircleArrowRight, LdCircleCheck, LdInfo, LdPlay, LdCircleX};
+use dioxus_free_icons::icons::ld_icons::{
+    LdCircleArrowRight, LdCircleCheck, LdCircleX, LdInfo, LdPlay,
+};
 use dioxus_free_icons::icons::ld_icons::{LdClock3, LdClock6, LdClock9, LdClock12};
 
 #[component]
@@ -20,7 +22,7 @@ pub fn Navbar(
     selected_emulator: Signal<EmulatorOption>,
     breakpoints: ReadOnlySignal<BTreeSet<usize>>,
     minimize_console: Signal<bool>,
-    help_panel_displayed: Signal<bool>
+    help_panel_displayed: Signal<bool>,
 ) -> Element {
     let is_started = emulator_state.read().is_some();
     let is_assembled = assembled_program.read().is_some();
@@ -165,10 +167,7 @@ pub fn Navbar(
                             "Program Assembled"
                         }
                     } else if error_count > 0 {
-                        Icon {
-                            width: 17,
-                            icon: LdCircleX
-                        }
+                        Icon { width: 17, icon: LdCircleX }
                         "Errors: {error_count}"
                     } else {
                         "Ready"
@@ -181,7 +180,7 @@ pub fn Navbar(
                         selected_emulator.set(new_selection);
                         emulator_state.set(None);
                     },
-                    img { width: 20, src: "assets/pipeline.svg" }
+                    img { width: 20, src: asset!("assets/pipeline.svg") }
                     "{selected_emulator.read().display_string()}"
                 }
                 button {
@@ -192,8 +191,12 @@ pub fn Navbar(
                         info!("Help panel toggled: {:?}", help_panel_toggle);
                     },
                     match *help_panel_displayed.read() {
-                        true => rsx!(Icon { width: 18, icon: LdCircleX }),
-                        _ => rsx!(Icon { width: 18, icon: LdInfo }),                   
+                        true => rsx! {
+                            Icon { width: 18, icon: LdCircleX }
+                        },
+                        _ => rsx! {
+                            Icon { width: 18, icon: LdInfo }
+                        },
                     }
                 }
             }
