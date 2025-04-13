@@ -1,3 +1,5 @@
+use std::{borrow::Cow, collections::HashMap};
+
 use dioxus::signals::Readable;
 use dioxus_logger::tracing::info;
 use js_sys::{Array, Object};
@@ -6,6 +8,7 @@ use monaco::sys::{
     editor::ITextModel,
     languages::{self, Hover, HoverProvider, ILanguageExtensionPoint, LanguageConfiguration},
 };
+use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 
 use crate::interface::ASSEMBLED_PROGRAM;
@@ -45,7 +48,22 @@ pub fn register_riscv_language() {
     languages::register_hover_provider(language_id, &make_hover_provider());
 }
 
+#[derive(Deserialize)]
+struct DocEntry<'a> {
+    #[serde(borrow)]
+    format: Cow<'a, str>,
+    #[serde(borrow)]
+    desc: Cow<'a, str>,
+    #[serde(borrow)]
+    example: Cow<'a, str>,
+}
+
+const DOCS: &str = include_str!("../../docs.json");
+
 fn make_hover_provider() -> HoverProvider {
+    let docs: HashMap<&'static str, DocEntry<'static>> =
+        serde_json::from_str(DOCS).expect("failed to parse docs.json");
+
     let provide_hover_fn = Closure::wrap(Box::new(
         move |model: ITextModel, position: IPosition, _token: CancellationToken| -> JsValue {
             let content = js_sys::Array::new();
@@ -54,7 +72,12 @@ fn make_hover_provider() -> HoverProvider {
                 let word = word_info.word();
 
                 // get static docs
-                content.push(&new_md_string(format!("docs for {}", &word).as_str()));
+                if let Some(doc) = docs.get(word.as_str()) {
+                    content.push(&new_md_string(&format!(
+                        "**{}**\n\n{}\n\n_Example:_\n```riscv\n{}\n```\n",
+                        doc.format, doc.desc, doc.example
+                    )));
+                }
 
                 // get dynamic info based on the current program
                 if let Some(program) = ASSEMBLED_PROGRAM.read().as_ref() {
