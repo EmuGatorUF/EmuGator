@@ -3,7 +3,9 @@ use std::ops::Deref;
 use dioxus::prelude::*;
 
 use emugator_core::emulator::{
-    AnyEmulatorState, controller_common::OpASel, five_stage::FiveStagePipeline,
+    AnyEmulatorState,
+    controller_common::{DataDestSel, LSUDataType, OpASel, OpBSel, PCSel},
+    five_stage::FiveStagePipeline,
 };
 
 macro_rules! format_opt {
@@ -74,14 +76,129 @@ enum FiveStageElement {
     IFPCWriteEnable,
     IFIDWriteEnable,
     IDEXWriteEnable,
+    EXControl,
+    MEMControl,
+    WBControl,
+    PCNextSelControlSignal,
+    ALUOpControlSignal,
+    ALUOpASelControlSignal,
+    ALUOpBSelControlSignal,
+    LSUDataTypeControlSignal,
+    LSURequestControlSignal,
+    LSUWriteEnableControlSignal,
+    LSUSignExtControlSignal,
+    WBSrcControlSignal,
+    RegWriteControlSignal,
+    JMPBaseControlSignal,
+    JumpUncondControlSignal,
+    JumpCondControlSignal,
 }
 
 impl FiveStageElement {
     fn tooltip_text(&self, pipeline: &FiveStagePipeline) -> String {
         match self {
-            FiveStageElement::ControlUnit => "Control Unit".to_string(),
+            FiveStageElement::ControlUnit => "ID Control (Forwarding EX/MEM/WB)".to_string(),
+            FiveStageElement::EXControl => "EX Control (Forwarding MEM/WB)".to_string(),
+            FiveStageElement::MEMControl => "MEM Control (Forwarding WB)".to_string(),
+            FiveStageElement::WBControl => "WB Control".to_string(),
             FiveStageElement::IFPC => {
                 format!("IF PC: 0x{:08X}", pipeline.if_pc)
+            }
+            FiveStageElement::PCNextSelControlSignal => match pipeline.if_lines.next_pc_sel {
+                PCSel::JMP => "Next PC Select: JMP".to_string(),
+                PCSel::PC4 => "Next PC Select: PC+4".to_string(),
+            },
+            FiveStageElement::ALUOpControlSignal => {
+                format!(
+                    "ALU Operation: {}",
+                    match pipeline.ex_control.alu_op {
+                        Some(op) => format!("{:?}", op),
+                        None => "DON'T CARE".to_string(),
+                    }
+                )
+            }
+            FiveStageElement::ALUOpASelControlSignal => {
+                format!(
+                    "ALU OP A Select: {}",
+                    match pipeline.ex_control.alu_op_a_sel {
+                        Some(OpASel::PC) => "PC",
+                        Some(OpASel::RF) => "Register File",
+                        None => "DON'T CARE",
+                    }
+                )
+            }
+            FiveStageElement::ALUOpBSelControlSignal => {
+                format!(
+                    "ALU OP B Select: {}",
+                    match pipeline.ex_control.alu_op_b_sel {
+                        Some(OpBSel::IMM) => "Immediate",
+                        Some(OpBSel::RF) => "Register File",
+                        Some(OpBSel::Four) => "Four",
+                        None => "DON'T CARE",
+                    }
+                )
+            }
+            FiveStageElement::JMPBaseControlSignal => {
+                format!(
+                    "Jump Base: {}",
+                    match pipeline.ex_control.jmp_base {
+                        Some(OpASel::PC) => "PC",
+                        Some(OpASel::RF) => "Register File",
+                        None => "DON'T CARE",
+                    }
+                )
+            }
+            FiveStageElement::JumpUncondControlSignal => {
+                let is_active = pipeline.ex_control.jump_uncond;
+                format!(
+                    "Unconditional Jump: {}",
+                    if is_active { "Enabled" } else { "Disabled" }
+                )
+            }
+            FiveStageElement::JumpCondControlSignal => {
+                let is_active = pipeline.ex_control.jump_cond;
+                format!(
+                    "Conditional Jump: {}",
+                    if is_active { "Enabled" } else { "Disabled" }
+                )
+            }
+            FiveStageElement::LSUDataTypeControlSignal => {
+                match pipeline.mem_control.lsu_data_type {
+                    Some(LSUDataType::Word) => "LSU Data Type: Word (32-bit)".to_string(),
+                    Some(LSUDataType::HalfWord) => "LSU Data Type: Half Word (16-bit)".to_string(),
+                    Some(LSUDataType::Byte) => "LSU Data Type: Byte (8-bit)".to_string(),
+                    None => "LSU Data Type: DON'T CARE".to_string(),
+                }
+            }
+            FiveStageElement::LSURequestControlSignal => match pipeline.mem_control.lsu_request {
+                true => "LSU Request: Enabled".to_string(),
+                false => "LSU Request: Disabled".to_string(),
+            },
+            FiveStageElement::LSUWriteEnableControlSignal => {
+                let is_active = pipeline.mem_control.lsu_write_enable;
+                format!(
+                    "LSU Write Enable: {}",
+                    if is_active { "Enabled" } else { "Disabled" }
+                )
+            }
+            FiveStageElement::LSUSignExtControlSignal => {
+                let sign_ext = pipeline.mem_control.lsu_sign_ext;
+                format!(
+                    "LSU Sign Extension: {}",
+                    if sign_ext { "Enabled" } else { "Disabled" }
+                )
+            }
+            FiveStageElement::WBSrcControlSignal => match pipeline.wb_control.wb_src {
+                Some(DataDestSel::ALU) => "Write Back Source: ALU".to_string(),
+                Some(DataDestSel::LSU) => "Write Back Source: LSU".to_string(),
+                None => "Write Back Source: DON'T CARE".to_string(),
+            },
+            FiveStageElement::RegWriteControlSignal => {
+                let is_active = pipeline.wb_control.reg_write;
+                format!(
+                    "Register Write: {}",
+                    if is_active { "Enabled" } else { "Disabled" }
+                )
             }
             FiveStageElement::PCMux => format_opt!("Next PC: 0x{:08X}", pipeline.if_lines.next_pc),
             FiveStageElement::PCPlus4 => {
@@ -262,7 +379,97 @@ pub fn FiveStageVisualization(
         };
     }
     rsx! {
-
+        g {
+            id: "ex_ctrl_to_opbmux_group",
+            style: "pointer-events: all;",
+            onmouseenter: move |_| {
+                hovered_element.set(Some(FiveStageElement::ALUOpBSelControlSignal));
+            },
+            onmouseleave: move |_| {
+                hovered_element.set(None);
+            },
+            line {
+                id: "ex_ctrl_to_opbmux_line",
+                x1: "838",
+                y1: "561", // 10 pixels above the arrow (571-10=561)
+                x2: "858",
+                y2: "561", // 10 pixels above the arrow (571-10=561)
+                stroke: match &*emulator_state.read() {
+                    Some(AnyEmulatorState::FiveStage(state)) => {
+                        match (state.pipeline.ex_control.alu_op_b_sel, *hovered_element.read()) {
+                            (Some(OpBSel::IMM), Some(FiveStageElement::ALUOpBSelControlSignal)) => {
+                                "green"
+                            }
+                            (Some(OpBSel::IMM), _) => "rgba(0, 200, 0, 0.4)",
+                            (Some(OpBSel::RF), Some(FiveStageElement::ALUOpBSelControlSignal)) => {
+                                "red"
+                            }
+                            (Some(OpBSel::RF), _) => "rgba(200, 0, 0, 0.4)",
+                            (Some(OpBSel::Four), Some(FiveStageElement::ALUOpBSelControlSignal)) => {
+                                "blue"
+                            }
+                            (Some(OpBSel::Four), _) => "rgba(0, 0, 200, 0.4)",
+                            (None, _) => "gray",
+                        }
+                    }
+                    _ => "gray",
+                },
+                "stroke-width": "2",
+            }
+            path {
+                id: "ex_ctrl_to_opbmux_arrow",
+                transform: "translate(0, 31)",
+                d: "M917.293 429.293C916.902 428.902 916.268 428.902 915.878 429.293L909.514 435.657C909.124 436.047 909.124 436.681 909.514 437.071C909.905 437.462 910.538 437.462 910.929 437.071L917 431.414L923.071 437.071C923.462 437.462 924.095 437.462 924.486 437.071C924.876 436.681 924.876 436.047 924.486 435.657L918.122 429.293ZM918 531L918 430L916 430L916 531L918 531Z",
+                fill: match &*emulator_state.read() {
+                    Some(AnyEmulatorState::FiveStage(state)) => {
+                        match (state.pipeline.ex_control.alu_op_b_sel, *hovered_element.read()) {
+                            (Some(OpBSel::IMM), Some(FiveStageElement::ALUOpBSelControlSignal)) => {
+                                "green"
+                            }
+                            (Some(OpBSel::IMM), _) => "rgba(0, 200, 0, 0.4)",
+                            (Some(OpBSel::RF), Some(FiveStageElement::ALUOpBSelControlSignal)) => {
+                                "red"
+                            }
+                            (Some(OpBSel::RF), _) => "rgba(200, 0, 0, 0.4)",
+                            (Some(OpBSel::Four), Some(FiveStageElement::ALUOpBSelControlSignal)) => {
+                                "blue"
+                            }
+                            (Some(OpBSel::Four), _) => "rgba(0, 0, 200, 0.4)",
+                            (None, _) => "gray",
+                        }
+                    }
+                    _ => "gray",
+                },
+            }
+            line {
+                id: "ex_ctrl_to_opbmux_connect",
+                x1: "858",
+                y1: "561",
+                x2: "916",
+                y2: "561",
+                stroke: match &*emulator_state.read() {
+                    Some(AnyEmulatorState::FiveStage(state)) => {
+                        match (state.pipeline.ex_control.alu_op_b_sel, *hovered_element.read()) {
+                            (Some(OpBSel::IMM), Some(FiveStageElement::ALUOpBSelControlSignal)) => {
+                                "green"
+                            }
+                            (Some(OpBSel::IMM), _) => "rgba(0, 200, 0, 0.4)",
+                            (Some(OpBSel::RF), Some(FiveStageElement::ALUOpBSelControlSignal)) => {
+                                "red"
+                            }
+                            (Some(OpBSel::RF), _) => "rgba(200, 0, 0, 0.4)",
+                            (Some(OpBSel::Four), Some(FiveStageElement::ALUOpBSelControlSignal)) => {
+                                "blue"
+                            }
+                            (Some(OpBSel::Four), _) => "rgba(0, 0, 200, 0.4)",
+                            (None, _) => "gray",
+                        }
+                    }
+                    _ => "gray",
+                },
+                "stroke-width": "2",
+            }
+        }
         g {
             id: "next_pc_group",
             style: "pointer-events: all;",
@@ -476,14 +683,14 @@ pub fn FiveStageVisualization(
                 x: "404",
                 y: "70",
                 width: "78",
-                height: "490",
+                height: "570",
                 stroke: element_stroke!(IFIDBuffer),
                 "stroke-width": "2",
                 fill: element_fill!(IFIDBuffer),
             }
             text {
                 x: "443",
-                y: "530",
+                y: "610",
                 "font-family": "Arial",
                 "font-size": "22",
                 "font-weight": "bold",
@@ -493,7 +700,7 @@ pub fn FiveStageVisualization(
             }
             text {
                 x: "443",
-                y: "550",
+                y: "630",
                 "font-family": "Arial",
                 "font-size": "22",
                 "font-weight": "bold",
@@ -516,14 +723,14 @@ pub fn FiveStageVisualization(
                 x: "760",
                 y: "71",
                 width: "78",
-                height: "490",
+                height: "570",
                 stroke: element_stroke!(IDEXBuffer),
                 "stroke-width": "2",
                 fill: element_fill!(IDEXBuffer),
             }
             text {
                 x: "799",
-                y: "530",
+                y: "610",
                 "font-family": "Arial",
                 "font-size": "22",
                 "font-weight": "bold",
@@ -533,7 +740,7 @@ pub fn FiveStageVisualization(
             }
             text {
                 x: "799",
-                y: "550",
+                y: "630",
                 "font-family": "Arial",
                 "font-size": "22",
                 "font-weight": "bold",
@@ -556,14 +763,14 @@ pub fn FiveStageVisualization(
                 x: "1117",
                 y: "70",
                 width: "78",
-                height: "490",
+                height: "570",
                 stroke: element_stroke!(EXMEMBuffer),
                 "stroke-width": "2",
                 fill: element_fill!(EXMEMBuffer),
             }
             text {
                 x: "1156",
-                y: "530",
+                y: "610",
                 "font-family": "Arial",
                 "font-size": "22",
                 "font-weight": "bold",
@@ -573,7 +780,7 @@ pub fn FiveStageVisualization(
             }
             text {
                 x: "1156",
-                y: "550",
+                y: "630",
                 "font-family": "Arial",
                 "font-size": "22",
                 "font-weight": "bold",
@@ -596,14 +803,14 @@ pub fn FiveStageVisualization(
                 x: "1474",
                 y: "70",
                 width: "78",
-                height: "490",
+                height: "570",
                 stroke: element_stroke!(MEMWBBuffer),
                 "stroke-width": "2",
                 fill: element_fill!(MEMWBBuffer),
             }
             text {
                 x: "1513",
-                y: "530",
+                y: "610",
                 "font-family": "Arial",
                 "font-size": "22",
                 "font-weight": "bold",
@@ -613,7 +820,7 @@ pub fn FiveStageVisualization(
             }
             text {
                 x: "1513",
-                y: "550",
+                y: "630",
                 "font-family": "Arial",
                 "font-size": "22",
                 "font-weight": "bold",
@@ -812,9 +1019,9 @@ pub fn FiveStageVisualization(
             rect {
                 id: "register_file_rect",
                 x: "542",
-                y: "276.669",
+                y: "277",
                 width: "158",
-                height: "202.497",
+                height: "203",
                 stroke: element_stroke!(RegisterFile),
                 "stroke-width": "2",
                 fill: element_fill!(RegisterFile),
@@ -1044,6 +1251,138 @@ pub fn FiveStageVisualization(
                 "text-anchor": "middle",
                 fill: element_stroke!(IDEXRS1),
                 "RS1"
+            }
+        }
+        g {
+            id: "idex_ctrl_register_group",
+            style: "pointer-events: all;",
+            onmouseenter: move |_| {
+                hovered_element.set(Some(FiveStageElement::EXControl));
+            },
+            onmouseleave: move |_| {
+                hovered_element.set(None);
+            },
+            rect {
+                id: "ex_ctrl_rect",
+                x: "760",
+                y: "500",
+                width: "78",
+                height: "80",
+                stroke: element_stroke!(EXControl),
+                "stroke-width": "2",
+                fill: element_fill!(EXControl),
+            }
+            path {
+                id: "ex_ctrl_arrow",
+                d: "M1115.71 325.707C1116.1 325.317 1116.1 324.683 1115.71 324.293L1109.34 317.929C1108.95 317.538 1108.32 317.538 1107.93 317.929C1107.54 318.319 1107.54 318.953 1107.93 319.343L1113.59 325L1107.93 330.657C1107.54 331.047 1107.54 331.681 1107.93 332.071C1108.32 332.462 1108.95 332.462 1109.34 332.071L1115.71 325.707ZM839 326H1115V324H839V326Z",
+                fill: element_stroke!(EXControl),
+                transform: "translate(0, 245)",
+            }
+            text {
+                x: "799",
+                y: "537",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(EXControl),
+                "EX"
+            }
+            text {
+                x: "799",
+                y: "557",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(EXControl),
+                "CTRL"
+            }
+        }
+        g {
+            id: "exmem_ctrl_register_group",
+            style: "pointer-events: all;",
+            onmouseenter: move |_| {
+                hovered_element.set(Some(FiveStageElement::MEMControl));
+            },
+            onmouseleave: move |_| {
+                hovered_element.set(None);
+            },
+            rect {
+                id: "mem_ctrl_rect",
+                x: "1117",
+                y: "500",
+                width: "78",
+                height: "80",
+                stroke: element_stroke!(MEMControl),
+                "stroke-width": "2",
+                fill: element_fill!(MEMControl),
+            }
+            path {
+                id: "exmem_ctrl_arrow",
+                d: "M1115.71 325.707C1116.1 325.317 1116.1 324.683 1115.71 324.293L1109.34 317.929C1108.95 317.538 1108.32 317.538 1107.93 317.929C1107.54 318.319 1107.54 318.953 1107.93 319.343L1113.59 325L1107.93 330.657C1107.54 331.047 1107.54 331.681 1107.93 332.071C1108.32 332.462 1108.95 332.462 1109.34 332.071L1115.71 325.707ZM839 326H1115V324H839V326Z",
+                fill: element_stroke!(MEMControl),
+                transform: "translate(357, 245)",
+            }
+            text {
+                x: "1156",
+                y: "537",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(MEMControl),
+                "MEM"
+            }
+            text {
+                x: "1156",
+                y: "557",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(MEMControl),
+                "CTRL"
+            }
+        }
+        g {
+            id: "memwb_ctrl_register_group",
+            style: "pointer-events: all;",
+            onmouseenter: move |_| {
+                hovered_element.set(Some(FiveStageElement::WBControl));
+            },
+            onmouseleave: move |_| {
+                hovered_element.set(None);
+            },
+            rect {
+                id: "wb_ctrl_rect",
+                x: "1474",
+                y: "500",
+                width: "78",
+                height: "80",
+                stroke: element_stroke!(WBControl),
+                "stroke-width": "2",
+                fill: element_fill!(WBControl),
+            }
+            text {
+                x: "1513",
+                y: "537",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(WBControl),
+                "WB"
+            }
+            text {
+                x: "1513",
+                y: "557",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(WBControl),
+                "CTRL"
             }
         }
         g {
@@ -1785,23 +2124,23 @@ pub fn FiveStageVisualization(
                 x1: "1664",
                 y1: "383",
                 x2: "1664",
-                y2: "581",
+                y2: "650",
                 stroke: element_stroke!(WritebackResult),
                 "stroke-width": "2",
             }
             line {
                 id: "writeback_line3",
-                x1: "512",
-                y1: "580",
-                x2: "1663",
-                y2: "580",
+                x1: "510",
+                y1: "650",
+                x2: "1665",
+                y2: "650",
                 stroke: element_stroke!(WritebackResult),
                 "stroke-width": "2",
             }
             line {
                 id: "writeback_line4",
                 x1: "511",
-                y1: "581",
+                y1: "650",
                 x2: "511",
                 y2: "447",
                 stroke: element_stroke!(WritebackResult),
@@ -1844,23 +2183,29 @@ pub fn FiveStageVisualization(
             },
             rect {
                 id: "controller_rect",
-                x: "1",
-                y: "599",
-                width: "1663",
-                height: "84",
+                x: "542",
+                y: "500",
+                width: "158",
+                height: "80",
                 stroke: element_stroke!(ControlUnit),
                 "stroke-width": "2",
                 fill: element_fill!(ControlUnit),
             }
             text {
-                x: "832",
-                y: "651",
+                x: "621",
+                y: "547",
                 "font-family": "Arial",
                 "font-size": "20",
                 "font-weight": "bold",
                 "text-anchor": "middle",
                 fill: element_stroke!(ControlUnit),
                 "CONTROLLER"
+            }
+            path {
+                id: "controller_to_idex_arrow",
+                d: "M758.707 447.707C759.098 447.317 759.098 446.683 758.707 446.293L752.343 439.929C751.953 439.538 751.319 439.538 750.929 439.929C750.538 440.319 750.538 440.953 750.929 441.343L756.586 447L750.929 452.657C750.538 453.047 750.538 453.681 750.929 454.071C751.319 454.462 751.953 454.462 752.343 454.071L758.707 447.707ZM701 448H758V446H701V448Z",
+                fill: element_stroke!(ControlUnit),
+                transform: "translate(0, 93)",
             }
         }
     }
