@@ -60,6 +60,17 @@ struct DocEntry<'a> {
 
 const DOCS: &str = include_str!("../../docs.json");
 
+fn get_word_at_position(line: &str, col: usize) -> &str {
+    let word_end =
+        |c: char| c.is_whitespace() || c.is_ascii_punctuation() && !['.', '_'].contains(&c);
+    let start = line[..col].rfind(word_end).map(|i| i + 1).unwrap_or(0);
+    let end = line[col..]
+        .find(word_end)
+        .map(|i| i + col)
+        .unwrap_or(line.len());
+    &line[start..end]
+}
+
 fn make_hover_provider() -> HoverProvider {
     let docs: HashMap<&'static str, DocEntry<'static>> =
         serde_json::from_str(DOCS).expect("failed to parse docs.json");
@@ -68,24 +79,33 @@ fn make_hover_provider() -> HoverProvider {
         move |model: ITextModel, position: IPosition, _token: CancellationToken| -> JsValue {
             let content = js_sys::Array::new();
 
-            if let Some(word_info) = model.get_word_at_position(&position) {
-                let word = word_info.word();
+            let line = model.get_line_content(position.line_number());
+            let col = position.column() as usize;
 
-                // get static docs
-                if let Some(doc) = docs.get(word.as_str()) {
-                    content.push(&new_md_string(&format!(
-                        "**{}**\n\n{}\n\n_Example:_\n```riscv\n{}\n```\n",
-                        doc.format, doc.desc, doc.example
-                    )));
-                }
+            let comment_start = line.find('#').unwrap_or(line.len());
 
-                // get dynamic info based on the current program
-                if let Some(program) = ASSEMBLED_PROGRAM.read().as_ref() {
-                    info!("got program!");
+            // ignore comments
+            if col < comment_start {
+                // get the word at the position
+                let word = get_word_at_position(&line, col);
 
-                    // for labels, get the address
-                    if let Some(symbol) = program.symbol_table.get(&word) {
-                        content.push(&new_md_string(format!("{}", symbol).as_str()));
+                info!("getting hover docs for '{}'", word);
+
+                if !word.is_empty() {
+                    // get static docs
+                    if let Some(doc) = docs.get(word) {
+                        content.push(&new_md_string(&format!(
+                            "**{}**\n\n{}\n\n_Example:_\n```riscv\n{}\n```\n",
+                            doc.format, doc.desc, doc.example
+                        )));
+                    }
+
+                    // get dynamic info based on the current program
+                    if let Some(program) = ASSEMBLED_PROGRAM.read().as_ref() {
+                        // for labels, get the address
+                        if let Some(symbol) = program.symbol_table.get(word) {
+                            content.push(&new_md_string(format!("{}", symbol).as_str()));
+                        }
                     }
                 }
             }
