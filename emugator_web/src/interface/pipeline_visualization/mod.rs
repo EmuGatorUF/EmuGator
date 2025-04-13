@@ -1,11 +1,12 @@
 use cve2_visualization::CVE2Visualization;
-use dioxus::prelude::*;
+use dioxus::{html::geometry::euclid::Rect, prelude::*};
 use dioxus_elements::geometry::WheelDelta;
 use dioxus_elements::input_data::MouseButton;
 use dioxus_free_icons::Icon;
 use dioxus_free_icons::icons::ld_icons::LdRotateCcw;
 use emugator_core::emulator::{AnyEmulatorState, EmulatorOption};
 use five_stage_visualization::FiveStageVisualization;
+use std::rc::Rc;
 
 mod cve2_visualization;
 mod five_stage_visualization;
@@ -28,8 +29,23 @@ pub fn PipelineVisualization(
     let tooltip_text: Signal<Option<String>> = use_signal(|| None);
     let mut show_control_signals = use_signal(|| true);
 
+    // Get the bounding rect of the svg
+    let mut bounding_rectangle = use_signal(|| None as Option<Rc<MountedData>>);
+    let mut dimensions = use_signal(Rect::zero);
+    let read_dims = move |_| async move {
+        let read = bounding_rectangle.read();
+        let client_rect = read.as_ref().map(|el| el.get_client_rect());
+
+        if let Some(client_rect) = client_rect {
+            if let Ok(rect) = client_rect.await {
+                dimensions.set(rect);
+            }
+        }
+    };
+
     rsx! {
         div { class: "w-full h-full rounded bg-white overflow-hidden relative select-none",
+            onmounted: move |cx| { bounding_rectangle.set(Some(cx.data())); },
             button {
                 class: "absolute top-2 left-2 bg-gray-200 hover:bg-gray-300 p-1 rounded z-10 cursor-pointer",
                 title: "Recenter",
@@ -106,8 +122,10 @@ pub fn PipelineVisualization(
                         scale.set(new_scale);
                     }
                 },
-                onmousedown: move |e| {
+                onmousedown: move |e| async move {
                     if e.held_buttons().contains(MouseButton::Primary) {
+                        read_dims(e.clone()).await; // Get current dimensions when user clicks down. Should only trigger once.
+
                         is_panning.set(true);
                         let (view_x, view_y, _, _) = *view_box.read();
                         start_pan
@@ -119,12 +137,13 @@ pub fn PipelineVisualization(
                             ));
                     }
                 },
-                onmousemove: move |e| {
+                onmousemove: move |e|  {
                     if *is_panning.read() {
+                        let dims = dimensions.read();
                         let (start_x, start_y, initial_x, initial_y) = *start_pan.read();
                         let (_, _, width, height) = *view_box.read();
-                        let dx = (e.client_coordinates().x - start_x) * width / 200.0;
-                        let dy = (e.client_coordinates().y - start_y) * height / 100.0;
+                        let dx = (e.client_coordinates().x - start_x) * width / dims.width();
+                        let dy = (e.client_coordinates().y - start_y) * height / dims.height();
                         view_box.set((initial_x - dx, initial_y - dy, width, height));
                     }
                 },
