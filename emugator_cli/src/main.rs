@@ -1,16 +1,16 @@
 // The command-line interface was implemented referencing Ratatui's gauge example: https://ratatui.rs/examples/widgets/gauge/
 
-use std::time::Duration;
 use clap::Parser;
 use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use ratatui::DefaultTerminal;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::palette::tailwind;
 use ratatui::style::{Color, Style, Stylize};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Gauge, Padding, Paragraph, Widget};
-use ratatui::DefaultTerminal;
+use std::time::Duration;
 use tester::TestInfo;
 
 mod tester;
@@ -46,7 +46,7 @@ fn main() {
     }
 }
 
-fn tests_with_ratatui( test_args: tester::TestArgs) {
+fn tests_with_ratatui(test_args: tester::TestArgs) {
     let _ = color_eyre::install();
     let terminal = ratatui::init();
     let _ = App::default().run(terminal, test_args);
@@ -96,7 +96,7 @@ impl App {
     }
 
     fn run_tests(&mut self) {
-        if self.tester.test_program() == false {
+        if !self.tester.test_program() {
             self.ending_msg = self.tester.finish_up();
         }
     }

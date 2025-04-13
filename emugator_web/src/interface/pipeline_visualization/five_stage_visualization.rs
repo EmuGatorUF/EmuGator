@@ -339,9 +339,9 @@ pub fn FiveStageVisualization(
     emulator_state: ReadOnlySignal<Option<AnyEmulatorState>>,
     tooltip_text: Signal<Option<String>>,
 ) -> Element {
-    const HOVER_STROKE: &'static str = "rgba(66, 133, 244, 1)";
-    const ACTIVE_STROKE: &'static str = "rgba(66, 133, 244, 0.7)";
-    const HOVER_FILL: &'static str = "rgba(66, 133, 244, 0.1)";
+    const HOVER_STROKE: &str = "rgba(66, 133, 244, 1)";
+    const ACTIVE_STROKE: &str = "rgba(66, 133, 244, 0.7)";
+    const HOVER_FILL: &str = "rgba(66, 133, 244, 0.1)";
 
     let mut hovered_element = use_signal(|| Option::<FiveStageElement>::None);
 

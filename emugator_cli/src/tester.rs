@@ -7,9 +7,9 @@ use emugator_core::{
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeSet, HashMap},
-    iter::zip,
-    fs::{File, OpenOptions},
+    fs::OpenOptions,
     io::prelude::*,
+    iter::zip,
 };
 
 #[derive(Debug, Deserialize, Serialize, Default)]
@@ -19,25 +19,11 @@ struct ExpectedState {
     output_buffer: String,
 }
 
-#[derive(Serialize, Debug, Deserialize, Clone, Copy)]
+#[derive(Serialize, Debug, Deserialize, Clone, Copy, PartialEq, Eq, Hash)]
 #[serde(transparent)]
 struct HexValue {
     #[serde(with = "hex::serde")]
     value: [u8; 4],
-}
-
-impl std::cmp::PartialEq for HexValue {
-    fn eq(&self, other: &Self) -> bool {
-        self == other
-    }
-}
-
-impl std::cmp::Eq for HexValue {}
-
-impl std::hash::Hash for HexValue {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.value.hash(state);
-    }
 }
 
 /// Simple program to greet a person
@@ -103,7 +89,7 @@ pub fn new_project(args: NewArgs) {
         println!("Folder already exists");
         return;
     }
-    std::fs::create_dir(&project_path).expect("Failed to create project directory");
+    std::fs::create_dir(project_path).expect("Failed to create project directory");
 
     // create the programs folder
     let programs_path = project_path.join("programs");
@@ -199,7 +185,10 @@ impl TestInfo {
             .collect::<Vec<_>>();
 
         // check that output dir exists (or create it) and is valid
-        self.output_path = std::path::Path::new(&args.tests).parent().expect("Cannot get parent of test dir").join("test_output");
+        self.output_path = std::path::Path::new(&args.tests)
+            .parent()
+            .expect("Cannot get parent of test dir")
+            .join("test_output");
         if !std::fs::exists(&self.output_path).expect("Can't check if output directory exists") {
             std::fs::create_dir(&self.output_path).expect("Failed to create test output directory");
         }
@@ -211,7 +200,8 @@ impl TestInfo {
 
         // write header to .csv file
         let output_csv_path = self.output_path.join("testresults.csv");
-        std::fs::write(&output_csv_path, format!("program name{}\n", tests_str)).expect("Failed to create test output file");
+        std::fs::write(&output_csv_path, format!("program name{}\n", tests_str))
+            .expect("Failed to create test output file");
     }
 
     // tests a program against all tests and appends results to .csv file.
@@ -224,7 +214,7 @@ impl TestInfo {
         self.position += 1;
 
         // Assemble the program
-        let mut program = match assemble(source) {
+        let program = match assemble(source) {
             Ok(p) => p,
             Err(err) => {
                 println!("Failed to assemble: {:?}", err);
@@ -239,11 +229,11 @@ impl TestInfo {
             let mut starting_state = EmulatorState::<CVE2Pipeline>::new(&program);
             starting_state
                 .data_memory
-                .set_serial_input(input.as_ref().map_or(&vec![], |v| v.as_bytes()));
+                .set_serial_input(input.as_ref().map_or(&[], |v| v.as_bytes()));
             let starting_state = starting_state;
 
             let mut ending_state =
-                starting_state.clock_until_break(&mut program, &BTreeSet::new(), self.timeout);
+                starting_state.clock_until_break(&program, &BTreeSet::new(), self.timeout);
 
             let mut pass: bool = true;
 
@@ -324,14 +314,17 @@ impl TestInfo {
 
         // append results of tests to .csv file.
         let mut file = OpenOptions::new()
-            .write(true)
             .append(true)
             .open(self.output_path.join("testresults.csv"))
             .unwrap();
 
-        let str = test_results.iter().map(|val| format!(",{}", val)).collect::<Vec<String>>().join("");
+        let str = test_results
+            .iter()
+            .map(|val| format!(",{}", val))
+            .collect::<Vec<String>>()
+            .join("");
 
-        if let Err(e) = writeln!(file, "{}{}",name, str) {
+        if let Err(e) = writeln!(file, "{}{}", name, str) {
             eprintln!("Couldn't write to file: {}", e);
         }
 
@@ -346,9 +339,9 @@ impl TestInfo {
     }
 
     pub fn finish_up(&self) -> String {
-        return format!(
+        format!(
             "The difference between ending states for failed tests can be found in: {:?}",
             self.output_path.to_str()
-        );
+        )
     }
 }

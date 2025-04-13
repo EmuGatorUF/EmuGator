@@ -2,10 +2,10 @@ use cve2_visualization::CVE2Visualization;
 use dioxus::prelude::*;
 use dioxus_elements::geometry::WheelDelta;
 use dioxus_elements::input_data::MouseButton;
-use emugator_core::emulator::{AnyEmulatorState, EmulatorOption};
-use five_stage_visualization::FiveStageVisualization;
 use dioxus_free_icons::Icon;
 use dioxus_free_icons::icons::ld_icons::LdRotateCcw;
+use emugator_core::emulator::{AnyEmulatorState, EmulatorOption};
+use five_stage_visualization::FiveStageVisualization;
 
 mod cve2_visualization;
 mod five_stage_visualization;

@@ -79,14 +79,12 @@ pub fn App() -> Element {
                     .all_pcs()
                     .iter()
                     .filter_map(|pc_pos| {
-                        if let Some(line) = get_pc_line(pc_pos.pc, &ASSEMBLED_PROGRAM.read()) {
-                            Some(LineHighlight {
+                        get_pc_line(pc_pos.pc, &ASSEMBLED_PROGRAM.read()).map(|line| {
+                            LineHighlight {
                                 line,
                                 css_class: pc_pos.name,
-                            })
-                        } else {
-                            None
-                        }
+                            }
+                        })
                     })
                     .collect(),
             );

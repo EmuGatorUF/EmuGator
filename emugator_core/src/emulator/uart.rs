@@ -35,7 +35,7 @@ impl Uart {
             rx_cursor: 0,
 
             output_buffer: vec![],
-            input_buffer: vec![].into(),
+            input_buffer: vec![],
         }
     }
 
@@ -94,15 +94,13 @@ impl Uart {
             }
         }
 
-        if self.rx_delay == 0 {
-            if self.lsr & LSRBitmask::ReceiveReady as u8 == 0 {
-                // If data has been read, move the byte into the rx_buffer"
-                if let Some(&data) = next_uart.input_buffer.get(self.rx_cursor) {
-                    next_uart.rx_buffer = data;
-                    next_uart.rx_cursor += 1;
-                    next_uart.lsr |= LSRBitmask::ReceiveReady as u8; // Receive buffer has new data
-                    next_uart.rx_delay = next_uart.uart_cycle_count;
-                }
+        if self.rx_delay == 0 && self.lsr & LSRBitmask::ReceiveReady as u8 == 0 {
+            // If data has been read, move the byte into the rx_buffer"
+            if let Some(&data) = next_uart.input_buffer.get(self.rx_cursor) {
+                next_uart.rx_buffer = data;
+                next_uart.rx_cursor += 1;
+                next_uart.lsr |= LSRBitmask::ReceiveReady as u8; // Receive buffer has new data
+                next_uart.rx_delay = next_uart.uart_cycle_count;
             }
         }
 

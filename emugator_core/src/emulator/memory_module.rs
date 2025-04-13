@@ -55,6 +55,10 @@ impl MemoryModule {
         self.ram.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.ram.is_empty()
+    }
+
     pub fn write_word(&mut self, address: u32, value: u32, byte_enable: [bool; 4]) {
         let bytes = value.to_le_bytes();
         for i in 0..4 {

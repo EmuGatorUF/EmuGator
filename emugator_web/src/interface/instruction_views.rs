@@ -22,7 +22,7 @@ pub fn InstructionView(
     let instruction_memory = &program.instruction_memory;
     let text_start = program.get_section_start(Section::Text);
     let emulator_state = emulator_state.read();
-    let current_pc = emulator_state.as_ref().map(|e| e.id_pc()).flatten();
+    let current_pc = emulator_state.as_ref().and_then(|e| e.id_pc());
 
     let total_instructions = (instruction_memory.len() / 4) as u32; // Since each instruction is 4 bytes
 
@@ -82,7 +82,7 @@ pub fn InstructionView(
                                                         span { class: "text-yellow-500", "{bits!(instr.immediate().unwrap(),11):01b}" }
                                                         span { class: "text-green-500", "{bits!(instr.immediate().unwrap(),19;12):08b}" }
                                                     }
-                                
+
                                                     if instr_frmt != InstructionFormat::U && instr_frmt != InstructionFormat::J {
                                                         if instr_frmt != InstructionFormat::I {
                                                             span { class: "text-orange-500", "{instr.rs2():05b}" }
@@ -90,7 +90,7 @@ pub fn InstructionView(
                                                         span { class: "text-yellow-500", "{instr.rs1():05b}" }
                                                         span { class: "text-green-500", "{instr.funct3():03b}" }
                                                     }
-                                
+
                                                     if instr_frmt == InstructionFormat::S {
                                                         span { class: "text-red-700", "{bits!(instr.immediate().unwrap(), 4;0):05b}" }
                                                     } else if instr_frmt == InstructionFormat::B {
@@ -99,13 +99,13 @@ pub fn InstructionView(
                                                     } else {
                                                         span { class: "text-blue-500", "{instr.rd():05b}" }
                                                     }
-                                
+
                                                     span { class: "text-purple-500", "{instr.opcode():07b}" }
                                                 } else {
                                                     span { class: "font-mono font-bold text-gray-500 text-xs", "{instruction:032b}" }
                                                 }
                                             }
-                                            if let Some(line) = program.source_map.get_by_left(&(base_addr as u32)) {
+                                            if let Some(line) = program.source_map.get_by_left(&base_addr) {
                                                 span { class: "text-xs text-gray-500", "Line {line}" }
                                             }
                                         }
@@ -132,7 +132,7 @@ pub fn InstructionView(
                                                                 span { class: "text-yellow-500", "imm[11] " }
                                                                 span { class: "text-green-500", "imm[19:12] " }
                                                             }
-                                                            
+
                                                             if instr_frmt != InstructionFormat::U && instr_frmt != InstructionFormat::J {
                                                                 if instr_frmt != InstructionFormat::I {
                                                                     span { class: "text-orange-500", "rs2 " }
@@ -140,7 +140,7 @@ pub fn InstructionView(
                                                                 span { class: "text-yellow-500", "rs1 " }
                                                                 span { class: "text-green-500", "funct3 " }
                                                             }
-                                                            
+
                                                             if instr_frmt == InstructionFormat::S {
                                                                 span { class: "text-blue-500", "imm[4:0] " }
                                                             } else if instr_frmt == InstructionFormat::B {
@@ -149,7 +149,7 @@ pub fn InstructionView(
                                                             } else {
                                                                 span { class: "text-blue-500", "rd " }
                                                             }
-                                                            
+
                                                             span { class: "text-purple-500", "opcode" }
                                                         }
                                                     }

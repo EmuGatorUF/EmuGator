@@ -1,5 +1,7 @@
-use std::{collections::BTreeMap, vec};
-
+use super::{
+    controller::{CVE2Control, get_control_signals},
+    datapath::CVE2Datapath,
+};
 use crate::{
     assembler::AssembledProgram,
     bitmask, bits,
@@ -10,11 +12,6 @@ use crate::{
         read_instruction,
     },
     isa::Instruction,
-};
-
-use super::{
-    controller::{CVE2Control, get_control_signals},
-    datapath::CVE2Datapath,
 };
 
 #[allow(non_snake_case)]
@@ -116,7 +113,7 @@ impl CVE2Pipeline {
         self.datapath.reg_s1 = instr.rs1();
         self.datapath.reg_s2 = instr.rs2();
         self.datapath.reg_d = instr.rd();
-        self.datapath.imm = instr.immediate().ok().map(|x| x as u32);
+        self.datapath.imm = instr.immediate().map(|x| x as u32);
     }
 
     fn run_read_registers(&mut self, register_file: &RegisterFile) {

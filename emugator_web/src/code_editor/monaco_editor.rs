@@ -79,7 +79,7 @@ pub fn MonacoEditor(
                 for line_highlight in line_highlights.read().iter() {
                     new_decor.push(&line_highlight_decoration(
                         line_highlight.line,
-                        &line_highlight.css_class,
+                        line_highlight.css_class,
                     ));
                 }
 

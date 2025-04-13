@@ -526,7 +526,7 @@ fn test_BNE() {
     state = state.clock(&program);
     let pc = state.pipeline.if_id.id_pc.unwrap();
     assert_eq!(state.x[1], 1);
-    
+
     // BNE (branch if x1 != x2) - should branch because x1 != x2
     state = state.clock(&program);
     state = state.clock(&program);
@@ -667,10 +667,10 @@ fn test_BLT() {
     state = state.clock(&program); //MEM
     state = state.clock(&program); //WB
     assert_eq!(state.x[1], u32::MAX); // ADDI ( x1 := x0 - 1)
-    state = state.clock(&program); 
+    state = state.clock(&program);
     assert_eq!(state.pipeline.if_pc, pc + 0x4); // BLT (branch if x0 < x1) - should not branch because x0 > x1
 
-    state = state.clock(&program); 
+    state = state.clock(&program);
     let pc = state.pipeline.if_id.id_pc.unwrap();
 
     state = state.clock(&program);
@@ -817,7 +817,7 @@ fn test_BLTU() {
     state = state.clock(&program);
     assert_eq!(state.pipeline.if_pc, pc + 0x4); // BLTU (branch if x1 < x0) - should not branch because x1 > x0
 
-    state = state.clock(&program); 
+    state = state.clock(&program);
     let pc = state.pipeline.if_id.id_pc.unwrap();
     state = state.clock(&program);
     state = state.clock(&program);
@@ -894,7 +894,6 @@ fn test_BGEU() {
     state = state.clock(&program);
     assert_eq!(state.pipeline.if_pc, pc + 0x8);
     assert_eq!(16, pc + 0x8);
-
 
     state = state.clock(&program);
     state = state.clock(&program);

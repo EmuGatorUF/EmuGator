@@ -1,5 +1,3 @@
-use crate::emulator::controller_common::PCSel;
-
 /// Lines in the datapath
 ///
 /// Initially based on the `cve2_top` module.

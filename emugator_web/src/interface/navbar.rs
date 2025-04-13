@@ -110,11 +110,11 @@ pub fn Navbar(
                         ),
                         disabled: !is_started,
                         onclick: move |_| {
-                            if let Some(mut program) = assembled_program.as_mut() {
+                            if let Some(program) = assembled_program.as_mut() {
                                 let new_state = emulator_state
                                     .read()
                                     .as_ref()
-                                    .map(|e| { e.clock_until_next_instruction(&mut program, 1000) });
+                                    .map(|e| { e.clock_until_next_instruction(&program, 1000) });
                                 emulator_state.set(new_state);
                             }
                         },
