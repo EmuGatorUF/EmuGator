@@ -49,6 +49,7 @@ print:
     ADDI x11, x0, LSR_ADR       # x11 = address of UART Line Status Register
 print_loop:
     LB x2, 0(x1)                # load character
+    BEQ x2, x0, end      # branch to end if character was null ('\0')
 
     wait_tx:
         LB x3, 0(x11)           # load LSR
@@ -57,7 +58,8 @@ print_loop:
     
     SB x2, 0(x10)               # write byte to TX Register
     ADDI x1, x1, 1              # message_ptr += 1
-    BNE x2, x0, print_loop      # branch to start if character was not null ('\0')
+    JAL x0, print_loop
+end:
     EBREAK                      # environment breakpoint
     JALR x0, x20, 0x0           # return to whence we came
 
