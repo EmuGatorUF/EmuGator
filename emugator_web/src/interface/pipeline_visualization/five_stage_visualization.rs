@@ -403,7 +403,17 @@ pub fn FiveStageVisualization(
                     y1: "59",
                     x2: "542",
                     y2: "59",
-                    stroke: element_stroke!(IFPCWriteEnable),
+                    stroke: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            let is_hovered = *hovered_element.read()
+                                == Some(FiveStageElement::IFPCWriteEnable);
+                            match state.pipeline.hazard_detector.hazard_detected.stop_if {
+                                true => if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
+                                false => if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
+                            }
+                        }
+                        _ => "gray",
+                    },
                     "stroke-width": "2",
                 }
                 line {
@@ -412,7 +422,17 @@ pub fn FiveStageVisualization(
                     y1: "58",
                     x2: "364",
                     y2: "337",
-                    stroke: element_stroke!(IFPCWriteEnable),
+                    stroke: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            let is_hovered = *hovered_element.read()
+                                == Some(FiveStageElement::IFPCWriteEnable);
+                            match state.pipeline.hazard_detector.hazard_detected.stop_if {
+                                true => if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
+                                false => if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
+                            }
+                        }
+                        _ => "gray",
+                    },
                     "stroke-width": "2",
                 }
                 line {
@@ -421,14 +441,34 @@ pub fn FiveStageVisualization(
                     y1: "336",
                     x2: "58",
                     y2: "336",
-                    stroke: element_stroke!(IFPCWriteEnable),
+                    stroke: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            let is_hovered = *hovered_element.read()
+                                == Some(FiveStageElement::IFPCWriteEnable);
+                            match state.pipeline.hazard_detector.hazard_detected.stop_if {
+                                true => if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
+                                false => if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
+                            }
+                        }
+                        _ => "gray",
+                    },
                     "stroke-width": "2",
                 }
                 path {
                     id: "ifpc_write_enable_arrow",
                     transform: "translate(-80, 222)",
                     d: "M137.707 94.2929C137.317 93.9024 136.683 93.9024 136.293 94.2929L129.929 100.657C129.538 101.047 129.538 101.681 129.929 102.071C130.319 102.462 130.953 102.462 131.343 102.071L137 96.4142L142.657 102.071C143.047 102.462 143.681 102.462 144.071 102.071C144.462 101.681 144.462 101.047 144.071 100.657L137.707 94.2929ZM138 115V95H136V115H138Z",
-                    fill: element_stroke!(IFPCWriteEnable),
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            let is_hovered = *hovered_element.read()
+                                == Some(FiveStageElement::IFPCWriteEnable);
+                            match state.pipeline.hazard_detector.hazard_detected.stop_if {
+                                true => if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
+                                false => if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
+                            }
+                        }
+                        _ => "gray",
+                    },
                 }
             }
             g {
@@ -534,7 +574,17 @@ pub fn FiveStageVisualization(
                     id: "ifid_write_enable_arrow",
                     transform: "translate(1, -100)",
                     d: "M482.293 188.707C481.902 188.317 481.902 187.683 482.293 187.293L488.657 180.929C489.047 180.538 489.681 180.538 490.071 180.929C490.462 181.319 490.462 181.953 490.071 182.343L484.414 188L490.071 193.657C490.462 194.047 490.462 194.681 490.071 195.071C489.681 195.462 489.047 195.462 488.657 195.071L482.293 188.707ZM540 189H483V187H540V189Z",
-                    fill: element_stroke!(IFIDWriteEnable),
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            let is_hovered = *hovered_element.read()
+                                == Some(FiveStageElement::IFIDWriteEnable);
+                            match state.pipeline.hazard_detector.hazard_detected.stop_id {
+                                true => if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
+                                false => if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
+                            }
+                        }
+                        _ => "gray",
+                    },
                 }
             }
             g {
@@ -550,7 +600,17 @@ pub fn FiveStageVisualization(
                     id: "idex_write_enable_arrow",
                     transform: "translate(218, -100)",
                     d: "M540.707 188.707C541.098 188.317 541.098 187.683 540.707 187.293L534.343 180.929C533.953 180.538 533.319 180.538 532.929 180.929C532.538 181.319 532.538 181.953 532.929 182.343L538.586 188L532.929 193.657C532.538 194.047 532.538 194.681 532.929 195.071C533.319 195.462 533.953 195.462 534.343 195.071L540.707 188.707ZM483 189H540V187H483V189Z",
-                    fill: element_stroke!(IDEXWriteEnable),
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            let is_hovered = *hovered_element.read()
+                                == Some(FiveStageElement::IDEXWriteEnable);
+                            match state.pipeline.hazard_detector.hazard_detected.stop_ex {
+                                true => if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
+                                false => if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
+                            }
+                        }
+                        _ => "gray",
+                    },
                 }
             }
             g {
@@ -1558,6 +1618,21 @@ pub fn FiveStageVisualization(
                 "stroke-width": "2",
                 fill: element_fill!(IFIDInstruction),
             }
+            circle {
+                id: "idex_pc_node1",
+                cx: "521",
+                cy: "188",
+                r: "3",
+                fill: element_stroke!(IFIDInstruction),
+            }
+            line {
+                x1: "521",
+                y1: "72",
+                x2: "521",
+                y2: "561",
+                stroke: element_stroke!(IFIDInstruction),
+                "stroke-width": "2",
+            }
             path {
                 id: "ifid_instruction_arrow1",
                 d: "M540.707 188.707C541.098 188.317 541.098 187.683 540.707 187.293L534.343 180.929C533.953 180.538 533.319 180.538 532.929 180.929C532.538 181.319 532.538 181.953 532.929 182.343L538.586 188L532.929 193.657C532.538 194.047 532.538 194.681 532.929 195.071C533.319 195.462 533.953 195.462 534.343 195.071L540.707 188.707ZM483 189H540V187H483V189Z",
@@ -1566,12 +1641,13 @@ pub fn FiveStageVisualization(
             path {
                 id: "ifid_instruction_arrow2",
                 transform: "translate(0, -115)",
-                d: "M540.707 188.707C541.098 188.317 541.098 187.683 540.707 187.293L534.343 180.929C533.953 180.538 533.319 180.538 532.929 180.929C532.538 181.319 532.538 181.953 532.929 182.343L538.586 188L532.929 193.657C532.538 194.047 532.538 194.681 532.929 195.071C533.319 195.462 533.953 195.462 534.343 195.071L540.707 188.707ZM483 189H540V187H483V189Z",
+                d: "M540.707 188.707C541.098 188.317 541.098 187.683 540.707 187.293L534.343 180.929C533.953 180.538 533.319 180.538 532.929 180.929C532.538 181.319 532.538 181.953 532.929 182.343L538.586 188L532.929 193.657C532.538 194.047 532.538 194.681 532.929 195.071C533.319 195.462 533.953 195.462 534.343 195.071L540.707 188.707ZM521 189H540V187H521V189Z",
                 fill: element_stroke!(IFIDInstruction),
             }
             path {
                 id: "ifid_instruction_arrow3",
-                d: "M540.707 188.707C541.098 188.317 541.098 187.683 540.707 187.293L534.343 180.929C533.953 180.538 533.319 180.538 532.929 180.929C532.538 181.319 532.538 181.953 532.929 182.343L538.586 188L532.929 193.657C532.538 194.047 532.538 194.681 532.929 195.071C533.319 195.462 533.953 195.462 534.343 195.071L540.707 188.707ZM483 189H540V187H483V189Z",
+                transform: "translate(0, 372)",
+                d: "M578.707 188.707C579.098 188.317 579.098 187.683 578.707 187.293L572.343 180.929C571.953 180.538 571.319 180.538 570.929 180.929C570.538 181.319 570.538 181.953 570.929 182.343L576.586 188L570.929 193.657C570.538 194.047 570.538 194.681 570.929 195.071C571.319 195.462 571.953 195.462 572.343 195.071L578.707 188.707ZM522 189H578V187H522V189Z",
                 fill: element_stroke!(IFIDInstruction),
             }
             text {
