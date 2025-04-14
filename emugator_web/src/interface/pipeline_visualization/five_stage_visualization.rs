@@ -608,7 +608,6 @@ pub fn FiveStageVisualization(
                         _ => "gray",
                     },
                 }
-
             }
             g {
                 id: "ex_ctrl_to_aluopmux_group",
@@ -878,12 +877,11 @@ pub fn FiveStageVisualization(
                 }
                 line {
                     id: "mem_ctrl_to_reg_write_mux_line",
-                    x1: "-800",
-                    y1: "86",
-                    x2: "261",
-                    y2: "86",
+                    x1: "554.7",
+                    y1: "656",
+                    x2: "1610",
+                    y2: "656",
                     "stroke-width": "2",
-                    transform: "translate(1349, 570)",
                     stroke: match &*emulator_state.read() {
                         Some(AnyEmulatorState::FiveStage(state)) => {
                             let is_hovered = *hovered_element.read()
@@ -898,8 +896,8 @@ pub fn FiveStageVisualization(
                 }
                 text {
                     id: "WE",
-                    x: "543",
-                    y: "475",
+                    x: "545",
+                    y: "473",
                     "text-anchor": "start",
                     "dominant-baseline": "middle",
                     "font-size": "12",
@@ -919,12 +917,11 @@ pub fn FiveStageVisualization(
                 }
                 line {
                     id: "mem_ctrl_to_reg_write_mux_line",
-                    x1: "-801",
-                    y1: "87",
-                    x2: "-801",
-                    y2: "-86",
+                    x1: "554",
+                    y1: "657",
+                    x2: "554",
+                    y2: "484",
                     "stroke-width": "2",
-                    transform: "translate(1349, 570)",
                     stroke: match &*emulator_state.read() {
                         Some(AnyEmulatorState::FiveStage(state)) => {
                             let is_hovered = *hovered_element.read()
@@ -939,7 +936,7 @@ pub fn FiveStageVisualization(
                 }
                 path {
                     id: "mem_ctrl_to_reg_write_mux_arrow",
-                    transform: "translate(540, 481)",
+                    transform: "translate(546, 481)",
                     d: "M8.70573 0.804236C8.31387 0.415059 7.68071 0.417238 7.29153 0.809106L0.949515 7.19494C0.560338 7.58681 0.562518 8.21997 0.954384 8.60915C1.34625 8.99832 1.97941 8.99614 2.36859 8.60428L8.00593 2.92798L13.6822 8.56532C14.0741 8.9545 14.7073 8.95232 15.0964 8.56046C15.4856 8.16859 15.4834 7.53543 15.0916 7.14625L8.70573 0.804236Z",
                     fill: match &*emulator_state.read() {
                         Some(AnyEmulatorState::FiveStage(state)) => {
@@ -1562,7 +1559,18 @@ pub fn FiveStageVisualization(
                 fill: element_fill!(IFIDInstruction),
             }
             path {
-                id: "ifid_instruction_arrow",
+                id: "ifid_instruction_arrow1",
+                d: "M540.707 188.707C541.098 188.317 541.098 187.683 540.707 187.293L534.343 180.929C533.953 180.538 533.319 180.538 532.929 180.929C532.538 181.319 532.538 181.953 532.929 182.343L538.586 188L532.929 193.657C532.538 194.047 532.538 194.681 532.929 195.071C533.319 195.462 533.953 195.462 534.343 195.071L540.707 188.707ZM483 189H540V187H483V189Z",
+                fill: element_stroke!(IFIDInstruction),
+            }
+            path {
+                id: "ifid_instruction_arrow2",
+                transform: "translate(0, -115)",
+                d: "M540.707 188.707C541.098 188.317 541.098 187.683 540.707 187.293L534.343 180.929C533.953 180.538 533.319 180.538 532.929 180.929C532.538 181.319 532.538 181.953 532.929 182.343L538.586 188L532.929 193.657C532.538 194.047 532.538 194.681 532.929 195.071C533.319 195.462 533.953 195.462 534.343 195.071L540.707 188.707ZM483 189H540V187H483V189Z",
+                fill: element_stroke!(IFIDInstruction),
+            }
+            path {
+                id: "ifid_instruction_arrow3",
                 d: "M540.707 188.707C541.098 188.317 541.098 187.683 540.707 187.293L534.343 180.929C533.953 180.538 533.319 180.538 532.929 180.929C532.538 181.319 532.538 181.953 532.929 182.343L538.586 188L532.929 193.657C532.538 194.047 532.538 194.681 532.929 195.071C533.319 195.462 533.953 195.462 534.343 195.071L540.707 188.707ZM483 189H540V187H483V189Z",
                 fill: element_stroke!(IFIDInstruction),
             }
@@ -2231,13 +2239,56 @@ pub fn FiveStageVisualization(
                 "RD"
             }
             line {
-                id: "memwb_rd_horizontal_line",
+                id: "memwb_rd_line1",
                 x1: "1552",
                 y1: "510",
                 x2: "1572",
                 y2: "510",
                 "stroke-width": "2",
                 stroke: element_stroke!(MEMWBRD),
+            }
+            line {
+                id: "memwb_rd_line2",
+                x1: "1572",
+                y1: "509",
+                x2: "1572",
+                y2: "650",
+                "stroke-width": "2",
+                stroke: element_stroke!(MEMWBRD),
+            }
+            line {
+                id: "memwb_rd_line2",
+                x1: "1572",
+                y1: "650",
+                x2: "500",
+                y2: "650",
+                "stroke-width": "2",
+                stroke: element_stroke!(MEMWBRD),
+            }
+            line {
+                id: "memwb_rd_line2",
+                x1: "500",
+                y1: "651",
+                x2: "500",
+                y2: "421",
+                "stroke-width": "2",
+                stroke: element_stroke!(MEMWBRD),
+            }
+            path {
+                id: "writeback_arrow",
+                d: "M540.707 447.707C541.098 447.317 541.098 446.683 540.707 446.293L534.343 439.929C533.953 439.538 533.319 439.538 532.929 439.929C532.538 440.319 532.538 440.953 532.929 441.343L538.586 447L532.929 452.657C532.538 453.047 532.538 453.681 532.929 454.071C533.319 454.462 533.953 454.462 534.343 454.071L540.707 447.707ZM500 448H540V446H500V448Z",
+                transform: "translate(0, -25)",
+                fill: element_stroke!(MEMWBRD),
+            }
+            text {
+                x: "544",
+                y: "424",
+                "text-anchor": "start",
+                "dominant-baseline": "middle",
+                "font-size": "12",
+                "font-weight": "bold",
+                fill: element_stroke!(MEMWBRD),
+                "RD"
             }
         }
         g {
@@ -3124,6 +3175,16 @@ pub fn FiveStageVisualization(
                 id: "writeback_arrow",
                 d: "M540.707 447.707C541.098 447.317 541.098 446.683 540.707 446.293L534.343 439.929C533.953 439.538 533.319 439.538 532.929 439.929C532.538 440.319 532.538 440.953 532.929 441.343L538.586 447L532.929 452.657C532.538 453.047 532.538 453.681 532.929 454.071C533.319 454.462 533.953 454.462 534.343 454.071L540.707 447.707ZM510 448H540V446H510V448Z",
                 fill: element_stroke!(WritebackResult),
+            }
+            text {
+                x: "544",
+                y: "449",
+                "text-anchor": "start",
+                "dominant-baseline": "middle",
+                "font-size": "12",
+                "font-weight": "bold",
+                fill: element_stroke!(WritebackResult),
+                "WB"
             }
             text {
                 x: "1595",
