@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{collections::BTreeSet, ops::Deref};
 
 use dioxus::prelude::*;
 
@@ -23,7 +23,7 @@ macro_rules! format_bool {
     };
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Eq, PartialOrd, Ord)]
 enum FiveStageElement {
     IFPC,
     PCMux,
@@ -340,6 +340,149 @@ impl FiveStageElement {
     }
 }
 
+fn find_active_elements(pipeline: &FiveStagePipeline) -> BTreeSet<FiveStageElement> {
+    use FiveStageElement::*;
+
+    let mut active_elements = BTreeSet::new();
+
+    macro_rules! add_element {
+        ($signal:expr, $element:ident) => {
+            if $signal {
+                active_elements.insert($element);
+            }
+        };
+
+        ($signal:expr, $element:ident, $($rest:ident),+) => {
+            {
+                add_element!($signal, $element);
+                add_element!($signal, $($rest),+);
+            }
+        };
+    }
+
+    // If Control Signals
+    if !pipeline.hazard_detector.hazard_detected.stop_if {
+        add_element!(true, IFPC, PCMux);
+        add_element!(pipeline.if_lines.next_pc_sel == PCSel::PC4, PCPlus4);
+    }
+
+    add_element!(
+        !pipeline.hazard_detector.hazard_detected.stop_id,
+        IFPC,
+        InstructionMemory
+    );
+
+    // IF/ID Buffer
+    add_element!(
+        !pipeline.hazard_detector.hazard_detected.stop_id,
+        IFIDBuffer
+    );
+
+    if !pipeline.hazard_detector.hazard_detected.stop_ex {
+        add_element!(pipeline.if_id.id_pc.is_some(), IFIDPC);
+        add_element!(pipeline.if_id.id_inst.is_some(), IFIDInstruction);
+
+        // ID Control Signals
+        add_element!(
+            pipeline.if_id.id_inst.is_some(),
+            Decoder,
+            DecoderRD,
+            DecoderRS1,
+            DecoderRS2,
+            DecoderImm,
+            RegisterFile,
+            RegisterFileRS1Value,
+            RegisterFileRS2Value,
+            ControlUnit
+        );
+    }
+
+    // ID/EX Buffer
+    add_element!(
+        !pipeline.hazard_detector.hazard_detected.stop_ex && pipeline.if_id.id_pc.is_some(),
+        IDEXBuffer
+    );
+
+    add_element!(
+        pipeline.ex_control.lsu_request && pipeline.ex_control.lsu_write_enable,
+        IDEXRS2
+    );
+    add_element!(pipeline.ex_control.reg_write, IDEXRD);
+
+    // Ex Control Signals
+    match pipeline.ex_control.alu_op_a_sel {
+        Some(OpASel::PC) => add_element!(true, ALUMuxA, IDEXPC),
+        Some(OpASel::RF) => add_element!(true, ALUMuxA, IDEXRS1),
+        _ => {}
+    }
+
+    match pipeline.ex_control.alu_op_b_sel {
+        Some(OpBSel::IMM) => add_element!(true, ALUMuxB, IDEXImm),
+        Some(OpBSel::RF) => add_element!(true, ALUMuxB, IDEXRS2),
+        Some(OpBSel::Four) => add_element!(true, ALUMuxB),
+        _ => {}
+    }
+    add_element!(pipeline.ex_control.alu_op.is_some(), ALU);
+
+    match pipeline.ex_control.jmp_base {
+        Some(OpASel::PC) => add_element!(true, JMPBaseAddress, JMPAddress, IDEXPC),
+        Some(OpASel::RF) => add_element!(true, JMPBaseAddress, IDEXRS1),
+        _ => {}
+    }
+
+    add_element!(
+        pipeline.ex_control.jump_cond,
+        JumpCondControlSignal,
+        ConditionResult,
+        PCNextSelControlSignal
+    );
+    add_element!(
+        pipeline.ex_control.jump_uncond,
+        JumpUncondControlSignal,
+        PCNextSelControlSignal
+    );
+
+    add_element!(pipeline.id_ex.ex_pc.is_some(), EXMEMBuffer);
+    add_element!(
+        pipeline.mem_control.lsu_request || pipeline.mem_control.reg_write,
+        EXMEMAlu
+    );
+    add_element!(
+        pipeline.mem_control.lsu_request && pipeline.ex_control.lsu_write_enable,
+        EXMEMRS2
+    );
+    add_element!(pipeline.mem_control.reg_write, EXMEMRD);
+
+    // Mem Control Signals
+    add_element!(
+        pipeline.mem_control.lsu_request,
+        LSURequestControlSignal,
+        LSU,
+        LSUADDR,
+        LSUDATA,
+        LSUREQ,
+        LSUWR,
+        LSUBYTE_EN,
+        LSUVALID,
+        DataMemory
+    );
+    add_element!(
+        pipeline.mem_lines.mem_data.is_some() && !pipeline.mem_control.lsu_write_enable,
+        LSURDOut
+    );
+
+    add_element!(pipeline.ex_mem.mem_pc.is_some(), MEMWBBuffer);
+    add_element!(pipeline.wb_control.reg_write, MEMWBRD, RegisterFile);
+    // Wb Control Signals
+    match pipeline.wb_control.wb_src {
+        Some(DataDestSel::ALU) => add_element!(true, WritebackResult, MEMWBAlu),
+        Some(DataDestSel::LSU) => add_element!(true, WritebackResult, MEMWBLsu),
+        _ => {}
+    }
+
+    active_elements
+}
+
 #[component]
 #[allow(non_snake_case)]
 pub fn FiveStageVisualization(
@@ -352,6 +495,13 @@ pub fn FiveStageVisualization(
     const HOVER_FILL: &str = "rgba(66, 133, 244, 0.1)";
 
     let mut hovered_element = use_signal(|| Option::<FiveStageElement>::None);
+    let mut active_elements = use_signal(BTreeSet::<FiveStageElement>::new);
+
+    use_effect(move || {
+        if let Some(AnyEmulatorState::FiveStage(state)) = &*emulator_state.read() {
+            active_elements.set(find_active_elements(&state.pipeline));
+        }
+    });
 
     use_effect(move || {
         let Some(AnyEmulatorState::FiveStage(state)) = &*emulator_state.read() else {
@@ -371,6 +521,8 @@ pub fn FiveStageVisualization(
         ($element:ident) => {
             if *hovered_element.read() == Some(FiveStageElement::$element) {
                 HOVER_STROKE
+            } else if active_elements.read().contains(&FiveStageElement::$element) {
+                ACTIVE_STROKE
             } else {
                 "black"
             }
@@ -614,7 +766,7 @@ pub fn FiveStageVisualization(
                 }
             }
             g {
-                id: "mem_ctrl_to_wb_src_mux_group",
+                id: "wb_ctrl_to_wb_src_mux_group",
                 style: "pointer-events: all;",
                 onmouseenter: move |_| {
                     hovered_element.set(Some(FiveStageElement::WBSrcControlSignal));
@@ -623,14 +775,14 @@ pub fn FiveStageVisualization(
                     hovered_element.set(None);
                 },
                 path {
-                    id: "mem_ctrl_to_wb_src_mux_arrow",
+                    id: "wb_ctrl_to_wb_src_mux_arrow",
                     transform: "translate(1600, 426)",
                     d: "M8.70573 0.804236C8.31387 0.415059 7.68071 0.417238 7.29153 0.809106L0.949515 7.19494C0.560338 7.58681 0.562518 8.21997 0.954384 8.60915C1.34625 8.99832 1.97941 8.99614 2.36859 8.60428L8.00593 2.92798L13.6822 8.56532C14.0741 8.9545 14.7073 8.95232 15.0964 8.56046C15.4856 8.16859 15.4834 7.53543 15.0916 7.14625L8.70573 0.804236ZM9.12499 123.5L9.00106 1.51033L7.00107 1.51722L7.12501 123.5L9.12499 123.5Z",
                     fill: match &*emulator_state.read() {
                         Some(AnyEmulatorState::FiveStage(state)) => {
                             let is_hovered = *hovered_element.read()
                                 == Some(FiveStageElement::WBSrcControlSignal);
-                            match state.pipeline.mem_control.wb_src {
+                            match state.pipeline.wb_control.wb_src {
                                 Some(DataDestSel::ALU) => {
                                     if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
                                 }
@@ -644,7 +796,7 @@ pub fn FiveStageVisualization(
                     },
                 }
                 line {
-                    id: "mem_ctrl_to_wb_src_mux_line",
+                    id: "wb_ctrl_to_wb_src_mux_line",
                     x1: "203",
                     y1: "0",
                     x2: "260",
@@ -655,7 +807,7 @@ pub fn FiveStageVisualization(
                         Some(AnyEmulatorState::FiveStage(state)) => {
                             let is_hovered = *hovered_element.read()
                                 == Some(FiveStageElement::WBSrcControlSignal);
-                            match state.pipeline.mem_control.wb_src {
+                            match state.pipeline.wb_control.wb_src {
                                 Some(DataDestSel::ALU) => {
                                     if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
                                 }
