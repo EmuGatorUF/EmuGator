@@ -110,7 +110,7 @@ impl Uart {
 
 impl Default for Uart {
     fn default() -> Self {
-        Uart::new(20)
+        Uart::new(60)
     }
 }
 

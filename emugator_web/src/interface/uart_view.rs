@@ -17,9 +17,9 @@ pub fn UartView(
 
     let icon_width = 25;
     rsx! {
-        div { class: "flex-col bg-inherit text-gray-200 font-mono border-t-[0.450px] border-gray-600 h-full",
+        div { class: "flex flex-col bg-inherit text-gray-200 font-mono border-t-[0.450px] border-gray-600 h-full",
             div {
-                div { class: "flex flex-grow font-bold p-2 items-center align-center justify-between",
+                div { class: "flex w-full font-bold p-2 items-center align-center justify-between",
                     "UART Console"
                     button {
                         class: "flex items-center justify-center text-center text-sm bg-inherit px-2 hover:outline outline-gray-400 rounded cursor-pointer",
@@ -38,11 +38,11 @@ pub fn UartView(
                     hr {}
                 }
             }
-            div { class: if *minimize_console.read() { "h-0" } else { "flex h-full" },
-                div { class: "flex flex-col w-full h-full",
-                    div { class: "p-2 font-semibold border-b border-r", "Serial Input" }
+            div { class: if *minimize_console.read() { "h-0" } else { "flex flex-1 w-full h-full" },
+                div { class: "flex flex-1 flex-col",
+                    div { class: "w-full p-2 font-semibold border-b border-r", "Serial Input" }
                     textarea {
-                        class: "flex-1 leading-none p-3 border-r h-full resize-none overflow-auto focus:outline-none",
+                        class: "flex-1 leading-none p-3 border-r resize-none overflow-auto focus:outline-none",
                         placeholder: "> Type here",
                         oninput: move |event| {
                             let value = event.value();
@@ -68,10 +68,10 @@ pub fn UartView(
                         value: "{serial_input}",
                     }
                 }
-                div { class: "flex flex-col h-full",
+                div { class: "flex flex-1 flex-col",
                     div { class: "w-full p-2 font-semibold border-b border-l", "Serial Output" }
                     textarea {
-                        class: "flex-1 leading-none p-3 border-l h-full resize-none overflow-auto focus:outline-none",
+                        class: "flex-1 leading-none p-3 border-l resize-none overflow-auto focus:outline-none",
                         placeholder: "> UART Output",
                         readonly: "true",
                         value: if let Some(memory_io) = state.as_ref().map(|e| e.memory_io()) { String::from_utf8_lossy(memory_io.get_serial_output()).to_string() } else { "".to_string() },
