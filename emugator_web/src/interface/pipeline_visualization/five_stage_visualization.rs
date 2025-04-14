@@ -72,7 +72,7 @@ enum FiveStageElement {
     MEMWBRD,
     JMPAddress,
     JMPBaseAddress,
-    HazzardDetector,
+    HazardUnit,
     IFPCWriteEnable,
     IFIDWriteEnable,
     IDEXWriteEnable,
@@ -92,6 +92,7 @@ enum FiveStageElement {
     WBSrcControlSignal,
     RegWriteControlSignal,
     JMPBaseControlSignal,
+    ConditionResult,
 }
 
 impl FiveStageElement {
@@ -108,6 +109,14 @@ impl FiveStageElement {
                 PCSel::JMP => "Next PC Select: JMP".to_string(),
                 PCSel::PC4 => "Next PC Select: PC+4".to_string(),
             },
+            FiveStageElement::ConditionResult => {
+                let cond_jump_taken =
+                    pipeline.ex_lines.alu_out.is_some() && pipeline.ex_control.jump_cond;
+                format!(
+                    "Condition AND Result: {}",
+                    if cond_jump_taken { "True" } else { "False" }
+                )
+            }
             FiveStageElement::ALUOpControlSignal => {
                 format!(
                     "ALU Operation: {}",
@@ -152,14 +161,14 @@ impl FiveStageElement {
                 let is_active = pipeline.ex_control.jump_uncond;
                 format!(
                     "Unconditional Jump: {}",
-                    if is_active { "Enabled" } else { "Disabled" }
+                    if is_active { "True" } else { "False" }
                 )
             }
             FiveStageElement::JumpCondControlSignal => {
                 let is_active = pipeline.ex_control.jump_cond;
                 format!(
                     "Conditional Jump: {}",
-                    if is_active { "Enabled" } else { "Disabled" }
+                    if is_active { "True" } else { "False" }
                 )
             }
             FiveStageElement::LSUDataTypeControlSignal => {
@@ -226,7 +235,7 @@ impl FiveStageElement {
             FiveStageElement::RegisterFileRS2Value => {
                 format!("RS2 Value: 0x{:08X}", pipeline.id_lines.rs2_v)
             }
-            FiveStageElement::HazzardDetector => "Hazard Detector".to_string(),
+            FiveStageElement::HazardUnit => "Hazard Unit".to_string(),
             FiveStageElement::IFPCWriteEnable => {
                 format_bool!(
                     "IF PC Write Enable: {}",
@@ -379,6 +388,228 @@ pub fn FiveStageVisualization(
     }
     rsx! {
         if *show_control_signals.read() {
+            g {
+                id: "ifpc_write_enable_group",
+                style: "pointer-events: all;",
+                onmouseenter: move |_| {
+                    hovered_element.set(Some(FiveStageElement::IFPCWriteEnable));
+                },
+                onmouseleave: move |_| {
+                    hovered_element.set(None);
+                },
+                line {
+                    id: "ifpc_write_enable_line1",
+                    x1: "365",
+                    y1: "59",
+                    x2: "542",
+                    y2: "59",
+                    stroke: element_stroke!(IFPCWriteEnable),
+                    "stroke-width": "2",
+                }
+                line {
+                    id: "ifpc_write_enable_line2",
+                    x1: "364",
+                    y1: "58",
+                    x2: "364",
+                    y2: "337",
+                    stroke: element_stroke!(IFPCWriteEnable),
+                    "stroke-width": "2",
+                }
+                line {
+                    id: "ifpc_write_enable_line3",
+                    x1: "364",
+                    y1: "336",
+                    x2: "58",
+                    y2: "336",
+                    stroke: element_stroke!(IFPCWriteEnable),
+                    "stroke-width": "2",
+                }
+                path {
+                    id: "ifpc_write_enable_arrow",
+                    transform: "translate(-80, 222)",
+                    d: "M137.707 94.2929C137.317 93.9024 136.683 93.9024 136.293 94.2929L129.929 100.657C129.538 101.047 129.538 101.681 129.929 102.071C130.319 102.462 130.953 102.462 131.343 102.071L137 96.4142L142.657 102.071C143.047 102.462 143.681 102.462 144.071 102.071C144.462 101.681 144.462 101.047 144.071 100.657L137.707 94.2929ZM138 115V95H136V115H138Z",
+                    fill: element_stroke!(IFPCWriteEnable),
+                }
+            }
+            g {
+                id: "jmp_uncond_control_group",
+                style: "pointer-events: all;",
+                onmouseenter: move |_| {
+                    hovered_element.set(Some(FiveStageElement::JumpUncondControlSignal));
+                },
+                onmouseleave: move |_| {
+                    hovered_element.set(None);
+                },
+                path {
+                    id: "jmp_uncond_arrow",
+                    transform: "translate(-134, -35)",
+                    d: "M1042.29 38.2929C1041.9 38.6834 1041.9 39.3166 1042.29 39.7071L1048.66 46.0711C1049.05 46.4616 1049.68 46.4616 1050.07 46.0711C1050.46 45.6805 1050.46 45.0474 1050.07 44.6569L1044.41 39L1050.07 33.3431C1050.46 32.9526 1050.46 32.3195 1050.07 31.9289C1049.68 31.5384 1049.05 31.5384 1048.66 31.9289L1042.29 38.2929ZM1088 38L1043 38V40L1088 40V38Z",
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            let is_hovered = *hovered_element.read()
+                                == Some(FiveStageElement::JumpUncondControlSignal);
+                            match state.pipeline.ex_control.jump_uncond {
+                                true => if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
+                                false => if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
+                            }
+                        }
+                        _ => "gray",
+                    },
+                }
+                line {
+                    id: "jmp_uncond_vertical_line",
+                    x1: "955",
+                    y1: "3",
+                    x2: "955",
+                    y2: "561",
+                    stroke: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            let is_hovered = *hovered_element.read()
+                                == Some(FiveStageElement::JumpUncondControlSignal);
+                            match state.pipeline.ex_control.jump_uncond {
+                                true => if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
+                                false => if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
+                            }
+                        }
+                        _ => "gray",
+                    },
+                    "stroke-width": "2",
+                }
+            }
+            g {
+                id: "jmp_cond_control_group",
+                style: "pointer-events: all;",
+                onmouseenter: move |_| {
+                    hovered_element.set(Some(FiveStageElement::JumpCondControlSignal));
+                },
+                onmouseleave: move |_| {
+                    hovered_element.set(None);
+                },
+                path {
+                    id: "jmp_cond_arrow",
+                    transform: "translate(0, -65)",
+                    d: "M1042.29 38.2929C1041.9 38.6834 1041.9 39.3166 1042.29 39.7071L1048.66 46.0711C1049.05 46.4616 1049.68 46.4616 1050.07 46.0711C1050.46 45.6805 1050.46 45.0474 1050.07 44.6569L1044.41 39L1050.07 33.3431C1050.46 32.9526 1050.46 32.3195 1050.07 31.9289C1049.68 31.5384 1049.05 31.5384 1048.66 31.9289L1042.29 38.2929ZM1098 38L1043 38V40L1098 40V38Z",
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            let is_hovered = *hovered_element.read()
+                                == Some(FiveStageElement::JumpCondControlSignal);
+                            match state.pipeline.ex_control.jump_cond {
+                                true => if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
+                                false => if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
+                            }
+                        }
+                        _ => "gray",
+                    },
+                }
+                line {
+                    id: "jmp_cond_vertical_line",
+                    x1: "1099",
+                    y1: "-27",
+                    x2: "1099",
+                    y2: "561",
+                    stroke: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            let is_hovered = *hovered_element.read()
+                                == Some(FiveStageElement::JumpCondControlSignal);
+                            match state.pipeline.ex_control.jump_cond {
+                                true => if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
+                                false => if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
+                            }
+                        }
+                        _ => "gray",
+                    },
+                    "stroke-width": "2",
+                }
+            }
+            g {
+                id: "ifid_write_enable_group",
+                style: "pointer-events: all;",
+                onmouseenter: move |_| {
+                    hovered_element.set(Some(FiveStageElement::IFIDWriteEnable));
+                },
+                onmouseleave: move |_| {
+                    hovered_element.set(None);
+                },
+                path {
+                    id: "ifid_write_enable_arrow",
+                    transform: "translate(1, -100)",
+                    d: "M482.293 188.707C481.902 188.317 481.902 187.683 482.293 187.293L488.657 180.929C489.047 180.538 489.681 180.538 490.071 180.929C490.462 181.319 490.462 181.953 490.071 182.343L484.414 188L490.071 193.657C490.462 194.047 490.462 194.681 490.071 195.071C489.681 195.462 489.047 195.462 488.657 195.071L482.293 188.707ZM540 189H483V187H540V189Z",
+                    fill: element_stroke!(IFIDWriteEnable),
+                }
+            }
+            g {
+                id: "idex_write_enable_group",
+                style: "pointer-events: all;",
+                onmouseenter: move |_| {
+                    hovered_element.set(Some(FiveStageElement::IDEXWriteEnable));
+                },
+                onmouseleave: move |_| {
+                    hovered_element.set(None);
+                },
+                path {
+                    id: "idex_write_enable_arrow",
+                    transform: "translate(218, -100)",
+                    d: "M540.707 188.707C541.098 188.317 541.098 187.683 540.707 187.293L534.343 180.929C533.953 180.538 533.319 180.538 532.929 180.929C532.538 181.319 532.538 181.953 532.929 182.343L538.586 188L532.929 193.657C532.538 194.047 532.538 194.681 532.929 195.071C533.319 195.462 533.953 195.462 534.343 195.071L540.707 188.707ZM483 189H540V187H483V189Z",
+                    fill: element_stroke!(IDEXWriteEnable),
+                }
+            }
+            g {
+                id: "mem_ctrl_to_wb_src_mux_group",
+                style: "pointer-events: all;",
+                onmouseenter: move |_| {
+                    hovered_element.set(Some(FiveStageElement::WBSrcControlSignal));
+                },
+                onmouseleave: move |_| {
+                    hovered_element.set(None);
+                },
+                path {
+                    id: "mem_ctrl_to_wb_src_mux_arrow",
+                    transform: "translate(1600, 426)",
+                    d: "M8.70573 0.804236C8.31387 0.415059 7.68071 0.417238 7.29153 0.809106L0.949515 7.19494C0.560338 7.58681 0.562518 8.21997 0.954384 8.60915C1.34625 8.99832 1.97941 8.99614 2.36859 8.60428L8.00593 2.92798L13.6822 8.56532C14.0741 8.9545 14.7073 8.95232 15.0964 8.56046C15.4856 8.16859 15.4834 7.53543 15.0916 7.14625L8.70573 0.804236ZM9.12499 123.5L9.00106 1.51033L7.00107 1.51722L7.12501 123.5L9.12499 123.5Z",
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            let is_hovered = *hovered_element.read()
+                                == Some(FiveStageElement::WBSrcControlSignal);
+                            match state.pipeline.mem_control.wb_src {
+                                Some(DataDestSel::ALU) => {
+                                    if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
+                                }
+                                Some(DataDestSel::LSU) => {
+                                    if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
+                                }
+                                None => "gray",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                }
+                line {
+                    id: "mem_ctrl_to_wb_src_mux_line",
+                    x1: "203",
+                    y1: "0",
+                    x2: "260",
+                    y2: "0",
+                    "stroke-width": "2",
+                    transform: "translate(1349, 550)",
+                    stroke: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            let is_hovered = *hovered_element.read()
+                                == Some(FiveStageElement::WBSrcControlSignal);
+                            match state.pipeline.mem_control.wb_src {
+                                Some(DataDestSel::ALU) => {
+                                    if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
+                                }
+                                Some(DataDestSel::LSU) => {
+                                    if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
+                                }
+                                None => "gray",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                }
+
+            }
             g {
                 id: "ex_ctrl_to_aluopmux_group",
                 style: "pointer-events: all;",
@@ -597,6 +828,133 @@ pub fn FiveStageVisualization(
                 }
             }
             g {
+                id: "mem_ctrl_to_reg_write_mux_group",
+                style: "pointer-events: all;",
+                onmouseenter: move |_| {
+                    hovered_element.set(Some(FiveStageElement::RegWriteControlSignal));
+                },
+                onmouseleave: move |_| {
+                    hovered_element.set(None);
+                },
+                line {
+                    id: "mem_ctrl_to_reg_write_mux_line",
+                    x1: "203",
+                    y1: "0",
+                    x2: "260",
+                    y2: "0",
+                    "stroke-width": "2",
+                    transform: "translate(1349, 570)",
+                    stroke: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            let is_hovered = *hovered_element.read()
+                                == Some(FiveStageElement::RegWriteControlSignal);
+                            match state.pipeline.mem_control.reg_write {
+                                true => if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
+                                false => if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
+                            }
+                        }
+                        _ => "gray",
+                    },
+                }
+                line {
+                    id: "mem_ctrl_to_reg_write_mux_line",
+                    x1: "260",
+                    y1: "0",
+                    x2: "260",
+                    y2: "85",
+                    "stroke-width": "2",
+                    transform: "translate(1349, 570)",
+                    stroke: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            let is_hovered = *hovered_element.read()
+                                == Some(FiveStageElement::RegWriteControlSignal);
+                            match state.pipeline.mem_control.reg_write {
+                                true => if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
+                                false => if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
+                            }
+                        }
+                        _ => "gray",
+                    },
+                }
+                line {
+                    id: "mem_ctrl_to_reg_write_mux_line",
+                    x1: "-800",
+                    y1: "86",
+                    x2: "261",
+                    y2: "86",
+                    "stroke-width": "2",
+                    transform: "translate(1349, 570)",
+                    stroke: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            let is_hovered = *hovered_element.read()
+                                == Some(FiveStageElement::RegWriteControlSignal);
+                            match state.pipeline.mem_control.reg_write {
+                                true => if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
+                                false => if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
+                            }
+                        }
+                        _ => "gray",
+                    },
+                }
+                text {
+                    id: "WE",
+                    x: "543",
+                    y: "475",
+                    "text-anchor": "start",
+                    "dominant-baseline": "middle",
+                    "font-size": "12",
+                    "font-weight": "bold",
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            match (state.pipeline.mem_control.reg_write, *hovered_element.read()) {
+                                (true, Some(FiveStageElement::RegWriteControlSignal)) => "green",
+                                (true, _) => "rgba(0, 200, 0, 0.4)",
+                                (false, Some(FiveStageElement::RegWriteControlSignal)) => "red",
+                                (false, _) => "rgba(200, 0, 0, 0.4)",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                    "WE"
+                }
+                line {
+                    id: "mem_ctrl_to_reg_write_mux_line",
+                    x1: "-801",
+                    y1: "87",
+                    x2: "-801",
+                    y2: "-86",
+                    "stroke-width": "2",
+                    transform: "translate(1349, 570)",
+                    stroke: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            let is_hovered = *hovered_element.read()
+                                == Some(FiveStageElement::RegWriteControlSignal);
+                            match state.pipeline.mem_control.reg_write {
+                                true => if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
+                                false => if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
+                            }
+                        }
+                        _ => "gray",
+                    },
+                }
+                path {
+                    id: "mem_ctrl_to_reg_write_mux_arrow",
+                    transform: "translate(540, 481)",
+                    d: "M8.70573 0.804236C8.31387 0.415059 7.68071 0.417238 7.29153 0.809106L0.949515 7.19494C0.560338 7.58681 0.562518 8.21997 0.954384 8.60915C1.34625 8.99832 1.97941 8.99614 2.36859 8.60428L8.00593 2.92798L13.6822 8.56532C14.0741 8.9545 14.7073 8.95232 15.0964 8.56046C15.4856 8.16859 15.4834 7.53543 15.0916 7.14625L8.70573 0.804236Z",
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            let is_hovered = *hovered_element.read()
+                                == Some(FiveStageElement::RegWriteControlSignal);
+                            match state.pipeline.mem_control.reg_write {
+                                true => if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
+                                false => if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
+                            }
+                        }
+                        _ => "gray",
+                    },
+                }
+            }
+            g {
                 id: "jmp_base_ctrl_group",
                 style: "pointer-events: all;",
                 onmouseenter: move |_| {
@@ -706,10 +1064,43 @@ pub fn FiveStageVisualization(
             }
         }
         g {
-            id: "jmp_conditional_group",
+            id: "next_pc_select_group",
             style: "pointer-events: all;",
             onmouseenter: move |_| {
-                hovered_element.set(Some(FiveStageElement::JumpCondControlSignal));
+                hovered_element.set(Some(FiveStageElement::PCNextSelControlSignal));
+            },
+            onmouseleave: move |_| {
+                hovered_element.set(None);
+            },
+            path {
+                id: "jmp_unconditional_gate",
+                transform: "translate(-40, -570)",
+                d: "M914.823 580.07C923.812 583.636 934.877 584.922 951.436 585C947.277 575.843 945.146 568.447 945.144 561C945.141 553.554 947.267 546.159 951.434 537C937.668 537.089 926.638 538.377 917.982 541.938C908.208 545.538 899.775 551.487 891.331 561C899.757 570.564 905.79 576.487 914.823 580.07Z",
+                fill: element_fill!(PCNextSelControlSignal),
+                stroke: element_stroke!(PCNextSelControlSignal),
+                "stroke-width": "2",
+            }
+            path {
+                id: "downward_arrow",
+                transform: "translate(-575, -261)",
+                d: "M620.293 275.707C620.683 276.098 621.317 276.098 621.707 275.707L628.071 269.343C628.462 268.953 628.462 268.319 628.071 267.929C627.681 267.538 627.047 267.538 626.657 267.929L621 273.586L615.343 267.929C614.953 267.538 614.319 267.538 613.929 267.929C613.538 268.319 613.538 268.953 613.929 269.343L620.293 275.707ZM620 252L620 275L622 275L622 252L620 252Z",
+                fill: element_stroke!(PCNextSelControlSignal),
+            }
+            line {
+                id: "jmp_uncond_output_line",
+                x1: "852",
+                y1: "-9",
+                x2: "45",
+                y2: "-9",
+                stroke: element_stroke!(PCNextSelControlSignal),
+                "stroke-width": "2",
+            }
+        }
+        g {
+            id: "jmp_conditional_AND_ALU",
+            style: "pointer-events: all;",
+            onmouseenter: move |_| {
+                hovered_element.set(Some(FiveStageElement::ConditionResult));
             },
             onmouseleave: move |_| {
                 hovered_element.set(None);
@@ -718,24 +1109,32 @@ pub fn FiveStageVisualization(
                 id: "jmp_conditional_gate",
                 transform: "translate(101, -570)",
                 d: "M880 560C880 545.086 891.054 533 905.917 533H940V587H905.917C891.054 587 880 574.914 880 560Z",
-                fill: element_fill!(JumpCondControlSignal),
-                stroke: element_stroke!(JumpCondControlSignal),
+                fill: element_fill!(ConditionResult),
+                stroke: element_stroke!(ConditionResult),
                 "stroke-width": "2",
             }
             path {
-                id: "jmp_conditional",
-                transform: "translate(-108, -50)",
+                id: "jmp_conditional_arrow",
+                transform: "translate(-134, -60)",
                 d: "M1042.29 38.2929C1041.9 38.6834 1041.9 39.3166 1042.29 39.7071L1048.66 46.0711C1049.05 46.4616 1049.68 46.4616 1050.07 46.0711C1050.46 45.6805 1050.46 45.0474 1050.07 44.6569L1044.41 39L1050.07 33.3431C1050.46 32.9526 1050.46 32.3195 1050.07 31.9289C1049.68 31.5384 1049.05 31.5384 1048.66 31.9289L1042.29 38.2929ZM1088 38L1043 38V40L1088 40V38Z",
-                fill: element_stroke!(JumpCondControlSignal),
+                fill: element_stroke!(ConditionResult),
             }
-            // Input line from left
             line {
-                id: "jmp_cond_input_line",
-                x1: "860",
-                y1: "560",
-                x2: "880",
-                y2: "560",
-                stroke: element_stroke!(JumpCondControlSignal),
+                id: "jmp_cond_input_line1",
+                x1: "955",
+                y1: "-10",
+                x2: "980",
+                y2: "-10",
+                stroke: element_stroke!(ConditionResult),
+                "stroke-width": "2",
+            }
+            line {
+                id: "jmp_cond_input_line2",
+                x1: "954.9",
+                y1: "-9",
+                x2: "954.9",
+                y2: "-22",
+                stroke: element_stroke!(ConditionResult),
                 "stroke-width": "2",
             }
         }
@@ -1211,6 +1610,36 @@ pub fn FiveStageVisualization(
                 "text-anchor": "middle",
                 fill: element_stroke!(IFIDPC),
                 "IDPC"
+            }
+        }
+        g {
+            id: "hazard_unit_group",
+            style: "pointer-events: all;",
+            onmouseenter: move |_| {
+                hovered_element.set(Some(FiveStageElement::HazardUnit));
+            },
+            onmouseleave: move |_| {
+                hovered_element.set(None);
+            },
+            rect {
+                id: "hazard_rect",
+                x: "542",
+                y: "50",
+                width: "158",
+                height: "48",
+                stroke: element_stroke!(HazardUnit),
+                "stroke-width": "2",
+                fill: element_fill!(HazardUnit),
+            }
+            text {
+                x: "621",
+                y: "80",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(HazardUnit),
+                "HAZARD UNIT"
             }
         }
         g {
@@ -1801,6 +2230,15 @@ pub fn FiveStageVisualization(
                 fill: element_stroke!(MEMWBRD),
                 "RD"
             }
+            line {
+                id: "memwb_rd_horizontal_line",
+                x1: "1552",
+                y1: "510",
+                x2: "1572",
+                y2: "510",
+                "stroke-width": "2",
+                stroke: element_stroke!(MEMWBRD),
+            }
         }
         g {
             id: "memwb_ctrl_register_group",
@@ -2138,6 +2576,19 @@ pub fn FiveStageVisualization(
                 id: "alu_arrow2",
                 transform: "translate(0, -40)",
                 d: "M1042.29 38.2929C1041.9 38.6834 1041.9 39.3166 1042.29 39.7071L1048.66 46.0711C1049.05 46.4616 1049.68 46.4616 1050.07 46.0711C1050.46 45.6805 1050.46 45.0474 1050.07 44.6569L1044.41 39L1050.07 33.3431C1050.46 32.9526 1050.46 32.3195 1050.07 31.9289C1049.68 31.5384 1049.05 31.5384 1048.66 31.9289L1042.29 38.2929ZM1088 38L1043 38V40L1088 40V38Z",
+                fill: element_stroke!(ALU),
+            }
+            path {
+                id: "alu_arrow3",
+                transform: "translate(-341, 20)",
+                d: "M1042.29 38.2929C1041.9 38.6834 1041.9 39.3166 1042.29 39.7071L1048.66 46.0711C1049.05 46.4616 1049.68 46.4616 1050.07 46.0711C1050.46 45.6805 1050.46 45.0474 1050.07 44.6569L1044.41 39L1050.07 33.3431C1050.46 32.9526 1050.46 32.3195 1050.07 31.9289C1049.68 31.5384 1049.05 31.5384 1048.66 31.9289L1042.29 38.2929ZM1429 38L1043 38V40L1429 40V38Z",
+                fill: element_stroke!(ALU),
+            }
+            circle {
+                id: "alu_node",
+                cx: "1087",
+                cy: "59",
+                r: "3",
                 fill: element_stroke!(ALU),
             }
             circle {
@@ -2647,23 +3098,23 @@ pub fn FiveStageVisualization(
                 x1: "1664",
                 y1: "383",
                 x2: "1664",
-                y2: "650",
+                y2: "660",
                 stroke: element_stroke!(WritebackResult),
                 "stroke-width": "2",
             }
             line {
                 id: "writeback_line3",
                 x1: "510",
-                y1: "650",
+                y1: "660",
                 x2: "1665",
-                y2: "650",
+                y2: "660",
                 stroke: element_stroke!(WritebackResult),
                 "stroke-width": "2",
             }
             line {
                 id: "writeback_line4",
                 x1: "511",
-                y1: "650",
+                y1: "660",
                 x2: "511",
                 y2: "447",
                 stroke: element_stroke!(WritebackResult),
