@@ -1014,10 +1014,6 @@ fn test_LB_with_JAL() {
     assert_eq!(state.x[2], 0xFFFFFFDE);
     assert_eq!(state.pipeline.if_pc, 0);
     assert_eq!(pc - 4, 0);
-    state = state.clock(&program);
-    state = state.clock(&program);
-    state = state.clock(&program);
-    state = state.clock(&program);
 }
 
 #[test]
@@ -1060,10 +1056,6 @@ fn test_LB_with_ADDI() {
     assert_eq!(state.x[2], 0);
     state = state.clock(&program);
     assert_eq!(state.x[2], 0xFFFFFFDE);
-    state = state.clock(&program);
-    state = state.clock(&program);
-    state = state.clock(&program);
-    state = state.clock(&program);
 }
 
 #[test]
