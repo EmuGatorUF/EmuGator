@@ -47,6 +47,16 @@ pub enum AnyEmulatorState {
     FiveStage(EmulatorState<FiveStagePipeline>),
 }
 
+impl PartialEq for AnyEmulatorState {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (AnyEmulatorState::CVE2(a), AnyEmulatorState::CVE2(b)) => a == b,
+            (AnyEmulatorState::FiveStage(a), AnyEmulatorState::FiveStage(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
 impl AnyEmulatorState {
     pub fn new_cve2(program: &AssembledProgram) -> Self {
         AnyEmulatorState::CVE2(EmulatorState::new(program))
@@ -137,7 +147,7 @@ impl AnyEmulatorState {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct EmulatorState<P: Pipeline> {
     pub x: RegisterFile,
     pub data_memory: MemoryModule,

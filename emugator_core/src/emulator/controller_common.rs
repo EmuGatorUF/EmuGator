@@ -1,5 +1,5 @@
 #[repr(u32)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ALUOp {
     ADD,
     SUB,
@@ -41,14 +41,14 @@ impl ALUOp {
 }
 
 #[repr(u32)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum OpASel {
     PC,
     RF,
 }
 
 #[repr(u32)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum OpBSel {
     RF,
     IMM,
@@ -56,14 +56,14 @@ pub enum OpBSel {
 }
 
 #[repr(u32)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum DataDestSel {
     ALU,
     LSU,
 }
 
 #[repr(u32)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum LSUDataType {
     Word,
     HalfWord,
@@ -89,7 +89,7 @@ impl LSUDataType {
 }
 
 #[repr(u32)]
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
 pub enum PCSel {
     #[default]
     PC4,

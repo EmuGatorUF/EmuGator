@@ -15,7 +15,7 @@ use crate::{
 };
 
 #[allow(non_snake_case)]
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
 pub struct CVE2Pipeline {
     pub IF_inst: Option<u32>, // Instruction Fetch Buffer
     pub IF_pc: u32,           // Program Counter for the IF stage

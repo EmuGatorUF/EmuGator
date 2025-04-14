@@ -1,19 +1,19 @@
 use crate::emulator::controller_common::PCSel;
 
-#[derive(Clone, Copy, Default, Debug)]
+#[derive(Clone, Copy, Default, Debug, PartialEq)]
 pub struct IfLines {
     pub instr: Option<u32>,
     pub next_pc_sel: PCSel,
     pub next_pc: Option<u32>,
 }
 
-#[derive(Clone, Copy, Default, Debug)]
+#[derive(Clone, Copy, Default, Debug, PartialEq)]
 pub struct IfIdBuffer {
     pub id_pc: Option<u32>,
     pub id_inst: Option<u32>,
 }
 
-#[derive(Clone, Copy, Default, Debug)]
+#[derive(Clone, Copy, Default, Debug, PartialEq)]
 pub struct IdLines {
     // decode
     pub rs1: u8,
@@ -26,7 +26,7 @@ pub struct IdLines {
     pub rs2_v: u32,
 }
 
-#[derive(Clone, Copy, Default, Debug)]
+#[derive(Clone, Copy, Default, Debug, PartialEq)]
 pub struct IdExBuffer {
     pub ex_pc: Option<u32>,
     pub rs1_v: u32,
@@ -35,7 +35,7 @@ pub struct IdExBuffer {
     pub rd: Option<u8>,
 }
 
-#[derive(Clone, Copy, Default, Debug)]
+#[derive(Clone, Copy, Default, Debug, PartialEq)]
 pub struct ExLines {
     // alu
     pub op_a: Option<u32>,
@@ -48,7 +48,7 @@ pub struct ExLines {
     pub cmp_result: Option<u32>,
 }
 
-#[derive(Clone, Copy, Default, Debug)]
+#[derive(Clone, Copy, Default, Debug, PartialEq)]
 pub struct ExMemBuffer {
     pub mem_pc: Option<u32>,
     pub alu_o: Option<u32>,
@@ -56,7 +56,7 @@ pub struct ExMemBuffer {
     pub rd: Option<u8>,
 }
 
-#[derive(Clone, Copy, Default, Debug)]
+#[derive(Clone, Copy, Default, Debug, PartialEq)]
 pub struct MemLines {
     pub mem_data: Option<u32>,
 
@@ -72,7 +72,7 @@ pub struct MemLines {
     pub data_err_i: bool,     // Input signal indicating an error during the data memory operation
 }
 
-#[derive(Clone, Copy, Default, Debug)]
+#[derive(Clone, Copy, Default, Debug, PartialEq)]
 pub struct MemWbBuffer {
     pub wb_pc: Option<u32>,
     pub alu: Option<u32>,
@@ -80,7 +80,7 @@ pub struct MemWbBuffer {
     pub rd: Option<u8>,
 }
 
-#[derive(Clone, Copy, Default, Debug)]
+#[derive(Clone, Copy, Default, Debug, PartialEq)]
 pub struct WbLines {
     pub wb_data: Option<u32>,
 }

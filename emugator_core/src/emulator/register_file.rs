@@ -1,6 +1,6 @@
 use std::ops::{Index, IndexMut};
 
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Default, Debug, PartialEq)]
 pub struct RegisterFile {
     pub x: [u32; 32],
 }

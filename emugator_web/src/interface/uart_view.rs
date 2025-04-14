@@ -8,7 +8,8 @@ use dioxus_free_icons::icons::ld_icons::{LdChevronDown, LdChevronUp};
 #[component]
 #[allow(non_snake_case)]
 pub fn UartView(
-    emulator_state: Signal<Option<AnyEmulatorState>>,
+    emulator_states: Signal<Vec<AnyEmulatorState>>,
+    emulator_state: ReadOnlySignal<Option<AnyEmulatorState>>,
     serial_input: Signal<String>,
     minimize_console: Signal<bool>,
 ) -> Element {
@@ -45,9 +46,9 @@ pub fn UartView(
                         placeholder: "> Type here",
                         oninput: move |event| {
                             let value = event.value();
-                            if let Some(memory_io_mut) = emulator_state
+                            if let Some(memory_io_mut) = emulator_states
                                 .write()
-                                .as_mut()
+                                .last_mut()
                                 .map(|e| e.memory_io_mut())
                             {
                                 let i = memory_io_mut.get_serial_cursor();

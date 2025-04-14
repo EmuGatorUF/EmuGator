@@ -5,10 +5,11 @@ use dioxus::prelude::*;
 use dioxus_logger::tracing::info;
 use std::collections::BTreeSet;
 use std::ops::Deref;
+use std::vec;
 
 use dioxus_free_icons::Icon;
 use dioxus_free_icons::icons::ld_icons::{
-    LdCircleArrowRight, LdCircleCheck, LdCircleX, LdInfo, LdPlay, LdRefreshCw,
+    LdCircleArrowRight, LdCircleCheck, LdCircleX, LdInfo, LdPlay, LdRefreshCw, LdUndo,
 };
 use dioxus_free_icons::icons::ld_icons::{LdClock3, LdClock6, LdClock9, LdClock12};
 
@@ -18,14 +19,14 @@ pub fn Navbar(
     source: ReadOnlySignal<String>,
     assembled_program: Signal<Option<AssembledProgram>>,
     assembler_errors: Signal<Vec<AssemblerError>>,
-    emulator_state: Signal<Option<AnyEmulatorState>>,
+    emulator_states: Signal<Vec<AnyEmulatorState>>,
     serial_input: Signal<String>,
     selected_emulator: Signal<EmulatorOption>,
     breakpoints: ReadOnlySignal<BTreeSet<usize>>,
     minimize_console: Signal<bool>,
     help_panel_displayed: Signal<bool>,
 ) -> Element {
-    let is_started = emulator_state.read().is_some();
+    let is_started = !emulator_states.read().is_empty();
     let is_assembled = assembled_program.read().is_some();
     let error_count = assembler_errors.read().len();
 
@@ -50,7 +51,7 @@ pub fn Navbar(
                                     new_state
                                         .memory_io_mut()
                                         .set_serial_input(serial_input.read().as_bytes());
-                                    emulator_state.set(Some(new_state));
+                                    emulator_states.set(vec![new_state]);
                                     assembled_program.set(Some(assembled));
                                     assembler_errors.set(Vec::new());
                                     minimize_console.set(false);
@@ -82,14 +83,15 @@ pub fn Navbar(
                         ),
                         disabled: !is_started,
                         onclick: move |_| {
-                            let new_tick = *tick.read() + 1;
-                            tick.set(new_tick);
-                            if let Some(mut program) = assembled_program.as_mut() {
-                                let new_state = emulator_state
-                                    .read()
-                                    .as_ref()
-                                    .map(|e| e.clock(&mut program));
-                                emulator_state.set(new_state);
+                            (*tick.write()) += 1;
+                            if let Some(new_state) = if let (Some(mut program), Some(emulator_state)) = (
+                                assembled_program.as_mut(),
+                                emulator_states.read().last(),
+                            ) {
+                                Some(emulator_state
+                                    .clock(&mut program))
+                            } else { None } {
+                                emulator_states.write().push(new_state);
                             }
                         },
                         match *tick.read() % 4 {
@@ -119,12 +121,14 @@ pub fn Navbar(
                         ),
                         disabled: !is_started,
                         onclick: move |_| {
-                            if let Some(program) = assembled_program.as_mut() {
-                                let new_state = emulator_state
-                                    .read()
-                                    .as_ref()
-                                    .map(|e| { e.clock_until_next_instruction(&program, 1000) });
-                                emulator_state.set(new_state);
+                            if let Some(new_state) = if let (Some(mut program), Some(emulator_state)) = (
+                                assembled_program.as_mut(),
+                                emulator_states.read().last(),
+                            ) {
+                                Some(emulator_state
+                                    .clock_until_next_instruction(&mut program, 1000))
+                            } else { None } {
+                                emulator_states.write().push(new_state);
                             }
                         },
                         Icon { width: 17, icon: LdCircleArrowRight }
@@ -141,18 +145,35 @@ pub fn Navbar(
                         ),
                         disabled: !is_started,
                         onclick: move |_| {
-                            if let Some(mut program) = assembled_program.as_mut() {
-                                let new_state = emulator_state
-                                    .read()
-                                    .as_ref()
-                                    .map(|e| {
-                                        e.clock_until_break(&mut program, breakpoints.read().deref(), 10_000)
-                                    });
-                                emulator_state.set(new_state);
+                            if let Some(new_state) = if let (Some(mut program), Some(emulator_state)) = (
+                                assembled_program.as_mut(),
+                                emulator_states.read().last(),
+                            ) {
+                                Some(emulator_state
+                                    .clock_until_break(&mut program, breakpoints.read().deref(), 10_000))
+                            } else { None } {
+                                emulator_states.write().push(new_state);
                             }
                         },
                         Icon { width: 17, icon: LdCircleArrowRight }
                         "Until Break"
+                    }
+
+                    button {
+                        class: format!(
+                            "{} text-white font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex items-center gap-x-1",
+                            if is_started {
+                                "bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer"
+                            } else {
+                                "bg-gray-600 text-gray-300 cursor-not-allowed"
+                            },
+                        ),
+                        disabled: !is_started,
+                        onclick: move |_| {
+                            emulator_states.write().pop();
+                        },
+                        Icon { width: 17, icon: LdUndo }
+                        "Undo"
                     }
                 }
             }
@@ -187,7 +208,7 @@ pub fn Navbar(
                     onclick: move |_| {
                         let new_selection = selected_emulator.read().other();
                         selected_emulator.set(new_selection);
-                        emulator_state.set(None);
+                        emulator_states.set(vec![]);
                     },
                     img { width: 20, src: asset!("assets/pipeline.svg") }
                     "{selected_emulator.read().display_string()}"

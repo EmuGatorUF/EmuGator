@@ -1,6 +1,6 @@
 use crate::isa::{Instruction, InstructionDefinition, InstructionFormat};
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct HazardDetector {
     // Which stages are blocked if a hazard is detected
     pub hazard_detected: Hazard,
@@ -110,7 +110,7 @@ impl HazardDetector {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Hazard {
     pub stop_if: bool,
     pub stop_id: bool,
