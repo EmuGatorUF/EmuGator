@@ -31,6 +31,7 @@ pub static ASSEMBLED_PROGRAM: GlobalSignal<Option<AssembledProgram>> = GlobalSig
 #[component]
 #[allow(non_snake_case)]
 pub fn App() -> Element {
+    let serial_input = use_signal(|| String::new());
     let source = use_signal(|| include_test_file!("beta-demo.s").to_string());
     let mut assembler_errors: Signal<Vec<AssemblerError>> = use_signal(Vec::new);
     let selected_emulator: Signal<EmulatorOption> = use_signal(|| EmulatorOption::CVE2);
@@ -104,6 +105,7 @@ pub fn App() -> Element {
                 assembled_program: ASSEMBLED_PROGRAM.signal(),
                 assembler_errors,
                 emulator_state,
+                serial_input,
                 selected_emulator,
                 breakpoints,
                 minimize_console,
@@ -124,7 +126,11 @@ pub fn App() -> Element {
                             "transition-all duration-300 ease-in-out bg-[#2D2D2D] border-t-2 border-gray-900 {}",
                             if *minimize_console.read() { "h-min" } else { "h-4/10" },
                         ),
-                        UartView { emulator_state, minimize_console }
+                        UartView {
+                            emulator_state,
+                            serial_input,
+                            minimize_console,
+                        }
                     }
                 }
                 if !*help_panel_displayed.read() {
