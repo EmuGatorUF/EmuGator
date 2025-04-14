@@ -19,18 +19,23 @@ mod five_stage_visualization;
 
 const SCROLL_MULTIPLIER: f64 = 1.1;
 
+/// Calculates the SVG viewport based on the viewBox and dimensions assuming "xMidYMid meet"
 fn svg_viewport(
     view_box: (f64, f64, f64, f64),
     dimensions: Rect<f64, Pixels>,
 ) -> Rect<f64, Pixels> {
-    let (x, y, width, height) = view_box;
+    let (view_x, view_y, view_width, view_height) = view_box;
     let (element_width, element_height) = (dimensions.width(), dimensions.height());
-    let (width, height) = if width / element_width > height / element_height {
-        (width, width * element_height / element_width)
+    let (width, height) = if view_width / element_width > view_height / element_height {
+        (view_width, view_width * element_height / element_width)
     } else {
-        (height * element_width / element_height, height)
+        (view_height * element_width / element_height, view_height)
     };
 
+    let (x, y) = (
+        view_x + (view_width - width) / 2.0,
+        view_y + (view_height - height) / 2.0,
+    );
     Rect::new(Point2D::new(x, y), Size2D::new(width, height))
 }
 
@@ -116,7 +121,7 @@ pub fn PipelineVisualization(
                     view_box.read().2,
                     view_box.read().3,
                 ),
-                preserve_aspect_ratio: "xMinYMin meet",
+                preserve_aspect_ratio: "xMidYMid meet",
                 xmlns: "httk://www.w3.org/2000/svg",
                 style: format!(
                     "cursor: {}; user-select: none;",
