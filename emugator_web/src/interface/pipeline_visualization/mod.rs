@@ -2,10 +2,10 @@ use cve2_visualization::CVE2Visualization;
 use dioxus::prelude::*;
 use dioxus_elements::geometry::WheelDelta;
 use dioxus_elements::input_data::MouseButton;
-use emugator_core::emulator::{AnyEmulatorState, EmulatorOption};
-use five_stage_visualization::FiveStageVisualization;
 use dioxus_free_icons::Icon;
 use dioxus_free_icons::icons::ld_icons::LdRotateCcw;
+use emugator_core::emulator::{AnyEmulatorState, EmulatorOption};
+use five_stage_visualization::FiveStageVisualization;
 
 mod cve2_visualization;
 mod five_stage_visualization;
@@ -37,11 +37,7 @@ pub fn PipelineVisualization(
                     view_box.set(initial_view);
                     scale.set(1.0);
                 },
-                Icon {
-                    width: 16,
-                    height: 16,
-                    icon: LdRotateCcw
-                }
+                Icon { width: 16, height: 16, icon: LdRotateCcw }
             }
             button {
                 class: format!(
@@ -147,7 +143,7 @@ pub fn PipelineVisualization(
                             CVE2Visualization { emulator_state, tooltip_text, show_control_signals }
                         },
                         EmulatorOption::FiveStage => rsx! {
-                            FiveStageVisualization { emulator_state, tooltip_text }
+                            FiveStageVisualization { emulator_state, tooltip_text, show_control_signals }
                         },
                     }
                 }

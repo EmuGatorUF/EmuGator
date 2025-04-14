@@ -80,6 +80,8 @@ enum FiveStageElement {
     MEMControl,
     WBControl,
     PCNextSelControlSignal,
+    JumpUncondControlSignal,
+    JumpCondControlSignal,
     ALUOpControlSignal,
     ALUOpASelControlSignal,
     ALUOpBSelControlSignal,
@@ -90,8 +92,6 @@ enum FiveStageElement {
     WBSrcControlSignal,
     RegWriteControlSignal,
     JMPBaseControlSignal,
-    JumpUncondControlSignal,
-    JumpCondControlSignal,
 }
 
 impl FiveStageElement {
@@ -252,8 +252,6 @@ impl FiveStageElement {
             FiveStageElement::IDEXRS1 => format!("EX RS1 Value: 0x{:08X}", pipeline.id_ex.rs1_v),
             FiveStageElement::IDEXRS2 => format!("EX RS2 Value: 0x{:08X}", pipeline.id_ex.rs2_v),
             FiveStageElement::IDEXImm => format_opt!("EX IMM: 0x{:08X}", pipeline.id_ex.imm),
-            // EX stage
-            // ALU
             FiveStageElement::ALUMuxA => format_opt!("ALU OP A: 0x{:08X}", pipeline.ex_lines.op_a),
             FiveStageElement::ALUMuxB => format_opt!("ALU OP B: 0x{:08X}", pipeline.ex_lines.op_b),
             FiveStageElement::ALU => format_opt!("ALU Output: 0x{:08X}", pipeline.ex_lines.alu_out),
@@ -338,6 +336,7 @@ impl FiveStageElement {
 pub fn FiveStageVisualization(
     emulator_state: ReadOnlySignal<Option<AnyEmulatorState>>,
     tooltip_text: Signal<Option<String>>,
+    show_control_signals: Signal<bool>,
 ) -> Element {
     const HOVER_STROKE: &'static str = "rgba(66, 133, 244, 1)";
     const ACTIVE_STROKE: &'static str = "rgba(66, 133, 244, 0.7)";
@@ -379,94 +378,364 @@ pub fn FiveStageVisualization(
         };
     }
     rsx! {
+        if *show_control_signals.read() {
+            g {
+                id: "ex_ctrl_to_aluopmux_group",
+                style: "pointer-events: all;",
+                onmouseenter: move |_| {
+                    hovered_element.set(Some(FiveStageElement::ALUOpControlSignal));
+                },
+                onmouseleave: move |_| {
+                    hovered_element.set(None);
+                },
+                path {
+                    id: "ex_ctrl_to_aluopmux_arrow",
+                    transform: "translate(1015, 458)",
+                    d: "M8.70573 0.804236C8.31387 0.415059 7.68071 0.417238 7.29153 0.809106L0.949515 7.19494C0.560338 7.58681 0.562518 8.21997 0.954384 8.60915C1.34625 8.99832 1.97941 8.99614 2.36859 8.60428L8.00593 2.92798L13.6822 8.56532C14.0741 8.9545 14.7073 8.95232 15.0964 8.56046C15.4856 8.16859 15.4834 7.53543 15.0916 7.14625L8.70573 0.804236ZM9.12499 102.5L9.00106 1.51033L7.00107 1.51722L7.12501 102.5L9.12499 102.5Z",
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            match (state.pipeline.ex_control.alu_op, *hovered_element.read()) {
+                                (Some(_), Some(FiveStageElement::ALUOpControlSignal)) => "green",
+                                (Some(_), _) => "rgba(0, 200, 0, 0.4)",
+                                (None, Some(FiveStageElement::ALUOpControlSignal)) => "gray",
+                                (None, _) => "gray",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                }
+            }
+            g {
+                id: "ex_ctrl_to_opamux_group",
+                style: "pointer-events: all;",
+                onmouseenter: move |_| {
+                    hovered_element.set(Some(FiveStageElement::ALUOpASelControlSignal));
+                },
+                onmouseleave: move |_| {
+                    hovered_element.set(None);
+                },
+                path {
+                    id: "ex_ctrl_to_opamux_arrow",
+                    transform: "translate(909, 338)",
+                    d: "M8.70573 0.804236C8.31387 0.415059 7.68071 0.417238 7.29153 0.809106L0.949515 7.19494C0.560338 7.58681 0.562518 8.21997 0.954384 8.60915C1.34625 8.99832 1.97941 8.99614 2.36859 8.60428L8.00593 2.92798L13.6822 8.56532C14.0741 8.9545 14.7073 8.95232 15.0964 8.56046C15.4856 8.16859 15.4834 7.53543 15.0916 7.14625L8.70573 0.804236ZM9.12499 21.5L9.00106 1.51033L7.00107 1.51722L7.12501 21.5L9.12499 21.5Z",
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            match (state.pipeline.ex_control.alu_op_a_sel, *hovered_element.read()) {
+                                (Some(OpASel::PC), Some(FiveStageElement::ALUOpASelControlSignal)) => {
+                                    "green"
+                                }
+                                (Some(OpASel::PC), _) => "rgba(0, 200, 0, 0.4)",
+                                (Some(OpASel::RF), Some(FiveStageElement::ALUOpASelControlSignal)) => {
+                                    "red"
+                                }
+                                (Some(OpASel::RF), _) => "rgba(200, 0, 0, 0.4)",
+                                (None, _) => "gray",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                }
+                line {
+                    id: "ex_ctrl_to_opamux_horizontal_line",
+                    x1: "918.13",
+                    y1: "360.49",
+                    x2: "874",
+                    y2: "360.49",
+                    stroke: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            match (state.pipeline.ex_control.alu_op_a_sel, *hovered_element.read()) {
+                                (Some(OpASel::PC), Some(FiveStageElement::ALUOpASelControlSignal)) => {
+                                    "green"
+                                }
+                                (Some(OpASel::PC), _) => "rgba(0, 200, 0, 0.4)",
+                                (Some(OpASel::RF), Some(FiveStageElement::ALUOpASelControlSignal)) => {
+                                    "red"
+                                }
+                                (Some(OpASel::RF), _) => "rgba(200, 0, 0, 0.4)",
+                                (None, _) => "gray",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                    "stroke-width": "2",
+                }
+                line {
+                    id: "ex_ctrl_to_opamux_horizontal_line",
+                    x1: "873",
+                    y1: "359.49",
+                    x2: "873",
+                    y2: "560",
+                    stroke: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            match (state.pipeline.ex_control.alu_op_a_sel, *hovered_element.read()) {
+                                (Some(OpASel::PC), Some(FiveStageElement::ALUOpASelControlSignal)) => {
+                                    "green"
+                                }
+                                (Some(OpASel::PC), _) => "rgba(0, 200, 0, 0.4)",
+                                (Some(OpASel::RF), Some(FiveStageElement::ALUOpASelControlSignal)) => {
+                                    "red"
+                                }
+                                (Some(OpASel::RF), _) => "rgba(200, 0, 0, 0.4)",
+                                (None, _) => "gray",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                    "stroke-width": "2",
+                }
+            }
+            g {
+                id: "ex_ctrl_to_lsu_data_type_mux_group",
+                style: "pointer-events: all;",
+                onmouseenter: move |_| {
+                    hovered_element.set(Some(FiveStageElement::LSUDataTypeControlSignal));
+                },
+                onmouseleave: move |_| {
+                    hovered_element.set(None);
+                },
+                path {
+                    id: "mem_ctrl_to_lsu_data_type_mux_arrow",
+                    transform: "translate(1309, 314.5)",
+                    d: "M8.70573 0.804236C8.31387 0.415059 7.68071 0.417238 7.29153 0.809106L0.949515 7.19494C0.560338 7.58681 0.562518 8.21997 0.954384 8.60915C1.34625 8.99832 1.97941 8.99614 2.36859 8.60428L8.00593 2.92798L13.6822 8.56532C14.0741 8.9545 14.7073 8.95232 15.0964 8.56046C15.4856 8.16859 15.4834 7.53543 15.0916 7.14625L8.70573 0.804236ZM9.12499 246.5L9.00106 1.51033L7.00107 1.51722L7.12501 246.5L9.12499 246.5Z",
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            let is_hovered = *hovered_element.read()
+                                == Some(FiveStageElement::LSUDataTypeControlSignal);
+                            match state.pipeline.mem_control.lsu_data_type {
+                                Some(LSUDataType::Word) => {
+                                    if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
+                                }
+                                Some(LSUDataType::HalfWord) => {
+                                    if is_hovered { "blue" } else { "rgba(0, 0, 200, 0.4)" }
+                                }
+                                Some(LSUDataType::Byte) => {
+                                    if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
+                                }
+                                None => "gray",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                }
+            }
+            g {
+                id: "mem_ctrl_to_lsu_sign_ext_mux_group",
+                style: "pointer-events: all;",
+                onmouseenter: move |_| {
+                    hovered_element.set(Some(FiveStageElement::LSUSignExtControlSignal));
+                },
+                onmouseleave: move |_| {
+                    hovered_element.set(None);
+                },
+                path {
+                    id: "mem_ctrl_to_lsu_sign_ext_mux_arrow",
+                    transform: "translate(1349, 314.5)",
+                    d: "M8.70573 0.804236C8.31387 0.415059 7.68071 0.417238 7.29153 0.809106L0.949515 7.19494C0.560338 7.58681 0.562518 8.21997 0.954384 8.60915C1.34625 8.99832 1.97941 8.99614 2.36859 8.60428L8.00593 2.92798L13.6822 8.56532C14.0741 8.9545 14.7073 8.95232 15.0964 8.56046C15.4856 8.16859 15.4834 7.53543 15.0916 7.14625L8.70573 0.804236ZM9.12499 246.5L9.00106 1.51033L7.00107 1.51722L7.12501 246.5L9.12499 246.5Z",
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            let is_hovered = *hovered_element.read()
+                                == Some(FiveStageElement::LSUSignExtControlSignal);
+                            match state.pipeline.mem_control.lsu_sign_ext {
+                                true => if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
+                                false => if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
+                            }
+                        }
+                        _ => "gray",
+                    },
+                }
+            }
+            g {
+                id: "mem_ctrl_to_lsu_write_enable_mux_group",
+                style: "pointer-events: all;",
+                onmouseenter: move |_| {
+                    hovered_element.set(Some(FiveStageElement::LSUWriteEnableControlSignal));
+                },
+                onmouseleave: move |_| {
+                    hovered_element.set(None);
+                },
+                path {
+                    id: "mem_ctrl_to_lsu_write_enable_mux_arrow",
+                    transform: "translate(1369, 314.5)",
+                    d: "M8.70573 0.804236C8.31387 0.415059 7.68071 0.417238 7.29153 0.809106L0.949515 7.19494C0.560338 7.58681 0.562518 8.21997 0.954384 8.60915C1.34625 8.99832 1.97941 8.99614 2.36859 8.60428L8.00593 2.92798L13.6822 8.56532C14.0741 8.9545 14.7073 8.95232 15.0964 8.56046C15.4856 8.16859 15.4834 7.53543 15.0916 7.14625L8.70573 0.804236ZM9.12499 246.5L9.00106 1.51033L7.00107 1.51722L7.12501 246.5L9.12499 246.5Z",
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            let is_hovered = *hovered_element.read()
+                                == Some(FiveStageElement::LSUWriteEnableControlSignal);
+                            match state.pipeline.mem_control.lsu_write_enable {
+                                true => if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
+                                false => if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
+                            }
+                        }
+                        _ => "gray",
+                    },
+                }
+            }
+            g {
+                id: "mem_ctrl_to_lsu_request_mux_group",
+                style: "pointer-events: all;",
+                onmouseenter: move |_| {
+                    hovered_element.set(Some(FiveStageElement::LSURequestControlSignal));
+                },
+                onmouseleave: move |_| {
+                    hovered_element.set(None);
+                },
+                path {
+                    id: "mem_ctrl_to_lsu_request_mux_arrow",
+                    transform: "translate(1389, 314.5)",
+                    d: "M8.70573 0.804236C8.31387 0.415059 7.68071 0.417238 7.29153 0.809106L0.949515 7.19494C0.560338 7.58681 0.562518 8.21997 0.954384 8.60915C1.34625 8.99832 1.97941 8.99614 2.36859 8.60428L8.00593 2.92798L13.6822 8.56532C14.0741 8.9545 14.7073 8.95232 15.0964 8.56046C15.4856 8.16859 15.4834 7.53543 15.0916 7.14625L8.70573 0.804236ZM9.12499 246.5L9.00106 1.51033L7.00107 1.51722L7.12501 246.5L9.12499 246.5Z",
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            let is_hovered = *hovered_element.read()
+                                == Some(FiveStageElement::LSURequestControlSignal);
+                            match state.pipeline.mem_control.lsu_request {
+                                true => if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
+                                false => if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
+                            }
+                        }
+                        _ => "gray",
+                    },
+                }
+            }
+            g {
+                id: "jmp_base_ctrl_group",
+                style: "pointer-events: all;",
+                onmouseenter: move |_| {
+                    hovered_element.set(Some(FiveStageElement::JMPBaseControlSignal));
+                },
+                onmouseleave: move |_| {
+                    hovered_element.set(None);
+                },
+                path {
+                    id: "jmp_base_ctrl_arrow",
+                    transform: "translate(909, 218)",
+                    d: "M8.70573 0.804236C8.31387 0.415059 7.68071 0.417238 7.29153 0.809106L0.949515 7.19494C0.560338 7.58681 0.562518 8.21997 0.954384 8.60915C1.34625 8.99832 1.97941 8.99614 2.36859 8.60428L8.00593 2.92798L13.6822 8.56532C14.0741 8.9545 14.7073 8.95232 15.0964 8.56046C15.4856 8.16859 15.4834 7.53543 15.0916 7.14625L8.70573 0.804236ZM9.12499 24.5L9.00106 1.51033L7.00107 1.51722L7.12501 24.5L9.12499 24.5Z",
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            match (state.pipeline.ex_control.jmp_base, *hovered_element.read()) {
+                                (Some(OpASel::PC), Some(FiveStageElement::JMPBaseControlSignal)) => {
+                                    "green"
+                                }
+                                (Some(OpASel::PC), _) => "rgba(0, 200, 0, 0.4)",
+                                (Some(OpASel::RF), Some(FiveStageElement::JMPBaseControlSignal)) => "red",
+                                (Some(OpASel::RF), _) => "rgba(200, 0, 0, 0.4)",
+                                (None, _) => "gray",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                }
+                line {
+                    id: "jmp_base_ctrl_to_opamux_horizontal_line",
+                    x1: "916.13",
+                    y1: "243.48",
+                    x2: "962",
+                    y2: "243.48",
+                    stroke: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            match (state.pipeline.ex_control.jmp_base, *hovered_element.read()) {
+                                (Some(OpASel::PC), Some(FiveStageElement::JMPBaseControlSignal)) => {
+                                    "green"
+                                }
+                                (Some(OpASel::PC), _) => "rgba(0, 200, 0, 0.4)",
+                                (Some(OpASel::RF), Some(FiveStageElement::JMPBaseControlSignal)) => "red",
+                                (Some(OpASel::RF), _) => "rgba(200, 0, 0, 0.4)",
+                                (None, _) => "gray",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                    "stroke-width": "2",
+                }
+                line {
+                    id: "jmp_base_ctrl_to_opamux_vertical_line",
+                    x1: "963",
+                    y1: "242.48",
+                    x2: "963",
+                    y2: "560",
+                    stroke: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            match (state.pipeline.ex_control.jmp_base, *hovered_element.read()) {
+                                (Some(OpASel::PC), Some(FiveStageElement::JMPBaseControlSignal)) => {
+                                    "green"
+                                }
+                                (Some(OpASel::PC), _) => "rgba(0, 200, 0, 0.4)",
+                                (Some(OpASel::RF), Some(FiveStageElement::JMPBaseControlSignal)) => "red",
+                                (Some(OpASel::RF), _) => "rgba(200, 0, 0, 0.4)",
+                                (None, _) => "gray",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                    "stroke-width": "2",
+                }
+            }
+            g {
+                id: "ex_ctrl_to_opbmux_group",
+                style: "pointer-events: all;",
+                onmouseenter: move |_| {
+                    hovered_element.set(Some(FiveStageElement::ALUOpBSelControlSignal));
+                },
+                onmouseleave: move |_| {
+                    hovered_element.set(None);
+                },
+                path {
+                    id: "ex_ctrl_to_opbmux_arrow",
+                    transform: "translate(908.86, 460)",
+                    d: "M8.70573 0.804236C8.31387 0.415059 7.68071 0.417238 7.29153 0.809106L0.949515 7.19494C0.560338 7.58681 0.562518 8.21997 0.954384 8.60915C1.34625 8.99832 1.97941 8.99614 2.36859 8.60428L8.00593 2.92798L13.6822 8.56532C14.0741 8.9545 14.7073 8.95232 15.0964 8.56046C15.4856 8.16859 15.4834 7.53543 15.0916 7.14625L8.70573 0.804236ZM9.12499 102L9.00106 1.51033L6.90107 1.51722L7.12501 102L9.12499 102Z",
+                    fill: match &*emulator_state.read() {
+                        Some(AnyEmulatorState::FiveStage(state)) => {
+                            match (state.pipeline.ex_control.alu_op_b_sel, *hovered_element.read()) {
+                                (Some(OpBSel::IMM), Some(FiveStageElement::ALUOpBSelControlSignal)) => {
+                                    "green"
+                                }
+                                (Some(OpBSel::IMM), _) => "rgba(0, 200, 0, 0.4)",
+                                (Some(OpBSel::RF), Some(FiveStageElement::ALUOpBSelControlSignal)) => {
+                                    "red"
+                                }
+                                (Some(OpBSel::RF), _) => "rgba(200, 0, 0, 0.4)",
+                                (Some(OpBSel::Four), Some(FiveStageElement::ALUOpBSelControlSignal)) => {
+                                    "blue"
+                                }
+                                (Some(OpBSel::Four), _) => "rgba(0, 0, 200, 0.4)",
+                                (None, _) => "gray",
+                            }
+                        }
+                        _ => "gray",
+                    },
+                }
+            }
+        }
         g {
-            id: "ex_ctrl_to_opbmux_group",
+            id: "jmp_conditional_group",
             style: "pointer-events: all;",
             onmouseenter: move |_| {
-                hovered_element.set(Some(FiveStageElement::ALUOpBSelControlSignal));
+                hovered_element.set(Some(FiveStageElement::JumpCondControlSignal));
             },
             onmouseleave: move |_| {
                 hovered_element.set(None);
             },
-            line {
-                id: "ex_ctrl_to_opbmux_line",
-                x1: "838",
-                y1: "561", // 10 pixels above the arrow (571-10=561)
-                x2: "858",
-                y2: "561", // 10 pixels above the arrow (571-10=561)
-                stroke: match &*emulator_state.read() {
-                    Some(AnyEmulatorState::FiveStage(state)) => {
-                        match (state.pipeline.ex_control.alu_op_b_sel, *hovered_element.read()) {
-                            (Some(OpBSel::IMM), Some(FiveStageElement::ALUOpBSelControlSignal)) => {
-                                "green"
-                            }
-                            (Some(OpBSel::IMM), _) => "rgba(0, 200, 0, 0.4)",
-                            (Some(OpBSel::RF), Some(FiveStageElement::ALUOpBSelControlSignal)) => {
-                                "red"
-                            }
-                            (Some(OpBSel::RF), _) => "rgba(200, 0, 0, 0.4)",
-                            (Some(OpBSel::Four), Some(FiveStageElement::ALUOpBSelControlSignal)) => {
-                                "blue"
-                            }
-                            (Some(OpBSel::Four), _) => "rgba(0, 0, 200, 0.4)",
-                            (None, _) => "gray",
-                        }
-                    }
-                    _ => "gray",
-                },
+            path {
+                id: "jmp_conditional_gate",
+                transform: "translate(101, -570)",
+                d: "M880 560C880 545.086 891.054 533 905.917 533H940V587H905.917C891.054 587 880 574.914 880 560Z",
+                fill: element_fill!(JumpCondControlSignal),
+                stroke: element_stroke!(JumpCondControlSignal),
                 "stroke-width": "2",
             }
             path {
-                id: "ex_ctrl_to_opbmux_arrow",
-                transform: "translate(0, 31)",
-                d: "M917.293 429.293C916.902 428.902 916.268 428.902 915.878 429.293L909.514 435.657C909.124 436.047 909.124 436.681 909.514 437.071C909.905 437.462 910.538 437.462 910.929 437.071L917 431.414L923.071 437.071C923.462 437.462 924.095 437.462 924.486 437.071C924.876 436.681 924.876 436.047 924.486 435.657L918.122 429.293ZM918 531L918 430L916 430L916 531L918 531Z",
-                fill: match &*emulator_state.read() {
-                    Some(AnyEmulatorState::FiveStage(state)) => {
-                        match (state.pipeline.ex_control.alu_op_b_sel, *hovered_element.read()) {
-                            (Some(OpBSel::IMM), Some(FiveStageElement::ALUOpBSelControlSignal)) => {
-                                "green"
-                            }
-                            (Some(OpBSel::IMM), _) => "rgba(0, 200, 0, 0.4)",
-                            (Some(OpBSel::RF), Some(FiveStageElement::ALUOpBSelControlSignal)) => {
-                                "red"
-                            }
-                            (Some(OpBSel::RF), _) => "rgba(200, 0, 0, 0.4)",
-                            (Some(OpBSel::Four), Some(FiveStageElement::ALUOpBSelControlSignal)) => {
-                                "blue"
-                            }
-                            (Some(OpBSel::Four), _) => "rgba(0, 0, 200, 0.4)",
-                            (None, _) => "gray",
-                        }
-                    }
-                    _ => "gray",
-                },
+                id: "jmp_conditional",
+                transform: "translate(-108, -50)",
+                d: "M1042.29 38.2929C1041.9 38.6834 1041.9 39.3166 1042.29 39.7071L1048.66 46.0711C1049.05 46.4616 1049.68 46.4616 1050.07 46.0711C1050.46 45.6805 1050.46 45.0474 1050.07 44.6569L1044.41 39L1050.07 33.3431C1050.46 32.9526 1050.46 32.3195 1050.07 31.9289C1049.68 31.5384 1049.05 31.5384 1048.66 31.9289L1042.29 38.2929ZM1088 38L1043 38V40L1088 40V38Z",
+                fill: element_stroke!(JumpCondControlSignal),
             }
+            // Input line from left
             line {
-                id: "ex_ctrl_to_opbmux_connect",
-                x1: "858",
-                y1: "561",
-                x2: "916",
-                y2: "561",
-                stroke: match &*emulator_state.read() {
-                    Some(AnyEmulatorState::FiveStage(state)) => {
-                        match (state.pipeline.ex_control.alu_op_b_sel, *hovered_element.read()) {
-                            (Some(OpBSel::IMM), Some(FiveStageElement::ALUOpBSelControlSignal)) => {
-                                "green"
-                            }
-                            (Some(OpBSel::IMM), _) => "rgba(0, 200, 0, 0.4)",
-                            (Some(OpBSel::RF), Some(FiveStageElement::ALUOpBSelControlSignal)) => {
-                                "red"
-                            }
-                            (Some(OpBSel::RF), _) => "rgba(200, 0, 0, 0.4)",
-                            (Some(OpBSel::Four), Some(FiveStageElement::ALUOpBSelControlSignal)) => {
-                                "blue"
-                            }
-                            (Some(OpBSel::Four), _) => "rgba(0, 0, 200, 0.4)",
-                            (None, _) => "gray",
-                        }
-                    }
-                    _ => "gray",
-                },
+                id: "jmp_cond_input_line",
+                x1: "860",
+                y1: "560",
+                x2: "880",
+                y2: "560",
+                stroke: element_stroke!(JumpCondControlSignal),
                 "stroke-width": "2",
             }
         }
@@ -587,6 +856,51 @@ pub fn FiveStageVisualization(
                 cy: "236",
                 r: "3",
                 fill: element_stroke!(IFPC),
+            }
+        }
+        g {
+            id: "jmp_address_group",
+            style: "pointer-events: all;",
+            onmouseenter: move |_| {
+                hovered_element.set(Some(FiveStageElement::JMPAddress));
+            },
+            onmouseleave: move |_| {
+                hovered_element.set(None);
+            },
+            rect {
+                id: "jmp_address_rect",
+                x: "978",
+                y: "156",
+                width: "40",
+                height: "40",
+                fill: element_fill!(JMPAddress),
+                stroke: element_stroke!(JMPAddress),
+                "stroke-width": "2",
+            }
+            line {
+                id: "jmp_address_line",
+                x1: "998",
+                y1: "38",
+                x2: "998",
+                y2: "155",
+                stroke: element_stroke!(JMPAddress),
+                "stroke-width": "2",
+            }
+            path {
+                id: "jmp_address_arrow",
+                transform: "translate(77.5, 30)",
+                d: "M0.804236 8.70573C0.415059 8.31387 0.417238 7.68071 0.809106 7.29153L7.19494 0.949515C7.58681 0.560338 8.21997 0.562518 8.60915 0.954384C8.99832 1.34625 8.99614 1.97941 8.60428 2.36859L2.92798 8.00593L8.56532 13.6822C8.9545 14.0741 8.95232 14.7073 8.56046 15.0964C8.16859 15.4856 7.53543 15.4834 7.14625 15.0916L0.804236 8.70573ZM921.5 9.12499L1.51033 9.00106L1.51722 7.00107L921.5 7.12501L921.5 9.12499Z",
+                fill: element_stroke!(JMPAddress),
+            }
+            text {
+                x: "998",
+                y: "183",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(JMPAddress),
+                "+"
             }
         }
         g {
@@ -968,9 +1282,34 @@ pub fn FiveStageVisualization(
             onmouseleave: move |_| {
                 hovered_element.set(None);
             },
+            line {
+                x1: "661",
+                y1: "227",
+                x2: "661",
+                y2: "250",
+                stroke: element_stroke!(DecoderRD),
+                "stroke-width": "2",
+            }
+            line {
+                x1: "660",
+                y1: "251",
+                x2: "710",
+                y2: "251",
+                stroke: element_stroke!(DecoderRD),
+                "stroke-width": "2",
+            }
+            line {
+                x1: "711",
+                y1: "250",
+                x2: "711",
+                y2: "512",
+                stroke: element_stroke!(DecoderRD),
+                "stroke-width": "2",
+            }
             path {
-                id: "decoder_rd_arrow",
-                d: "M660.293 275.707C660.683 276.098 661.317 276.098 661.707 275.707L668.071 269.343C668.462 268.953 668.462 268.319 668.071 267.929C667.681 267.538 667.047 267.538 666.657 267.929L661 273.586L655.343 267.929C654.953 267.538 654.319 267.538 653.929 267.929C653.538 268.319 653.538 268.953 653.929 269.343L660.293 275.707ZM660 227L660 275L662 275L662 227L660 227Z",
+                id: "rs2_value_arrow",
+                transform: "translate(0, 64)",
+                d: "M758.707 447.707C759.098 447.317 759.098 446.683 758.707 446.293L752.343 439.929C751.953 439.538 751.319 439.538 750.929 439.929C750.538 440.319 750.538 440.953 750.929 441.343L756.586 447L750.929 452.657C750.538 453.047 750.538 453.681 750.929 454.071C751.319 454.462 751.953 454.462 752.343 454.071L758.707 447.707ZM711 448H758V446H711V448Z",
                 fill: element_stroke!(DecoderRD),
             }
         }
@@ -1153,11 +1492,17 @@ pub fn FiveStageVisualization(
             }
             path {
                 id: "idex_pc_arrow2",
+                transform: "translate(0, -120)",
+                d: "M886.707 269.707C887.098 269.317 887.098 268.683 886.707 268.293L880.343 261.929C879.953 261.538 879.319 261.538 878.929 261.929C878.538 262.319 878.538 262.953 878.929 263.343L884.586 269L878.929 274.657C878.538 275.047 878.538 275.681 878.929 276.071C879.319 276.462 879.953 276.462 880.343 276.071L886.707 269.707ZM867 270H886V268H867V270Z",
+                fill: element_stroke!(IDEXPC),
+            }
+            path {
+                id: "idex_pc_arrow3",
                 d: "M886.707 269.707C887.098 269.317 887.098 268.683 886.707 268.293L880.343 261.929C879.953 261.538 879.319 261.538 878.929 261.929C878.538 262.319 878.538 262.953 878.929 263.343L884.586 269L878.929 274.657C878.538 275.047 878.538 275.681 878.929 276.071C879.319 276.462 879.953 276.462 880.343 276.071L886.707 269.707ZM867 270H886V268H867V270Z",
                 fill: element_stroke!(IDEXPC),
             }
             line {
-                id: "idex_pc_arrow3",
+                id: "idex_pc_line",
                 x1: "866",
                 y1: "270",
                 x2: "866",
@@ -1166,9 +1511,16 @@ pub fn FiveStageVisualization(
                 "stroke-width": "2",
             }
             circle {
-                id: "idex_pc_node",
+                id: "idex_pc_node1",
                 cx: "866",
                 cy: "109",
+                r: "3",
+                fill: element_stroke!(IDEXPC),
+            }
+            circle {
+                id: "idex_pc_node2",
+                cx: "866",
+                cy: "149",
                 r: "3",
                 fill: element_stroke!(IDEXPC),
             }
@@ -1237,9 +1589,31 @@ pub fn FiveStageVisualization(
                 "stroke-width": "2",
                 fill: element_fill!(IDEXRS1),
             }
+            line {
+                id: "idex_pc_arrow3",
+                x1: "850",
+                y1: "325",
+                x2: "850",
+                y2: "205",
+                stroke: element_stroke!(IDEXRS1),
+                "stroke-width": "2",
+            }
+            circle {
+                id: "idex_pc_node1",
+                cx: "850",
+                cy: "325",
+                r: "3",
+                fill: element_stroke!(IDEXRS1),
+            }
             path {
                 id: "idex_rs1_arrow",
                 d: "M886.707 325.707C887.098 325.317 887.098 324.683 886.707 324.293L880.343 317.929C879.953 317.538 879.319 317.538 878.929 317.929C878.538 318.319 878.538 318.953 878.929 319.343L884.586 325L878.929 330.657C878.538 331.047 878.538 331.681 878.929 332.071C879.319 332.462 879.953 332.462 880.343 332.071L886.707 325.707ZM839 326H886V324H839V326Z",
+                fill: element_stroke!(IDEXRS1),
+            }
+            path {
+                id: "idex_rs1_arrow_shorter",
+                transform: "translate(0, -120)",
+                d: "M886.707 325.707C887.098 325.317 887.098 324.683 886.707 324.293L880.343 317.929C879.953 317.538 879.319 317.538 878.929 317.929C878.538 318.319 878.538 318.953 878.929 319.343L884.586 325L878.929 330.657C878.538 331.047 878.538 331.681 878.929 332.071C879.319 332.462 879.953 332.462 880.343 332.071L886.707 325.707ZM849 326H886V324H849V326Z",
                 fill: element_stroke!(IDEXRS1),
             }
             text {
@@ -1254,6 +1628,42 @@ pub fn FiveStageVisualization(
             }
         }
         g {
+            id: "idex_rd_register_group",
+            style: "pointer-events: all;",
+            onmouseenter: move |_| {
+                hovered_element.set(Some(FiveStageElement::IDEXRD));
+            },
+            onmouseleave: move |_| {
+                hovered_element.set(None);
+            },
+            rect {
+                id: "idex_rd_rect",
+                x: "760",
+                y: "491",
+                width: "78",
+                height: "38",
+                stroke: element_stroke!(IDEXRD),
+                "stroke-width": "2",
+                fill: element_fill!(IDEXRD),
+            }
+            path {
+                id: "idex_rd_arrow",
+                d: "M1115.71 325.707C1116.1 325.317 1116.1 324.683 1115.71 324.293L1109.34 317.929C1108.95 317.538 1108.32 317.538 1107.93 317.929C1107.54 318.319 1107.54 318.953 1107.93 319.343L1113.59 325L1107.93 330.657C1107.54 331.047 1107.54 331.681 1107.93 332.071C1108.32 332.462 1108.95 332.462 1109.34 332.071L1115.71 325.707ZM839 326H1115V324H839V326Z",
+                fill: element_stroke!(IDEXRD),
+                transform: "translate(0, 186)",
+            }
+            text {
+                x: "799",
+                y: "517",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(IDEXRD),
+                "RD"
+            }
+        }
+        g {
             id: "idex_ctrl_register_group",
             style: "pointer-events: all;",
             onmouseenter: move |_| {
@@ -1265,9 +1675,9 @@ pub fn FiveStageVisualization(
             rect {
                 id: "ex_ctrl_rect",
                 x: "760",
-                y: "500",
+                y: "541",
                 width: "78",
-                height: "80",
+                height: "38",
                 stroke: element_stroke!(EXControl),
                 "stroke-width": "2",
                 fill: element_fill!(EXControl),
@@ -1276,21 +1686,11 @@ pub fn FiveStageVisualization(
                 id: "ex_ctrl_arrow",
                 d: "M1115.71 325.707C1116.1 325.317 1116.1 324.683 1115.71 324.293L1109.34 317.929C1108.95 317.538 1108.32 317.538 1107.93 317.929C1107.54 318.319 1107.54 318.953 1107.93 319.343L1113.59 325L1107.93 330.657C1107.54 331.047 1107.54 331.681 1107.93 332.071C1108.32 332.462 1108.95 332.462 1109.34 332.071L1115.71 325.707ZM839 326H1115V324H839V326Z",
                 fill: element_stroke!(EXControl),
-                transform: "translate(0, 245)",
+                transform: "translate(0, 236)",
             }
             text {
                 x: "799",
-                y: "537",
-                "font-family": "Arial",
-                "font-size": "18",
-                "font-weight": "bold",
-                "text-anchor": "middle",
-                fill: element_stroke!(EXControl),
-                "EX"
-            }
-            text {
-                x: "799",
-                y: "557",
+                y: "567",
                 "font-family": "Arial",
                 "font-size": "18",
                 "font-weight": "bold",
@@ -1300,6 +1700,43 @@ pub fn FiveStageVisualization(
             }
         }
         g {
+            id: "exmem_rd_register_group",
+            style: "pointer-events: all;",
+            onmouseenter: move |_| {
+                hovered_element.set(Some(FiveStageElement::EXMEMRD));
+            },
+            onmouseleave: move |_| {
+                hovered_element.set(None);
+            },
+            rect {
+                id: "exmem_rd_rect",
+                x: "1117",
+                y: "491",
+                width: "78",
+                height: "38",
+                stroke: element_stroke!(EXMEMRD),
+                "stroke-width": "2",
+                fill: element_fill!(EXMEMRD),
+            }
+            path {
+                id: "exmem_rd_arrow",
+                d: "M1115.71 325.707C1116.1 325.317 1116.1 324.683 1115.71 324.293L1109.34 317.929C1108.95 317.538 1108.32 317.538 1107.93 317.929C1107.54 318.319 1107.54 318.953 1107.93 319.343L1113.59 325L1107.93 330.657C1107.54 331.047 1107.54 331.681 1107.93 332.071C1108.32 332.462 1108.95 332.462 1109.34 332.071L1115.71 325.707ZM839 326H1115V324H839V326Z",
+                fill: element_stroke!(EXMEMRD),
+                transform: "translate(357, 186)",
+            }
+            text {
+                x: "1156",
+                y: "517",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(EXMEMRD),
+                "RD"
+            }
+        }
+        g {
+
             id: "exmem_ctrl_register_group",
             style: "pointer-events: all;",
             onmouseenter: move |_| {
@@ -1311,9 +1748,9 @@ pub fn FiveStageVisualization(
             rect {
                 id: "mem_ctrl_rect",
                 x: "1117",
-                y: "500",
+                y: "541",
                 width: "78",
-                height: "80",
+                height: "38",
                 stroke: element_stroke!(MEMControl),
                 "stroke-width": "2",
                 fill: element_fill!(MEMControl),
@@ -1322,27 +1759,47 @@ pub fn FiveStageVisualization(
                 id: "exmem_ctrl_arrow",
                 d: "M1115.71 325.707C1116.1 325.317 1116.1 324.683 1115.71 324.293L1109.34 317.929C1108.95 317.538 1108.32 317.538 1107.93 317.929C1107.54 318.319 1107.54 318.953 1107.93 319.343L1113.59 325L1107.93 330.657C1107.54 331.047 1107.54 331.681 1107.93 332.071C1108.32 332.462 1108.95 332.462 1109.34 332.071L1115.71 325.707ZM839 326H1115V324H839V326Z",
                 fill: element_stroke!(MEMControl),
-                transform: "translate(357, 245)",
+                transform: "translate(357, 236)",
             }
             text {
                 x: "1156",
-                y: "537",
-                "font-family": "Arial",
-                "font-size": "18",
-                "font-weight": "bold",
-                "text-anchor": "middle",
-                fill: element_stroke!(MEMControl),
-                "MEM"
-            }
-            text {
-                x: "1156",
-                y: "557",
+                y: "567",
                 "font-family": "Arial",
                 "font-size": "18",
                 "font-weight": "bold",
                 "text-anchor": "middle",
                 fill: element_stroke!(MEMControl),
                 "CTRL"
+            }
+        }
+        g {
+            id: "memwb_rd_register_group",
+            style: "pointer-events: all;",
+            onmouseenter: move |_| {
+                hovered_element.set(Some(FiveStageElement::MEMWBRD));
+            },
+            onmouseleave: move |_| {
+                hovered_element.set(None);
+            },
+            rect {
+                id: "memwb_rd_rect",
+                x: "1474",
+                y: "491",
+                width: "78",
+                height: "38",
+                stroke: element_stroke!(MEMWBRD),
+                "stroke-width": "2",
+                fill: element_fill!(MEMWBRD),
+            }
+            text {
+                x: "1513",
+                y: "517",
+                "font-family": "Arial",
+                "font-size": "18",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(MEMWBRD),
+                "RD"
             }
         }
         g {
@@ -1357,26 +1814,16 @@ pub fn FiveStageVisualization(
             rect {
                 id: "wb_ctrl_rect",
                 x: "1474",
-                y: "500",
+                y: "541",
                 width: "78",
-                height: "80",
+                height: "38",
                 stroke: element_stroke!(WBControl),
                 "stroke-width": "2",
                 fill: element_fill!(WBControl),
             }
             text {
                 x: "1513",
-                y: "537",
-                "font-family": "Arial",
-                "font-size": "18",
-                "font-weight": "bold",
-                "text-anchor": "middle",
-                fill: element_stroke!(WBControl),
-                "WB"
-            }
-            text {
-                x: "1513",
-                y: "557",
+                y: "567",
                 "font-family": "Arial",
                 "font-size": "18",
                 "font-weight": "bold",
@@ -1479,8 +1926,14 @@ pub fn FiveStageVisualization(
                 fill: element_fill!(IDEXImm),
             }
             path {
-                id: "idex_imm_arrow",
+                id: "idex_imm_arrow1",
                 d: "M886.707 395.707C887.098 395.317 887.098 394.683 886.707 394.293L880.343 387.929C879.953 387.538 879.319 387.538 878.929 387.929C878.538 388.319 878.538 388.953 878.929 389.343L884.586 395L878.929 400.657C878.538 401.047 878.538 401.681 878.929 402.071C879.319 402.462 879.953 402.462 880.343 402.071L886.707 395.707ZM839 396H886V394H839V396Z",
+                fill: element_stroke!(IDEXImm),
+            }
+            path {
+                id: "idex_imm_arrow2",
+                transform: "translate(990, 196.5)",
+                d: "M8.70573 0.804236C8.31387 0.415059 7.68071 0.417238 7.29153 0.809106L0.949515 7.19494C0.560338 7.58681 0.562518 8.21997 0.954384 8.60915C1.34625 8.99832 1.97941 8.99614 2.36859 8.60428L8.00593 2.92798L13.6822 8.56532C14.0741 8.9545 14.7073 8.95232 15.0964 8.56046C15.4856 8.16859 15.4834 7.53543 15.0916 7.14625L8.70573 0.804236ZM9.12499 41.5L9.00106 1.51033L7.00107 1.51722L7.12501 41.5L9.12499 41.5Z",
                 fill: element_stroke!(IDEXImm),
             }
             text {
@@ -1492,6 +1945,75 @@ pub fn FiveStageVisualization(
                 "text-anchor": "middle",
                 fill: element_stroke!(IDEXImm),
                 "IMM"
+            }
+            line {
+                id: "idex_pc_line1",
+                x1: "858",
+                y1: "395",
+                x2: "858",
+                y2: "236",
+                stroke: element_stroke!(IDEXImm),
+                "stroke-width": "2",
+            }
+            line {
+                id: "idex_pc_line2",
+                x1: "859",
+                y1: "237",
+                x2: "998",
+                y2: "237",
+                stroke: element_stroke!(IDEXImm),
+                "stroke-width": "2",
+            }
+            circle {
+                id: "idex_pc_node1",
+                cx: "858",
+                cy: "395",
+                r: "3",
+                fill: element_stroke!(IDEXImm),
+            }
+        }
+        g {
+            id: "jmp_addr_mux_group",
+            style: "pointer-events: all;",
+            onmouseenter: move |_| {
+                hovered_element.set(Some(FiveStageElement::JMPBaseAddress));
+            },
+            onmouseleave: move |_| {
+                hovered_element.set(None);
+            },
+            path {
+                id: "jmp_addr_mux",
+                d: "M888 243.558L946 270.142V323.858L888 350.442V243.558Z",
+                transform: "translate(0, -120)",
+                stroke: element_stroke!(JMPBaseAddress),
+                "stroke-width": "2",
+                fill: element_fill!(JMPBaseAddress),
+            }
+            path {
+                id: "jmp_addr_arrow",
+                transform: "translate(0, -120)",
+                d: "M976.707 297.707C977.098 297.317 977.098 296.683 976.707 296.293L970.343 289.929C969.953 289.538 969.319 289.538 968.929 289.929C968.538 290.319 968.538 290.953 968.929 291.343L974.586 297L968.929 302.657C968.538 303.047 968.538 303.681 968.929 304.071C969.319 304.462 969.953 304.462 970.343 304.071L976.707 297.707ZM947 298H976V296H947V298Z",
+                fill: element_stroke!(JMPBaseAddress),
+            }
+            text {
+                x: "902",
+                y: "153",
+                "font-family": "Arial",
+                "font-size": "14",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(JMPBaseAddress),
+                "PC"
+            }
+            text {
+                x: "905",
+                y: "210",
+                "font-family": "Arial",
+                "font-size": "14",
+                "font-weight": "bold",
+                "text-anchor": "middle",
+                fill: element_stroke!(JMPBaseAddress),
+                "RS1"
             }
         }
         g {
@@ -1614,6 +2136,7 @@ pub fn FiveStageVisualization(
             }
             path {
                 id: "alu_arrow2",
+                transform: "translate(0, -40)",
                 d: "M1042.29 38.2929C1041.9 38.6834 1041.9 39.3166 1042.29 39.7071L1048.66 46.0711C1049.05 46.4616 1049.68 46.4616 1050.07 46.0711C1050.46 45.6805 1050.46 45.0474 1050.07 44.6569L1044.41 39L1050.07 33.3431C1050.46 32.9526 1050.46 32.3195 1050.07 31.9289C1049.68 31.5384 1049.05 31.5384 1048.66 31.9289L1042.29 38.2929ZM1088 38L1043 38V40L1088 40V38Z",
                 fill: element_stroke!(ALU),
             }
@@ -1629,7 +2152,7 @@ pub fn FiveStageVisualization(
                 x1: "1087",
                 y1: "358",
                 x2: "1087",
-                y2: "39",
+                y2: "0",
                 stroke: element_stroke!(ALU),
                 "stroke-width": "2",
             }
@@ -2183,29 +2706,29 @@ pub fn FiveStageVisualization(
             },
             rect {
                 id: "controller_rect",
-                x: "542",
-                y: "500",
-                width: "158",
+                x: "580",
+                y: "520",
+                width: "120",
                 height: "80",
                 stroke: element_stroke!(ControlUnit),
                 "stroke-width": "2",
                 fill: element_fill!(ControlUnit),
             }
             text {
-                x: "621",
-                y: "547",
+                x: "640",
+                y: "567",
                 "font-family": "Arial",
                 "font-size": "20",
                 "font-weight": "bold",
                 "text-anchor": "middle",
                 fill: element_stroke!(ControlUnit),
-                "CONTROLLER"
+                "CONTROL"
             }
             path {
                 id: "controller_to_idex_arrow",
                 d: "M758.707 447.707C759.098 447.317 759.098 446.683 758.707 446.293L752.343 439.929C751.953 439.538 751.319 439.538 750.929 439.929C750.538 440.319 750.538 440.953 750.929 441.343L756.586 447L750.929 452.657C750.538 453.047 750.538 453.681 750.929 454.071C751.319 454.462 751.953 454.462 752.343 454.071L758.707 447.707ZM701 448H758V446H701V448Z",
                 fill: element_stroke!(ControlUnit),
-                transform: "translate(0, 93)",
+                transform: "translate(0, 113)",
             }
         }
     }
