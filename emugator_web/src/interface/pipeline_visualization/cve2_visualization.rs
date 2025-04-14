@@ -53,18 +53,10 @@ enum CVE2Element {
 impl CVE2Element {
     fn tooltip_text(&self, pipeline: &CVE2Pipeline) -> String {
         match self {
-            CVE2Element::IfIdBuffer => {
-                format!("IF/ID Buffer")
-            }
-            CVE2Element::Decoder => {
-                format!("Decoder")
-            }
-            CVE2Element::RegisterFile => {
-                format!("Register File")
-            }
-            CVE2Element::DataMemory => {
-                format!("Data Memory")
-            }
+            CVE2Element::IfIdBuffer => "IF/ID Buffer".to_string(),
+            CVE2Element::Decoder => "Decoder".to_string(),
+            CVE2Element::RegisterFile => "Register File".to_string(),
+            CVE2Element::DataMemory => "Data Memory".to_string(),
             CVE2Element::IfPc => {
                 format!("IF PC: {}", format_pc(pipeline.IF_pc))
             }
@@ -130,15 +122,12 @@ impl CVE2Element {
                 let is_active = pipeline.control.pc_set;
                 format!("PC Set: {}", if is_active { "Enabled" } else { "Disabled" })
             }
-            CVE2Element::BranchUnit => {
-                let target_address = match pipeline.datapath.alu_out {
-                    Some(value) => format!("JMP: {}", format_pc(value)),
-                    None => "JMP: None".to_string(),
-                };
-                target_address
-            }
+            CVE2Element::BranchUnit => match pipeline.datapath.alu_out {
+                Some(value) => format!("JMP: {}", format_pc(value)),
+                None => "JMP: None".to_string(),
+            },
             CVE2Element::InstructionMemory => match pipeline.IF_inst {
-                Some(inst) => format!("Instruction: {}", format!("0x{:08X}", inst)),
+                Some(inst) => format!("Instruction: 0x{:08X}", inst),
                 None => return "None".to_string(),
             },
             CVE2Element::PCPlus4 => {
@@ -151,8 +140,8 @@ impl CVE2Element {
                 None => return "None".to_string(),
             },
             CVE2Element::IdIr => match pipeline.ID_inst {
-                Some(inst) => format!("Instruction: {}", format!("0x{:08X}", inst)),
-                None => return "None".to_string(),
+                Some(inst) => format!("Instruction: 0x{:08X}", inst),
+                None => "None".to_string(),
             },
             CVE2Element::Rs1 => format!("RS1: {}", pipeline.datapath.reg_s1),
             CVE2Element::Rs2 => format!("RS2: {}", pipeline.datapath.reg_s2),
@@ -363,19 +352,18 @@ pub fn CVE2Visualization(
     tooltip_text: Signal<Option<String>>,
     show_control_signals: Signal<bool>,
 ) -> Element {
-    const HOVER_STROKE: &'static str = "rgba(66, 133, 244, 1)";
-    const ACTIVE_STROKE: &'static str = "rgba(147, 112, 219, 1)";
-    const HOVER_FILL: &'static str = "rgba(66, 133, 244, 0.1)";
+    const HOVER_STROKE: &str = "rgba(66, 133, 244, 1)";
+    const ACTIVE_STROKE: &str = "rgba(147, 112, 219, 1)";
+    const HOVER_FILL: &str = "rgba(66, 133, 244, 0.1)";
 
     let mut hovered_element = use_signal(|| Option::<CVE2Element>::None);
-    let mut active_elements = use_signal(|| BTreeSet::<CVE2Element>::new());
+    let mut active_elements = use_signal(BTreeSet::<CVE2Element>::new);
 
     // Update active elements based on control signals
-    use_effect(move || match &*emulator_state.read() {
-        Some(AnyEmulatorState::CVE2(state)) => {
+    use_effect(move || {
+        if let Some(AnyEmulatorState::CVE2(state)) = &*emulator_state.read() {
             active_elements.set(find_active_elements(state.pipeline.control));
         }
-        _ => {}
     });
 
     // Sync tooltip text with the hovered element

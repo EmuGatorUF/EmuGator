@@ -12,7 +12,7 @@ pub struct HazardDetector {
     /// This is 1 cycles of stopping, then 1 cycle of freeing IF, and 1 cycle of freeing ID.
     branch_jump_track: u8,
 
-    // Tracks the number of cycles for memory operations because lsu stage will take two cycles 
+    // Tracks the number of cycles for memory operations because lsu stage will take two cycles
     // mem stage cannot be overwritten during this.
     mem_access_track: u8,
 }
@@ -34,7 +34,7 @@ impl HazardDetector {
             }
         }
 
-        if self.branch_jump_track != 0{
+        if self.branch_jump_track != 0 {
             self.branch_jump_track -= 1;
         }
         // if a jump was not taken, reduce the hazard so the old if_pc goes through and isn't skipped.
@@ -43,9 +43,9 @@ impl HazardDetector {
         }
 
         // check that neither register being read is a hazard.
-        let instr_def = InstructionDefinition::from_instr(instruction.clone()).unwrap();
+        let instr_def = InstructionDefinition::from_instr(instruction).unwrap();
         let instr_frmt = instr_def.format;
-        
+
         if self.mem_access_track != 0 {
             match self.mem_access_track {
                 1 => self.hazard_detected = Hazard::allow_up_to_id(),
@@ -53,20 +53,17 @@ impl HazardDetector {
                 _ => self.hazard_detected = Hazard::all_go(),
             }
             self.mem_access_track -= 1;
-
         } else if instr_frmt != InstructionFormat::U
             && instr_frmt != InstructionFormat::J
             && self.hazard_reg_track[instruction.rs1() as usize] != 0
         {
             self.hazard_detected = Hazard::stop_up_to_ex();
-
         } else if (instr_frmt == InstructionFormat::R
             || instr_frmt == InstructionFormat::S
             || instr_frmt == InstructionFormat::B)
             && self.hazard_reg_track[instruction.rs2() as usize] != 0
         {
             self.hazard_detected = Hazard::stop_up_to_ex();
-
         } else if self.branch_jump_track != 0 {
             match self.branch_jump_track {
                 1 => self.hazard_detected = Hazard::allow_up_to_id(),
@@ -97,7 +94,6 @@ impl HazardDetector {
                 // must be 4 because register track is decremented at the beginning, and it is only at the start of the fourth cycle the hazard is gone.
                 self.hazard_reg_track[instruction.rd() as usize] = 4;
             }
-            
         } else {
             if instr_frmt != InstructionFormat::S {
                 // must be 4 because register track is decremented at the beginning, and it is only at the start of the fourth cycle the hazard is gone.

@@ -7,7 +7,9 @@ use std::collections::BTreeSet;
 use std::ops::Deref;
 
 use dioxus_free_icons::Icon;
-use dioxus_free_icons::icons::ld_icons::{LdCircleArrowRight, LdCircleCheck, LdInfo, LdPlay, LdCircleX};
+use dioxus_free_icons::icons::ld_icons::{
+    LdCircleArrowRight, LdCircleCheck, LdCircleX, LdInfo, LdPlay, LdRefreshCw,
+};
 use dioxus_free_icons::icons::ld_icons::{LdClock3, LdClock6, LdClock9, LdClock12};
 
 #[component]
@@ -17,10 +19,11 @@ pub fn Navbar(
     assembled_program: Signal<Option<AssembledProgram>>,
     assembler_errors: Signal<Vec<AssemblerError>>,
     emulator_state: Signal<Option<AnyEmulatorState>>,
+    serial_input: Signal<String>,
     selected_emulator: Signal<EmulatorOption>,
     breakpoints: ReadOnlySignal<BTreeSet<usize>>,
     minimize_console: Signal<bool>,
-    help_panel_displayed: Signal<bool>
+    help_panel_displayed: Signal<bool>,
 ) -> Element {
     let is_started = emulator_state.read().is_some();
     let is_assembled = assembled_program.read().is_some();
@@ -40,10 +43,13 @@ pub fn Navbar(
                             match assembler::assemble(&source.read()) {
                                 Ok(assembled) => {
                                     info!("Final assembly succeeded.");
-                                    let new_state = AnyEmulatorState::new_of_type(
+                                    let mut new_state = AnyEmulatorState::new_of_type(
                                         &assembled,
                                         *selected_emulator.read(),
                                     );
+                                    new_state
+                                        .memory_io_mut()
+                                        .set_serial_input(serial_input.read().as_bytes());
                                     emulator_state.set(Some(new_state));
                                     assembled_program.set(Some(assembled));
                                     assembler_errors.set(Vec::new());
@@ -56,8 +62,13 @@ pub fn Navbar(
                                 }
                             }
                         },
-                        Icon { width: 15, icon: LdPlay }
-                        "Start"
+                        if !is_started {
+                            Icon { width: 15, icon: LdPlay }
+                            "Start"
+                        } else {
+                            Icon { width: 15, icon: LdRefreshCw }
+                            "Reload"
+                        }
                     }
 
                     button {
@@ -108,11 +119,11 @@ pub fn Navbar(
                         ),
                         disabled: !is_started,
                         onclick: move |_| {
-                            if let Some(mut program) = assembled_program.as_mut() {
+                            if let Some(program) = assembled_program.as_mut() {
                                 let new_state = emulator_state
                                     .read()
                                     .as_ref()
-                                    .map(|e| { e.clock_until_next_instruction(&mut program, 1000) });
+                                    .map(|e| { e.clock_until_next_instruction(&program, 1000) });
                                 emulator_state.set(new_state);
                             }
                         },
@@ -165,10 +176,7 @@ pub fn Navbar(
                             "Program Assembled"
                         }
                     } else if error_count > 0 {
-                        Icon {
-                            width: 17,
-                            icon: LdCircleX
-                        }
+                        Icon { width: 17, icon: LdCircleX }
                         "Errors: {error_count}"
                     } else {
                         "Ready"
@@ -181,7 +189,7 @@ pub fn Navbar(
                         selected_emulator.set(new_selection);
                         emulator_state.set(None);
                     },
-                    img { width: 20, src: "assets/pipeline.svg" }
+                    img { width: 20, src: asset!("assets/pipeline.svg") }
                     "{selected_emulator.read().display_string()}"
                 }
                 button {
@@ -192,8 +200,12 @@ pub fn Navbar(
                         info!("Help panel toggled: {:?}", help_panel_toggle);
                     },
                     match *help_panel_displayed.read() {
-                        true => rsx!(Icon { width: 18, icon: LdCircleX }),
-                        _ => rsx!(Icon { width: 18, icon: LdInfo }),                   
+                        true => rsx! {
+                            Icon { width: 18, icon: LdCircleX }
+                        },
+                        _ => rsx! {
+                            Icon { width: 18, icon: LdInfo }
+                        },
                     }
                 }
             }

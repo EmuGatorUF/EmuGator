@@ -364,27 +364,33 @@ impl Instruction {
         bits!(self.instr,6;0) as u8
     }
 
-    pub fn immediate(&self) -> Result<i32, ()> {
+    pub fn immediate(&self) -> Option<i32> {
         // get format from instruction opcode, etc
-        let format: InstructionFormat = InstructionDefinition::from_instr(*self).ok_or(())?.format;
+        let format: InstructionFormat = InstructionDefinition::from_instr(*self)?.format;
         match format {
             InstructionFormat::I => {
-                Ok(((bits!(self.instr, 31) * bitmask!(31; 11)) | bits!(self.instr,30;20)) as i32)
+                Some(((bits!(self.instr, 31) * bitmask!(31; 11)) | bits!(self.instr,30;20)) as i32)
             }
-            InstructionFormat::S => Ok(((bits!(self.instr, 31) * bitmask!(31; 11))
-                | (bits!(self.instr,30;25) << 5)
-                | bits!(self.instr,11;7 )) as i32),
-            InstructionFormat::B => Ok(((bits!(self.instr, 31) * bitmask!(31; 12))
-                | (bits!(self.instr, 7) << 11)
-                | (bits!(self.instr,30;25) << 5)
-                | (bits!(self.instr,11;8 ) << 1)) as i32),
-            InstructionFormat::U => Ok((bits!(self.instr,31;12) << 12) as i32),
-            InstructionFormat::J => Ok(((bits!(self.instr, 31) * bitmask!(31; 20))
-                | (bits!(self.instr,19;12) << 12)
-                | (bits!(self.instr, 20) << 11)
-                | (bits!(self.instr,30;25) << 5)
-                | (bits!(self.instr,24;21) << 1)) as i32),
-            _ => Err(()),
+            InstructionFormat::S => Some(
+                ((bits!(self.instr, 31) * bitmask!(31; 11))
+                    | (bits!(self.instr,30;25) << 5)
+                    | bits!(self.instr,11;7 )) as i32,
+            ),
+            InstructionFormat::B => Some(
+                ((bits!(self.instr, 31) * bitmask!(31; 12))
+                    | (bits!(self.instr, 7) << 11)
+                    | (bits!(self.instr,30;25) << 5)
+                    | (bits!(self.instr,11;8 ) << 1)) as i32,
+            ),
+            InstructionFormat::U => Some((bits!(self.instr,31;12) << 12) as i32),
+            InstructionFormat::J => Some(
+                ((bits!(self.instr, 31) * bitmask!(31; 20))
+                    | (bits!(self.instr,19;12) << 12)
+                    | (bits!(self.instr, 20) << 11)
+                    | (bits!(self.instr,30;25) << 5)
+                    | (bits!(self.instr,24;21) << 1)) as i32,
+            ),
+            _ => None,
         }
     }
 

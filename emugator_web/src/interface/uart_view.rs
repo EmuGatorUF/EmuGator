@@ -2,17 +2,16 @@ use dioxus::prelude::*;
 use dioxus::{prelude::component, signals::Signal};
 use emugator_core::emulator::AnyEmulatorState;
 
-use dioxus_free_icons::icons::ld_icons::{LdChevronUp, LdChevronDown};
 use dioxus_free_icons::Icon;
+use dioxus_free_icons::icons::ld_icons::{LdChevronDown, LdChevronUp};
 
 #[component]
 #[allow(non_snake_case)]
 pub fn UartView(
     emulator_state: Signal<Option<AnyEmulatorState>>,
+    serial_input: Signal<String>,
     minimize_console: Signal<bool>,
 ) -> Element {
-    let mut input_text = use_signal(|| String::new());
-
     let state = emulator_state.read();
 
     let icon_width = 25;
@@ -28,15 +27,9 @@ pub fn UartView(
                             minimize_console.set(!is_minimized);
                         },
                         if *minimize_console.read() {
-                            Icon {
-                                width: icon_width,
-                                icon: LdChevronUp
-                            }
+                            Icon { width: icon_width, icon: LdChevronUp }
                         } else {
-                            Icon {
-                                width: icon_width,
-                                icon: LdChevronDown
-                            }
+                            Icon { width: icon_width, icon: LdChevronDown }
                         }
                     }
                 }
@@ -68,16 +61,15 @@ pub fn UartView(
                                         String::from_utf8_lossy(memory_io_mut.get_serial_input()), new_value, i
                                     );
                                     memory_io_mut.set_serial_input(new_value.as_bytes());
-                                    input_text
+                                    serial_input
                                         .set(
-                                            String::from_utf8_lossy(&memory_io_mut.get_serial_input())
-                                                .to_string(),
+                                            String::from_utf8_lossy(memory_io_mut.get_serial_input()).to_string(),
                                         );
                                 } else {
-                                    input_text.set(value);
+                                    serial_input.set(value);
                                 }
                             },
-                            value: "{input_text}",
+                            value: "{serial_input}",
                         }
                     }
                     div { class: "whitespace-pre",

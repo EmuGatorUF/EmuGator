@@ -4,7 +4,7 @@ use crate::isa::Instruction;
 
 /// Control signals for the five stage datapath.
 /// Note: `Option::None` is used to represent a "don't care" value.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct FiveStageControl {
     // ALU Control
     pub alu_op_a_sel: Option<OpASel>, // Mux control for selecting operand A.
@@ -28,26 +28,6 @@ pub struct FiveStageControl {
 
     // Debug Control
     pub debug_req: bool, // Debug request control
-}
-
-impl Default for FiveStageControl {
-    fn default() -> Self {
-        Self {
-            alu_op_a_sel: None,
-            alu_op_b_sel: None,
-            alu_op: None,
-            lsu_data_type: None,
-            lsu_request: false,
-            lsu_write_enable: false,
-            lsu_sign_ext: false,
-            wb_src: None,
-            reg_write: false,
-            jmp_base: None,
-            jump_uncond: false,
-            jump_cond: false,
-            debug_req: false,
-        }
-    }
 }
 
 impl FiveStageControl {

@@ -138,7 +138,7 @@ impl FiveStagePipeline {
         self.id_lines.rs1 = instr.rs1();
         self.id_lines.rs2 = instr.rs2();
         self.id_lines.rd = instr.rd();
-        self.id_lines.imm = instr.immediate().ok().map(|x| x as u32);
+        self.id_lines.imm = instr.immediate().map(|x| x as u32);
 
         // read from register file
         self.id_lines.rs1_v = registers[self.id_lines.rs1 as usize];
@@ -239,14 +239,10 @@ impl FiveStagePipeline {
 
     fn run_wb(&mut self) {
         // select source
-        self.wb_lines.wb_data = self
-            .wb_control
-            .wb_src
-            .map(|s| match s {
-                DataDestSel::ALU => self.mem_wb.alu,
-                DataDestSel::LSU => self.mem_wb.lsu,
-            })
-            .flatten();
+        self.wb_lines.wb_data = self.wb_control.wb_src.and_then(|s| match s {
+            DataDestSel::ALU => self.mem_wb.alu,
+            DataDestSel::LSU => self.mem_wb.lsu,
+        });
     }
 
     /* ---------------------------- Clocked Registers --------------------------- */

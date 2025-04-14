@@ -1,7 +1,5 @@
 use crate::emulator::controller_common::PCSel;
 
-use super::hazard_detection::Hazard;
-
 #[derive(Clone, Copy, Default, Debug)]
 pub struct IfLines {
     pub instr: Option<u32>,

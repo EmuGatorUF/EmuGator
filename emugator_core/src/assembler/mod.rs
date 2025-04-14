@@ -232,7 +232,7 @@ fn parse_directive<'a>(
                             error_message: "Skip is too large.".into(),
                             ..expression_err
                         })?;
-                    
+
                     Directive::Data(vec![0u8; skip as usize], 0)
                 }
                 "byte" | "2byte" | "4byte" | "8byte" | "half" | "word" | "dword" => {

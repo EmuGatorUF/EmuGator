@@ -58,7 +58,7 @@ struct DocEntry<'a> {
     example: Cow<'a, str>,
 }
 
-const DOCS: &str = include_str!("../../docs.json");
+const DOCS: &str = include_str!("../../assets/docs.json");
 
 fn get_word_at_position(line: &str, col: usize) -> &str {
     let word_end =
