@@ -64,3 +64,30 @@ pub struct CVE2Datapath {
     pub cmp_result: bool,     // Result of the branch comparison operation.
     pub next_pc: Option<u32>, // Next program counter value.
 }
+
+impl PartialEq for CVE2Datapath {
+    fn eq(&self, other: &Self) -> bool {
+        self.data_req_o == other.data_req_o
+            && self.data_addr_o == other.data_addr_o
+            && self.data_wdata_o == other.data_wdata_o
+            && self.data_rdata_i == other.data_rdata_i
+            && self.data_we_o == other.data_we_o
+            && self.data_be_o == other.data_be_o
+            && self.data_gnt_i == other.data_gnt_i
+            && self.data_rvalid_i == other.data_rvalid_i
+            && self.data_err_i == other.data_err_i
+            && self.reg_s1 == other.reg_s1
+            && self.reg_s2 == other.reg_s2
+            && self.imm == other.imm
+            && self.reg_d == other.reg_d
+            && self.data_s1 == other.data_s1
+            && self.data_s2 == other.data_s2
+            && self.alu_op_a == other.alu_op_a
+            && self.alu_op_b == other.alu_op_b
+            && self.alu_out == other.alu_out
+            && self.lsu_out == other.lsu_out
+            && self.reg_write_data == other.reg_write_data
+            && self.cmp_result == other.cmp_result
+            && self.next_pc == other.next_pc
+    }
+}

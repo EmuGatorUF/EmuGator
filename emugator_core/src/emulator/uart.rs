@@ -6,7 +6,7 @@ use std::fmt::Display;
 // RS - Looks like the baud rate wasn't set correctly
 
 #[allow(dead_code)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Uart {
     pub uart_cycle_count: u32,
 

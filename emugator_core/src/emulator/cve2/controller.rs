@@ -4,7 +4,7 @@ use crate::isa::Instruction;
 
 /// Control signals for the CVE2 datapath.
 /// Note: `Option::None` is used to represent a "don't care" value.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CVE2Control {
     // ALU Control
     pub alu_op_a_sel: Option<OpASel>, // Mux control for selecting operand A.

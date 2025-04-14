@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use super::uart::Uart;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct MemoryModule {
     ram: BTreeMap<u32, u8>,
     uart_address: u32,

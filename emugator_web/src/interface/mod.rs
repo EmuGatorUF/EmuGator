@@ -35,7 +35,9 @@ pub fn App() -> Element {
     let source = use_signal(|| include_test_file!("beta-demo.s").to_string());
     let mut assembler_errors: Signal<Vec<AssemblerError>> = use_signal(Vec::new);
     let selected_emulator: Signal<EmulatorOption> = use_signal(|| EmulatorOption::CVE2);
-    let emulator_state: Signal<Option<AnyEmulatorState>> = use_signal(|| None);
+    let emulator_states: Signal<Vec<AnyEmulatorState>> = use_signal(|| vec![]);
+    let emulator_state_memo = use_memo(move || emulator_states.read().last().map(|e| e.to_owned()));
+    let emulator_state: ReadOnlySignal<_> = emulator_state_memo.into();
     let breakpoints: Signal<BTreeSet<usize>> = use_signal(BTreeSet::new);
 
     let minimize_console: Signal<bool> = use_signal(|| true);
@@ -74,7 +76,7 @@ pub fn App() -> Element {
                 .and_then(|p| p.source_map.get_by_left(&pc).copied())
         }
 
-        if let Some(emulator_state) = emulator_state.read().as_ref() {
+        if let Some(emulator_state) = &*emulator_state_memo.read() {
             line_highlights.set(
                 emulator_state
                     .all_pcs()
@@ -104,7 +106,7 @@ pub fn App() -> Element {
                 source,
                 assembled_program: ASSEMBLED_PROGRAM.signal(),
                 assembler_errors,
-                emulator_state,
+                emulator_states,
                 serial_input,
                 selected_emulator,
                 breakpoints,
@@ -127,6 +129,7 @@ pub fn App() -> Element {
                             if *minimize_console.read() { "h-min" } else { "h-4/10" },
                         ),
                         UartView {
+                            emulator_states,
                             emulator_state,
                             serial_input,
                             minimize_console,

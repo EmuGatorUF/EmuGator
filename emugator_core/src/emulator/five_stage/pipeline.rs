@@ -11,7 +11,7 @@ use super::datapath::{
 };
 use super::hazard_detection::HazardDetector;
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, PartialEq)]
 pub struct FiveStagePipeline {
     pub if_pc: u32,
     pub if_id: IfIdBuffer,
