@@ -78,4 +78,3 @@ pub fn InterfacePageView() -> Element {
         }
     )
 }
-

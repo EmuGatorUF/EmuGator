@@ -1,14 +1,14 @@
+mod interface_page_view;
 mod intro_page_view;
 mod page_not_found_view;
 mod quick_start_view;
-mod interface_page_view;
 
 use dioxus::prelude::*;
 
+use interface_page_view::InterfacePageView;
 use intro_page_view::IntroPageView;
 use page_not_found_view::PageNotFoundView;
 use quick_start_view::QuickStartView;
-use interface_page_view::InterfacePageView;
 
 // Style class constants
 pub const H3_STYLE: &str = "text-3xl font-bold mb-4 border-b-2 border-gray-300 pb-2";
@@ -22,7 +22,14 @@ pub fn HelpPanelView() -> Element {
     // RS - Realistically speaking, this should just parse a markdown file and auto-generate
     // all of this
 
-    let subsections = ["Introduction", "Quick Start", "Interface", "Two stage", "Five stage", "UART"];
+    let subsections = [
+        "Introduction",
+        "Quick Start",
+        "Interface",
+        "Two stage",
+        "Five stage",
+        "UART",
+    ];
     let mut displayed_menu = use_signal(|| subsections[0]);
 
     rsx! {

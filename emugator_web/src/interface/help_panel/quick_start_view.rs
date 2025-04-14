@@ -30,4 +30,3 @@ pub fn QuickStartView() -> Element {
         }
     )
 }
-
