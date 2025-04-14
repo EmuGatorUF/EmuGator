@@ -43,8 +43,6 @@ The main function, `assemble`, handles the assembly string and coordinates the p
 
 An autograder command line tool built on the same foundation as the web tool.
 
-Under construction.
-
 ## Known Bugs
 - UART input can sometimes cause user text to appear over characters that have been read in already.
 - The Five Stage pipeline is currently non-functional.
