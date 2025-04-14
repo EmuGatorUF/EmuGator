@@ -1,7 +1,6 @@
 use dioxus::prelude::*;
 use std::{collections::BTreeSet, ops::Deref};
 
-use super::format_pc;
 use emugator_core::emulator::{
     AnyEmulatorState,
     controller_common::{DataDestSel, LSUDataType, OpASel, OpBSel, PCSel},
@@ -58,7 +57,7 @@ impl CVE2Element {
             CVE2Element::RegisterFile => "Register File".to_string(),
             CVE2Element::DataMemory => "Data Memory".to_string(),
             CVE2Element::IfPc => {
-                format!("IF PC: {}", format_pc(pipeline.IF_pc))
+                format!("IF PC: 0x{:08X}", pipeline.IF_pc)
             }
             CVE2Element::PCMuxControlSignal => match pipeline.control.next_pc_sel {
                 PCSel::JMP => "Next PC Select: JMP".to_string(),
@@ -123,7 +122,7 @@ impl CVE2Element {
                 format!("PC Set: {}", if is_active { "Enabled" } else { "Disabled" })
             }
             CVE2Element::BranchUnit => match pipeline.datapath.alu_out {
-                Some(value) => format!("JMP: {}", format_pc(value)),
+                Some(value) => format!("JMP: 0x{:08X}", value),
                 None => "JMP: None".to_string(),
             },
             CVE2Element::InstructionMemory => match pipeline.IF_inst {
@@ -133,10 +132,10 @@ impl CVE2Element {
             CVE2Element::PCPlus4 => {
                 let pc_value = pipeline.IF_pc;
                 let plus4_value = pc_value.wrapping_add(4);
-                format!("PC+4: {}", format_pc(plus4_value))
+                format!("PC+4: 0x{:08X}", plus4_value)
             }
             CVE2Element::IdPc => match pipeline.ID_pc {
-                Some(pc) => format!("ID PC: {}", format_pc(pc)),
+                Some(pc) => format!("ID PC: 0x{:08X}", pc),
                 None => return "None".to_string(),
             },
             CVE2Element::IdIr => match pipeline.ID_inst {
