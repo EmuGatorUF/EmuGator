@@ -51,7 +51,7 @@ pub fn InterfacePageView() -> Element {
             "Underneath the editor lies the UART console used for input and output."
         }
         p { class: P_STYLE,
-            "After starting a program, the UART console will populate with a text box. This text box allows you to type or paste text that can be read during program execution. Any characters your program outputs using the UART module will appear below the text box."
+            "After starting a program, the UART console will populate with a text box. This text box allows you to type or paste text that can be read during program execution. Any characters your program outputs using the UART module will appear beside the text box."
         }
 
         h4 { class: H4_STYLE, "Pipeline Visualization" }

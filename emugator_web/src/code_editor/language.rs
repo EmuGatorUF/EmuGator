@@ -49,16 +49,16 @@ pub fn register_riscv_language() {
 }
 
 #[derive(Deserialize)]
-struct DocEntry<'a> {
+pub struct DocEntry<'a> {
     #[serde(borrow)]
-    format: Cow<'a, str>,
+    pub format: Cow<'a, str>,
     #[serde(borrow)]
-    desc: Cow<'a, str>,
+    pub desc: Cow<'a, str>,
     #[serde(borrow)]
-    example: Cow<'a, str>,
+    pub example: Cow<'a, str>,
 }
 
-const DOCS: &str = include_str!("../../assets/docs.json");
+pub const DOCS: &str = include_str!("../../assets/docs.json");
 
 fn get_word_at_position(line: &str, col: usize) -> &str {
     let word_end =

@@ -1,3 +1,4 @@
+mod assembler_page_view;
 mod interface_page_view;
 mod intro_page_view;
 mod page_not_found_view;
@@ -5,6 +6,7 @@ mod quick_start_view;
 
 use dioxus::prelude::*;
 
+use assembler_page_view::AssemblerPageView;
 use interface_page_view::InterfacePageView;
 use intro_page_view::IntroPageView;
 use page_not_found_view::PageNotFoundView;
@@ -26,6 +28,7 @@ pub fn HelpPanelView() -> Element {
         "Introduction",
         "Quick Start",
         "Interface",
+        "Assembler and Instructions",
         "Two stage",
         "Five stage",
         "UART",
@@ -51,6 +54,7 @@ pub fn HelpPanelView() -> Element {
                     "Introduction" => rsx!(IntroPageView {}),
                     "Quick Start" => rsx!(QuickStartView {}),
                     "Interface" => rsx!(InterfacePageView {}),
+                    "Assembler and Instructions" => rsx!(AssemblerPageView {}),
                     _ => rsx!(PageNotFoundView {}),
                 }
             }
