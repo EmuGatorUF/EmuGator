@@ -18,6 +18,8 @@ mod cve2_visualization;
 mod five_stage_visualization;
 
 const SCROLL_MULTIPLIER: f64 = 1.1;
+const CVE2_PIPELINE_RECT: (f64, f64, f64, f64) = (-50.0, -50.0, 1500.0, 750.0);
+const FIVE_STAGE_PIPELINE_RECT: (f64, f64, f64, f64) = (-50.0, -50.0, 1750.0, 750.0);
 
 /// Calculates the SVG viewport based on the viewBox and dimensions assuming "xMidYMid meet"
 fn svg_viewport(
@@ -45,8 +47,11 @@ pub fn PipelineVisualization(
     emulator_state: ReadOnlySignal<Option<AnyEmulatorState>>,
     selected_emulator: ReadOnlySignal<EmulatorOption>,
 ) -> Element {
-    let initial_view = (0.0, 0.0, 1261.0, 660.0);
-    let mut view_box = use_signal(|| initial_view);
+    let initial_view = use_memo(move || match *selected_emulator.read() {
+        EmulatorOption::CVE2 => CVE2_PIPELINE_RECT,
+        EmulatorOption::FiveStage => FIVE_STAGE_PIPELINE_RECT,
+    });
+    let mut view_box: Signal<(f64, f64, f64, f64)> = use_signal(|| initial_view.cloned());
     let mut is_panning = use_signal(|| false);
     let mut start_pan = use_signal(|| (0.0, 0.0, 0.0, 0.0));
     let mut scale = use_signal(|| 1.0);
@@ -69,6 +74,13 @@ pub fn PipelineVisualization(
         None
     };
 
+    use_effect(move || {
+        let initial_view = *initial_view.read();
+        view_box.set(initial_view);
+        scale.set(1.0);
+        is_panning.set(false);
+    });
+
     rsx! {
         div {
             class: "w-full h-full rounded bg-white overflow-hidden relative select-none",
@@ -79,7 +91,7 @@ pub fn PipelineVisualization(
                 class: "absolute top-2 left-2 bg-gray-200 hover:bg-gray-300 p-1 rounded z-10 cursor-pointer",
                 title: "Recenter",
                 onclick: move |_| {
-                    view_box.set(initial_view);
+                    view_box.set(*initial_view.read());
                     scale.set(1.0);
                 },
                 Icon { width: 16, height: 16, icon: LdRotateCcw }
@@ -134,14 +146,13 @@ pub fn PipelineVisualization(
                             _view_box,
                             dims
                         );
-
                         let (u, v) = (e.element_coordinates().x / dims.width(), e.element_coordinates().y / dims.height());
                         let (anchor_x, anchor_y) = (
                             viewport.min_x() + u * viewport.width(),
                             viewport.min_y() + v * viewport.height(),
                         );
 
-                        let initial_viewport = svg_viewport(initial_view, dims);
+                        let initial_viewport = svg_viewport(*initial_view.read(), dims);
                         let initial_width = initial_viewport.width();
                         let initial_height = initial_viewport.height();
 
