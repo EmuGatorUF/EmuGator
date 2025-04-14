@@ -13,8 +13,6 @@ pub fn UartView(
     serial_input: Signal<String>,
     minimize_console: Signal<bool>,
 ) -> Element {
-    let state = emulator_state.read();
-
     let icon_width = 25;
     rsx! {
         div { class: "flex flex-col bg-inherit text-gray-200 font-mono border-t-[0.450px] border-gray-600 h-full",
@@ -42,7 +40,7 @@ pub fn UartView(
                 div { class: "flex flex-1 flex-col",
                     div { class: "w-full p-2 font-semibold border-b border-r", "Serial Input" }
                     textarea {
-                        class: "flex-1 leading-none p-3 border-r resize-none overflow-auto focus:outline-none",
+                        class: "text-nowrap flex-1 leading-none p-3 border-r resize-none overflow-auto focus:outline-none",
                         placeholder: "> Type here",
                         oninput: move |event| {
                             let value = event.value();
@@ -71,10 +69,10 @@ pub fn UartView(
                 div { class: "flex flex-1 flex-col",
                     div { class: "w-full p-2 font-semibold border-b border-l", "Serial Output" }
                     textarea {
-                        class: "flex-1 leading-none p-3 border-l resize-none overflow-auto focus:outline-none",
+                        class: "text-nowrap flex-1 leading-none p-3 border-l resize-none overflow-auto focus:outline-none",
                         placeholder: "> UART Output",
                         readonly: "true",
-                        value: if let Some(memory_io) = state.as_ref().map(|e| e.memory_io()) { String::from_utf8_lossy(memory_io.get_serial_output()).to_string() } else { "".to_string() },
+                        value: if let Some(memory_io) = emulator_state.read().as_ref().map(|e| e.memory_io()) { String::from_utf8_lossy(memory_io.get_serial_output()).to_string() } else { "".to_string() },
                     }
                 }
             }
