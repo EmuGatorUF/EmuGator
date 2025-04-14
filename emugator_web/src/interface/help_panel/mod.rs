@@ -1,10 +1,20 @@
 mod intro_page_view;
 mod page_not_found_view;
+mod quick_start_view;
+mod interface_page_view;
 
 use dioxus::prelude::*;
 
 use intro_page_view::IntroPageView;
 use page_not_found_view::PageNotFoundView;
+use quick_start_view::QuickStartView;
+use interface_page_view::InterfacePageView;
+
+// Style class constants
+pub const H3_STYLE: &str = "text-3xl font-bold mb-4 border-b-2 border-gray-300 pb-2";
+pub const H4_STYLE: &str = "text-xl font-semibold mb-2 mt-1";
+pub const H5_STYLE: &str = "text-md font-semibold mb-2 mt-1";
+pub const P_STYLE: &str = "leading-relaxed mb-2 text-sm";
 
 #[component]
 #[allow(non_snake_case)]
@@ -12,7 +22,7 @@ pub fn HelpPanelView() -> Element {
     // RS - Realistically speaking, this should just parse a markdown file and auto-generate
     // all of this
 
-    let subsections = ["Introduction", "Two stage", "Five stage", "UART"];
+    let subsections = ["Introduction", "Quick Start", "Interface", "Two stage", "Five stage", "UART"];
     let mut displayed_menu = use_signal(|| subsections[0]);
 
     rsx! {
@@ -32,6 +42,8 @@ pub fn HelpPanelView() -> Element {
             div { class: "flex-1 p-8 overflow-y-auto",
                 match *displayed_menu.read() {
                     "Introduction" => rsx!(IntroPageView {}),
+                    "Quick Start" => rsx!(QuickStartView {}),
+                    "Interface" => rsx!(InterfacePageView {}),
                     _ => rsx!(PageNotFoundView {}),
                 }
             }
