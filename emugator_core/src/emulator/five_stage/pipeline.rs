@@ -63,7 +63,7 @@ impl Pipeline for FiveStagePipeline {
         );
     }
 
-    fn requesting_debug(&mut self) -> bool {
+    fn requesting_debug(&self) -> bool {
         self.id_control.debug_req
     }
 

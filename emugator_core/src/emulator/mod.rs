@@ -9,6 +9,8 @@ pub mod uart;
 mod cve2_tests;
 #[cfg(test)]
 mod five_stage_tests;
+#[cfg(test)]
+mod fuzz_test;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -260,7 +262,7 @@ pub trait Pipeline: Clone {
     fn set_if_pc(&mut self, address: u32, program: &AssembledProgram);
 
     /// Check if the pipeline is currently requesting a debug via a ebreak
-    fn requesting_debug(&mut self) -> bool;
+    fn requesting_debug(&self) -> bool;
 
     /// Mutable reference to the instruction decode PC
     /// Allows reading to trigger breakpoints

@@ -97,6 +97,16 @@ impl MemoryModule {
     pub fn clock(&mut self) {
         self.uart = self.uart.clock();
     }
+
+    #[cfg(test)]
+    pub fn ram(&self) -> &BTreeMap<u32, u8> {
+        &self.ram
+    }
+
+    #[cfg(test)]
+    pub fn uart(&self) -> &Uart {
+        &self.uart
+    }
 }
 
 #[cfg(test)]

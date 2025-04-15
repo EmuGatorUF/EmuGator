@@ -85,7 +85,7 @@ impl Pipeline for CVE2Pipeline {
         self.run_instruction_fetch(program);
     }
 
-    fn requesting_debug(&mut self) -> bool {
+    fn requesting_debug(&self) -> bool {
         self.control.debug_req
     }
 
