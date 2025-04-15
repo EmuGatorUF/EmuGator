@@ -3,6 +3,9 @@ mod interface_page_view;
 mod intro_page_view;
 mod page_not_found_view;
 mod quick_start_view;
+mod two_stage_view;
+mod five_stage_view;
+mod uart_view;
 
 use dioxus::prelude::*;
 
@@ -11,6 +14,9 @@ use interface_page_view::InterfacePageView;
 use intro_page_view::IntroPageView;
 use page_not_found_view::PageNotFoundView;
 use quick_start_view::QuickStartView;
+use two_stage_view::TwoStageView;
+use five_stage_view::FiveStageView;
+use uart_view::UartView;
 
 // Style class constants
 pub const H3_STYLE: &str = "text-3xl font-bold mb-4 border-b-2 border-gray-300 pb-2";
@@ -55,6 +61,9 @@ pub fn HelpPanelView() -> Element {
                     "Quick Start" => rsx!(QuickStartView {}),
                     "Interface" => rsx!(InterfacePageView {}),
                     "Assembler and Instructions" => rsx!(AssemblerPageView {}),
+                    "Two stage" => rsx!(TwoStageView {}),
+                    "Five stage" => rsx!(FiveStageView {}),
+                    "UART" => rsx!(UartView {}),
                     _ => rsx!(PageNotFoundView {}),
                 }
             }
