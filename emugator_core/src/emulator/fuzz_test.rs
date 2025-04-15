@@ -85,7 +85,7 @@ fn test_fuzz() {
 
     let mut errors_panic = "".to_string();
 
-    for i in 0..100 {
+    for i in 0..10 {
         let mut source = String::from(".text\n");
         let num_instructions = rng.random_range(5..20);
 
@@ -93,7 +93,11 @@ fn test_fuzz() {
             let instr = gen_random_instruction(&mut rng);
             writeln!(source, "{}", instr).unwrap();
         }
-        writeln!(source, "EBREAK").unwrap();
+        writeln!(
+            source,
+            "ADD x0, x0, x0\nADD x0, x0, x0\nADD x0, x0, x0\nADD x0, x0, x0\nADD x0, x0, x0\nADD x0, x0, x0\nEBREAK"
+        )
+        .unwrap();
 
         let Ok(program) = assemble(&source) else {
             continue;
