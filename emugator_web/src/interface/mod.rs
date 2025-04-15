@@ -97,7 +97,7 @@ pub fn App() -> Element {
     rsx! {
         document::Title { "EmuGator" }
         document::Stylesheet { href: asset!("/assets/tailwind.css") }
-        document::Link { rel: "icon", href: asset!("/assets/favicon.ico") }
+        document::Link { rel: "icon", href: asset!("/assets/favicon.png") }
 
         style { "html, body {{ margin: 0; padding: 0; }} #main {{ margin: 0; }}" }
 

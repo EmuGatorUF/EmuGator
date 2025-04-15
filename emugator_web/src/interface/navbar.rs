@@ -33,10 +33,13 @@ pub fn Navbar(
     let mut tick = use_signal(|| 1);
 
     rsx! {
-        nav { class: "bg-gray-900 text-white w-full py-2 px-4 flex items-center justify-between shadow-md border-b-2 border-gray-950",
+        nav { class: "bg-gray-900 text-white w-full flex items-center px-4 justify-between shadow-md border-b-2 border-gray-950",
             div { class: "flex items-center",
-                span { class: "text-xl font-semibold text-blue-400 mr-4", "EmuGator" }
-                div { class: "flex space-x-2",
+                span { class: "flex items-center gap-2 text-sm font-medium mr-4 py-1",
+                    img { width: 45, src: asset!("assets/logo.svg") }
+                    p { class: "text-xl font-semibold text-blue-400 mr-4", "EmuGator" }
+                }
+                div { class: "flex space-x-2 py-2",
                     button {
                         class: "bg-green-600 gap-x-1 hover:bg-green-700 text-white font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex items-center cursor-pointer",
                         onclick: move |_| {
@@ -88,9 +91,10 @@ pub fn Navbar(
                                 assembled_program.as_mut(),
                                 emulator_states.read().last(),
                             ) {
-                                Some(emulator_state
-                                    .clock(&mut program))
-                            } else { None } {
+                                Some(emulator_state.clock(&mut program))
+                            } else {
+                                None
+                            } {
                                 emulator_states.write().push(new_state);
                             }
                         },
@@ -125,9 +129,10 @@ pub fn Navbar(
                                 assembled_program.as_mut(),
                                 emulator_states.read().last(),
                             ) {
-                                Some(emulator_state
-                                    .clock_until_next_instruction(&mut program, 1000))
-                            } else { None } {
+                                Some(emulator_state.clock_until_next_instruction(&mut program, 1000))
+                            } else {
+                                None
+                            } {
                                 emulator_states.write().push(new_state);
                             }
                         },
@@ -149,9 +154,13 @@ pub fn Navbar(
                                 assembled_program.as_mut(),
                                 emulator_states.read().last(),
                             ) {
-                                Some(emulator_state
-                                    .clock_until_break(&mut program, breakpoints.read().deref(), 10_000))
-                            } else { None } {
+                                Some(
+                                    emulator_state
+                                        .clock_until_break(&mut program, breakpoints.read().deref(), 10_000),
+                                )
+                            } else {
+                                None
+                            } {
                                 emulator_states.write().push(new_state);
                             }
                         },
@@ -177,7 +186,7 @@ pub fn Navbar(
                     }
                 }
             }
-            div { class: "flex items-stretch space-x-2",
+            div { class: "flex items-stretch space-x-2 py-2",
                 span {
                     class: format!(
                         "flex items-center gap-2 text-sm font-medium mr-4 {}",
