@@ -65,3 +65,4 @@ An autograder command line tool built on the same foundation as the web tool.
 2. cd into `/emugator_cli`
 3. run `cargo run -- [--programs filename] [--tests filename] [--timeout time]`
   - example: cargo run -- test --programs ../test-files --tests ../test-files/test-dir --timeout 1000
+4. Add new tests by placing a folder for each test case in the test directory and then adding `expectedstate.json` with the proper output (registers, data, and text output) and `input.txt` with what you want the input text buffer to be.
