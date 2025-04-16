@@ -1059,7 +1059,7 @@ pub fn FiveStageVisualization(
                         Some(AnyEmulatorState::FiveStage(state)) => {
                             let is_hovered = *hovered_element.read()
                                 == Some(FiveStageElement::RegWriteControlSignal);
-                            match state.pipeline.mem_control.reg_write {
+                            match state.pipeline.wb_control.reg_write {
                                 true => if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
                                 false => if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
                             }
@@ -1079,7 +1079,7 @@ pub fn FiveStageVisualization(
                         Some(AnyEmulatorState::FiveStage(state)) => {
                             let is_hovered = *hovered_element.read()
                                 == Some(FiveStageElement::RegWriteControlSignal);
-                            match state.pipeline.mem_control.reg_write {
+                            match state.pipeline.wb_control.reg_write {
                                 true => if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
                                 false => if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
                             }
@@ -1098,7 +1098,7 @@ pub fn FiveStageVisualization(
                         Some(AnyEmulatorState::FiveStage(state)) => {
                             let is_hovered = *hovered_element.read()
                                 == Some(FiveStageElement::RegWriteControlSignal);
-                            match state.pipeline.mem_control.reg_write {
+                            match state.pipeline.wb_control.reg_write {
                                 true => if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
                                 false => if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
                             }
@@ -1116,7 +1116,7 @@ pub fn FiveStageVisualization(
                     "font-weight": "bold",
                     fill: match &*emulator_state.read() {
                         Some(AnyEmulatorState::FiveStage(state)) => {
-                            match (state.pipeline.mem_control.reg_write, *hovered_element.read()) {
+                            match (state.pipeline.wb_control.reg_write, *hovered_element.read()) {
                                 (true, Some(FiveStageElement::RegWriteControlSignal)) => "green",
                                 (true, _) => "rgba(0, 200, 0, 0.4)",
                                 (false, Some(FiveStageElement::RegWriteControlSignal)) => "red",
@@ -1138,7 +1138,7 @@ pub fn FiveStageVisualization(
                         Some(AnyEmulatorState::FiveStage(state)) => {
                             let is_hovered = *hovered_element.read()
                                 == Some(FiveStageElement::RegWriteControlSignal);
-                            match state.pipeline.mem_control.reg_write {
+                            match state.pipeline.wb_control.reg_write {
                                 true => if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
                                 false => if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
                             }
@@ -1154,7 +1154,7 @@ pub fn FiveStageVisualization(
                         Some(AnyEmulatorState::FiveStage(state)) => {
                             let is_hovered = *hovered_element.read()
                                 == Some(FiveStageElement::RegWriteControlSignal);
-                            match state.pipeline.mem_control.reg_write {
+                            match state.pipeline.wb_control.reg_write {
                                 true => if is_hovered { "green" } else { "rgba(0, 200, 0, 0.4)" }
                                 false => if is_hovered { "red" } else { "rgba(200, 0, 0, 0.4)" }
                             }
