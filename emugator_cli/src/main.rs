@@ -22,9 +22,8 @@ const GAUGE_LABEL_COLOR: Color = tailwind::ORANGE.c800;
 #[derive(Debug, Default)]
 struct App {
     state: AppState,
-    tester: Box<TestInfo>,
-    ratio: f64,
-    ending_msg: String,
+    tester: TestInfo,
+    ending_msg: Option<String>,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -55,7 +54,7 @@ fn tests_with_ratatui(test_args: tester::TestArgs) {
 
 impl App {
     fn run(mut self, mut terminal: DefaultTerminal, test_args: tester::TestArgs) -> Result<()> {
-        self.tester = Box::new(tester::TestInfo::default());
+        self.tester = tester::TestInfo::default();
         self.tester.prepare_to_test(test_args);
 
         while self.state != AppState::Quitting {
@@ -72,7 +71,6 @@ impl App {
         }
 
         self.run_tests();
-        self.ratio = (self.tester.position as f64 / self.tester.num_programs as f64) * 100.0;
     }
 
     fn handle_events(&mut self) -> Result<()> {
@@ -96,31 +94,41 @@ impl App {
     }
 
     fn run_tests(&mut self) {
-        if !self.tester.test_program() {
-            self.ending_msg = self.tester.finish_up();
+        if !self.tester.run_curr_test() {
+            self.ending_msg = Some(self.tester.finish_up());
         }
     }
 
-    fn render_gauge(&self, area: Rect, buf: &mut Buffer) {
-        let title_str = "Currently testing: ".to_owned() + &self.tester.currently_testing;
-        let title = title_block(&title_str);
-        let label = Span::styled(
-            format!("{}/{}", self.tester.position, self.tester.num_programs),
-            Style::new().italic().bold().fg(GAUGE_LABEL_COLOR),
-        );
-        Gauge::default()
-            .block(title)
-            .gauge_style(GAUGE_COLOR)
-            .ratio(self.ratio / 100.0)
-            .label(label)
-            .render(area, buf);
+    fn render_gauges(&self, area: Rect, buf: &mut Buffer) {
+        let prog_title = format!("Current Program: {}", self.tester.current_program());
+        let mut prog_area = area;
+        prog_area.height = area.height / 2;
+        make_gague(
+            title_block(&prog_title),
+            self.tester.curr_prog,
+            self.tester.num_programs(),
+        )
+        .render(prog_area, buf);
+
+        let test_title = format!("Current Test: {}", self.tester.current_test());
+        let mut test_area = area;
+        test_area.y = area.y + area.height / 2;
+        test_area.height = area.height / 2;
+        make_gague(
+            title_block(&test_title),
+            self.tester.curr_test,
+            self.tester.num_tests(),
+        )
+        .render(test_area, buf);
     }
 
-    fn render_middle_text(&self, area: Rect, buf: &mut Buffer) {
-        Paragraph::new(self.ending_msg.clone())
-            .alignment(Alignment::Center)
-            .fg(GAUGE_LABEL_COLOR)
-            .render(area, buf);
+    fn render_ending_text(&self, area: Rect, buf: &mut Buffer) {
+        if let Some(ending_msg) = &self.ending_msg {
+            Paragraph::new(ending_msg.clone())
+                .alignment(Alignment::Center)
+                .fg(GAUGE_LABEL_COLOR)
+                .render(area, buf);
+        }
     }
 }
 
@@ -133,8 +141,11 @@ impl Widget for &App {
 
         render_header(header_area, buf);
         render_footer(footer_area, buf);
-        self.render_middle_text(middle_area, buf);
-        self.render_gauge(gauge_area, buf);
+        if self.ending_msg.is_some() {
+            self.render_ending_text(middle_area, buf);
+        } else {
+            self.render_gauges(gauge_area, buf);
+        }
     }
 }
 
@@ -161,4 +172,17 @@ fn title_block(title: &str) -> Block {
         .padding(Padding::vertical(1))
         .title(title)
         .fg(CUSTOM_LABEL_COLOR)
+}
+
+fn make_gague<'a>(title: Block<'a>, curr: usize, total: usize) -> Gauge<'a> {
+    let ratio = curr as f64 / total as f64;
+    let label = Span::styled(
+        format!("{}/{}", curr, total),
+        Style::new().italic().bold().fg(GAUGE_LABEL_COLOR),
+    );
+    Gauge::default()
+        .block(title)
+        .gauge_style(GAUGE_COLOR)
+        .ratio(ratio)
+        .label(label)
 }

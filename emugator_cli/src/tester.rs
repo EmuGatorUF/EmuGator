@@ -1,7 +1,7 @@
 use clap::{Args, Parser, Subcommand};
 
 use emugator_core::{
-    assembler::assemble,
+    assembler::{AssembledProgram, assemble},
     emulator::{EmulatorState, cve2::CVE2Pipeline},
 };
 use serde::{Deserialize, Serialize};
@@ -12,11 +12,66 @@ use std::{
     iter::zip,
 };
 
-#[derive(Debug, Deserialize, Serialize, Default)]
-struct ExpectedState {
+#[derive(Debug, Default)]
+struct Test {
+    name: String,
+    input: String,
+    expected_state: OutputState,
+}
+
+#[derive(Debug, Deserialize, Serialize, Default, PartialEq, Eq)]
+struct OutputState {
     registers: HashMap<u8, HexValue>,
     data_memory: HashMap<HexValue, HexValue>,
     output_buffer: String,
+}
+
+impl OutputState {
+    /// Checks that every value in self is found in state
+    /// Returns any values that are not there
+    pub fn validate(&self, state: &EmulatorState<CVE2Pipeline>) -> Option<OutputState> {
+        let mut pass = true;
+        let mut diff = OutputState::default();
+
+        for (reg, data) in &self.registers {
+            let actual_data = state.x[*reg as usize];
+            if actual_data != u32::from_be_bytes(data.value) {
+                pass = false;
+                diff.registers.insert(
+                    *reg,
+                    HexValue {
+                        value: u32::to_be_bytes(actual_data),
+                    },
+                );
+            }
+        }
+        for (addr, data) in &self.data_memory {
+            let actual_data = state.data_memory.preview(u32::from_be_bytes(addr.value));
+            if actual_data != data.value[3] {
+                pass = false;
+                diff.data_memory.insert(
+                    *addr,
+                    HexValue {
+                        value: u32::to_be_bytes(actual_data as u32),
+                    },
+                );
+            }
+        }
+
+        // Check UART output
+        let expected_output = self.output_buffer.as_bytes();
+        let actual_output = state.data_memory.get_serial_output();
+        if actual_output != expected_output {
+            pass = false;
+            let count = zip(expected_output, actual_output)
+                .take_while(|(a, b)| a == b)
+                .count();
+
+            diff.output_buffer = String::from_utf8_lossy(&actual_output[count..]).to_string();
+        }
+
+        if pass { None } else { Some(diff) }
+    }
 }
 
 #[derive(Serialize, Debug, Deserialize, Clone, Copy, PartialEq, Eq, Hash)]
@@ -116,22 +171,23 @@ pub fn new_project(args: NewArgs) {
 
 #[derive(Debug, Default)]
 pub struct TestInfo {
-    program_files: Vec<(String, String)>,
-    pub position: usize,
-    test_dirs: Vec<(String, Option<String>, Option<ExpectedState>)>,
+    programs: Vec<(String, Option<AssembledProgram>)>,
+    tests: Vec<Test>,
+    pub curr_prog: usize,
+    pub curr_test: usize,
     output_path: std::path::PathBuf,
+    test_results: Vec<Vec<bool>>,
     timeout: usize,
-    pub num_programs: usize,
-    pub currently_testing: String,
 }
 
 impl TestInfo {
     pub fn prepare_to_test(&mut self, args: TestArgs) {
         self.timeout = args.timeout;
-        self.position = 0;
+        self.curr_prog = 0;
+        self.curr_test = 0;
 
         // get (name, source) pairs from the programs folder
-        self.program_files = std::fs::read_dir(&args.programs)
+        self.programs = std::fs::read_dir(&args.programs)
             .expect("Failed to read programs directory")
             .filter_map(|entry| {
                 let entry = entry.expect("Failed to read entry");
@@ -139,16 +195,20 @@ impl TestInfo {
                 if path.is_file() {
                     let name = path.file_stem()?.to_str()?.to_string();
                     let source = std::fs::read_to_string(path).ok()?;
-                    Some((name, source))
+                    match assemble(&source) {
+                        Ok(program) => Some((name, Some(program))),
+                        Err(err) => {
+                            println!("Failed to assemble {}: {:?}", name, err);
+                            None
+                        }
+                    }
                 } else {
                     None
                 }
             })
             .collect::<Vec<_>>();
 
-        self.num_programs = self.program_files.len();
-
-        self.test_dirs = std::fs::read_dir(&args.tests)
+        self.tests = std::fs::read_dir(&args.tests)
             .expect("Failed to read tests dir")
             .filter_map(|entry| {
                 let entry = entry.expect("Failed to read entry");
@@ -156,7 +216,7 @@ impl TestInfo {
                 if path.is_dir() {
                     let test_name = path.file_stem()?.to_str()?.to_string();
                     let mut input = None;
-                    let mut expected_state: Option<ExpectedState> = None;
+                    let mut expected_state: Option<OutputState> = None;
 
                     // read files in test directory
                     for entry in std::fs::read_dir(path.as_path()).expect("Failed to read") {
@@ -177,12 +237,19 @@ impl TestInfo {
                             }
                         }
                     }
-                    Some((test_name, input, expected_state))
+                    Some(Test {
+                        name: test_name,
+                        input: input.unwrap_or_default(),
+                        expected_state: expected_state.unwrap_or_default(),
+                    })
                 } else {
                     None
                 }
             })
             .collect::<Vec<_>>();
+
+        // fill test results
+        self.test_results = vec![vec![false; self.tests.len()]; self.programs.len()];
 
         // check that output dir exists (or create it) and is valid
         self.output_path = std::path::Path::new(&args.tests)
@@ -194,8 +261,8 @@ impl TestInfo {
         }
 
         let mut tests_str: String = String::new();
-        for (name, _, _) in &self.test_dirs {
-            tests_str.push_str(&format!(",{}", name));
+        for test in &self.tests {
+            tests_str.push_str(&format!(",{}", test.name));
         }
 
         // write header to .csv file
@@ -205,84 +272,33 @@ impl TestInfo {
     }
 
     // tests a program against all tests and appends results to .csv file.
-    pub fn test_program(&mut self) -> bool {
-        // get program information
-        if self.position >= self.program_files.len() {
+    // returns true if there are more tests to run
+    pub fn run_curr_test(&mut self) -> bool {
+        if self.curr_prog >= self.programs.len() {
             return false;
         }
-        let (name, source) = &self.program_files[self.position];
-        self.position += 1;
 
-        // Assemble the program
-        let program = match assemble(source) {
-            Ok(p) => p,
-            Err(err) => {
-                println!("Failed to assemble: {:?}", err);
+        // run the current test on the current program
+        let (name, program) = &self.programs[self.curr_prog];
+        if let Some(program) = program {
+            let test = &self.tests[self.curr_test];
 
-                return true;
-            }
-        };
-
-        let mut test_results: Vec<bool> = Vec::new();
-        // run program for each test
-        for (test_name, input, expected_state) in &self.test_dirs {
             let mut starting_state = EmulatorState::<CVE2Pipeline>::new(&program);
             starting_state
                 .data_memory
-                .set_serial_input(input.as_ref().map_or(&[], |v| v.as_bytes()));
+                .set_serial_input(test.input.as_bytes());
             let starting_state = starting_state;
 
-            let mut ending_state =
+            let ending_state =
                 starting_state.clock_until_break(&program, &BTreeSet::new(), self.timeout);
 
-            let mut pass: bool = true;
+            let state_diff = test.expected_state.validate(&ending_state);
+            let pass = state_diff.is_none();
 
-            let mut state_diff: ExpectedState = ExpectedState::default();
-
-            if let Some(expected_state_ref) = expected_state {
-                for (reg, data) in &expected_state_ref.registers {
-                    let actual_data = ending_state.x[*reg as usize];
-                    if actual_data != u32::from_be_bytes(data.value) {
-                        pass = false;
-                        state_diff.registers.insert(
-                            *reg,
-                            HexValue {
-                                value: u32::to_be_bytes(actual_data),
-                            },
-                        );
-                    }
-                }
-                for (addr, data) in &expected_state_ref.data_memory {
-                    let actual_data = ending_state.data_memory.get(u32::from_be_bytes(addr.value));
-                    if actual_data != data.value[3] {
-                        pass = false;
-                        state_diff.data_memory.insert(
-                            *addr,
-                            HexValue {
-                                value: u32::to_be_bytes(actual_data as u32),
-                            },
-                        );
-                    }
-                }
-
-                // Check UART output
-                let expected_output = expected_state_ref.output_buffer.as_bytes();
-                let actual_output = ending_state.data_memory.get_serial_output();
-                if actual_output != expected_output {
-                    pass = false;
-                    let count = zip(expected_output, actual_output)
-                        .take_while(|(a, b)| a == b)
-                        .count();
-
-                    state_diff.output_buffer =
-                        String::from_utf8_lossy(&actual_output[count..]).to_string();
-                }
-            }
-
-            test_results.push(pass);
+            self.test_results[self.curr_prog][self.curr_test] = pass;
 
             if !pass {
-                let test_dir = self.output_path.join(test_name);
+                let test_dir = self.output_path.join(&test.name);
                 if !std::fs::exists(&test_dir)
                     .expect("Can't check if output subdirectory for test exists")
                 {
@@ -298,7 +314,7 @@ impl TestInfo {
                 std::fs::write(&test_result_path, &json_string)
                     .expect("Failed to create test output file");
             } else {
-                let test_dir = self.output_path.join(test_name);
+                let test_dir = self.output_path.join(&test.name);
                 if !std::fs::exists(&test_dir)
                     .expect("Can't check if output subdirectory for test exists")
                 {
@@ -312,36 +328,65 @@ impl TestInfo {
             }
         }
 
-        // append results of tests to .csv file.
+        // move to the next test
+        self.curr_test += 1;
+
+        // if done with all the tests for this program, move to the next program
+        if self.curr_test >= self.tests.len() {
+            self.curr_test = 0;
+            self.curr_prog += 1;
+        }
+
+        // return true if there are more tests to run
+        if self.curr_prog >= self.programs.len() {
+            self.export_results();
+            false
+        } else {
+            true
+        }
+    }
+
+    fn export_results(&self) {
         let mut file = OpenOptions::new()
             .append(true)
             .open(self.output_path.join("testresults.csv"))
-            .unwrap();
+            .expect("Could not open test results file");
 
-        let str = test_results
-            .iter()
-            .map(|val| format!(",{}", val))
-            .collect::<Vec<String>>()
-            .join("");
+        for (prog, test_results) in self.programs.iter().zip(self.test_results.iter()) {
+            let str = test_results
+                .iter()
+                .map(|val| format!(",{}", val))
+                .collect::<Vec<String>>()
+                .join("");
 
-        if let Err(e) = writeln!(file, "{}{}", name, str) {
-            eprintln!("Couldn't write to file: {}", e);
-        }
-
-        // return false if there are no more programs to be tested
-        if self.position >= self.program_files.len() {
-            false
-        } else {
-            let (name, _) = &self.program_files[self.position];
-            self.currently_testing = name.to_string();
-            true
+            writeln!(file, "{}{}", prog.0, str).expect("Failed to write test results");
         }
     }
 
     pub fn finish_up(&self) -> String {
         format!(
-            "The difference between ending states for failed tests can be found in: {:?}",
+            "Done! The difference between ending states for failed tests can be found in: {:?}",
             self.output_path.to_str()
         )
+    }
+
+    pub fn num_programs(&self) -> usize {
+        self.programs.len()
+    }
+
+    pub fn num_tests(&self) -> usize {
+        self.tests.len()
+    }
+
+    pub fn current_program(&self) -> &str {
+        self.programs
+            .get(self.curr_prog)
+            .map_or("", |p| p.0.as_str())
+    }
+
+    pub fn current_test(&self) -> &str {
+        self.tests
+            .get(self.curr_test)
+            .map_or("", |p| p.name.as_str())
     }
 }
