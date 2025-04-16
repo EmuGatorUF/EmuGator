@@ -1,19 +1,36 @@
 {
-    "version": "0.2.0",
-    "configurations": [
-      {
-        "type": "chrome",
-        "request": "launch",
-        "name": "Debug WebAssembly in Chrome",
-        "url": "http://localhost:8080",
-        "webRoot": "${workspaceFolder}",
-        "sourceMaps": true,
-        "sourceMapPathOverrides": {
-          "webpack:///./src/*": "${webRoot}/src/*"
-        },
-        "disableNetworkCache": true,
-        "userDataDir": "${workspaceFolder}/.vscode/chrome",
-        "runtimeArgs": ["--enable-features=WebAssembly"]
-      }
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb-dap",
+      "request": "launch",
+      "name": "Debug executable 'emugator_cli'",
+      "program": "${workspaceFolder}/target/debug/emugator-cli",
+      "args": [
+        "test",
+        "--tests",
+        "test-files/test-dir/",
+        "--programs",
+        "test-files/"
+      ],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "cargo: build emugator_cli"
+    },
+    {
+      "type": "chrome",
+      "request": "launch",
+      "name": "Debug WebAssembly in Chrome",
+      "url": "http://localhost:8080",
+      "webRoot": "${workspaceFolder}",
+      "sourceMaps": true,
+      "sourceMapPathOverrides": {
+        "webpack:///./src/*": "${webRoot}/src/*"
+      },
+      "disableNetworkCache": true,
+      "userDataDir": "${workspaceFolder}/.vscode/chrome",
+      "runtimeArgs": [
+        "--enable-features=WebAssembly"
+      ]
+    }
+  ]
 }

@@ -175,7 +175,11 @@ fn title_block(title: &str) -> Block {
 }
 
 fn make_gague<'a>(title: Block<'a>, curr: usize, total: usize) -> Gauge<'a> {
-    let ratio = curr as f64 / total as f64;
+    let ratio = if total == 0 {
+        0.0
+    } else {
+        curr as f64 / total as f64
+    };
     let label = Span::styled(
         format!("{}/{}", curr, total),
         Style::new().italic().bold().fg(GAUGE_LABEL_COLOR),

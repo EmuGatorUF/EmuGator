@@ -199,7 +199,7 @@ impl TestInfo {
                         Ok(program) => Some((name, Some(program))),
                         Err(err) => {
                             println!("Failed to assemble {}: {:?}", name, err);
-                            None
+                            Some((name, None))
                         }
                     }
                 } else {
