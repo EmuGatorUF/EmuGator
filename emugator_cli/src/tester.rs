@@ -286,7 +286,7 @@ impl TestInfo {
             let mut starting_state = EmulatorState::<CVE2Pipeline>::new(&program);
             starting_state
                 .data_memory
-                .set_serial_input(test.input.as_bytes());
+                .set_serial_input(test.input.replace("\r\n", "\n").as_bytes());
             let starting_state = starting_state;
 
             let ending_state =
