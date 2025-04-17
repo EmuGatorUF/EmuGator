@@ -42,7 +42,6 @@ main:
     
     ADDI x10, x0, not_palindrome_msg
     JAL x1, print
-    EBREAK
     JAL x0, end_program
     
 print_is_palindrome:
