@@ -47,13 +47,15 @@ impl std::ops::Div for Address {
     type Output = Result<Address, String>;
 
     fn div(self, other: Address) -> Self::Output {
-        if self.0 == Section::Absolute && other.0 == Section::Absolute {
-            Ok(Address(Section::Absolute, self.1 / other.1))
-        } else {
+        if self.0 != Section::Absolute || other.0 != Section::Absolute {
             Err(format!(
                 "Cannot divide addresses from sections {} / {}",
                 self.0, other.0
             ))
+        } else if other.1 == 0.into() {
+            Err("Division by zero".to_string())
+        } else {
+            Ok(Address(Section::Absolute, self.1 / other.1))
         }
     }
 }

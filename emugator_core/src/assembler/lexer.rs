@@ -48,7 +48,9 @@ pub struct Token<'a> {
 #[derive(Clone, Debug)]
 pub struct Lexer<'a> {
     source: &'a str,
-    char_iter: std::iter::Peekable<Enumerate<std::str::Chars<'a>>>,
+    char_iter: std::iter::Peekable<
+        Enumerate<std::iter::Chain<std::str::Chars<'a>, std::str::Chars<'static>>>,
+    >,
     line: usize,
     column: usize,
     terminated: bool,
@@ -58,7 +60,7 @@ impl<'a> Lexer<'a> {
     pub fn new(source: &'a str) -> Self {
         Lexer {
             source,
-            char_iter: source.chars().enumerate().peekable(),
+            char_iter: source.chars().chain("\n".chars()).enumerate().peekable(),
             line: 1,
             column: 0,
             terminated: false,
