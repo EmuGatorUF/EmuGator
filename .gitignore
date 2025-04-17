@@ -16,3 +16,6 @@ tailwind.css
 
 # Mac specific
 /.DS_Store/
+
+# Test Dirs
+**/test_output/**
