@@ -353,13 +353,17 @@ impl TestInfo {
             .expect("Could not open test results file");
 
         for (prog, test_results) in self.programs.iter().zip(self.test_results.iter()) {
+            let test_count = test_results.len();
+            let passed_count = test_results.iter().filter(|&&val| val).count();
+
             let str = test_results
                 .iter()
-                .map(|val| format!(",{}", val))
+                .map(|val| format!(",{}", if *val { "PASSED" } else { "FAILED" }))
                 .collect::<Vec<String>>()
                 .join("");
 
-            writeln!(file, "{}{}", prog.0, str).expect("Failed to write test results");
+            writeln!(file, "{}{} ({}/{})", prog.0, str, passed_count, test_count)
+                .expect("Failed to write test results");
         }
     }
 
