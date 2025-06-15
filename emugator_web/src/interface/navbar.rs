@@ -6,10 +6,11 @@ use dioxus_logger::tracing::info;
 use std::collections::BTreeSet;
 use std::ops::Deref;
 use std::vec;
+use wasm_bindgen::JsCast;
 
 use dioxus_free_icons::Icon;
 use dioxus_free_icons::icons::ld_icons::{
-    LdCircleArrowRight, LdCircleCheck, LdCircleX, LdInfo, LdPlay, LdRefreshCw, LdUndo,
+    LdCircleArrowRight, LdCircleCheck, LdCircleX, LdDownload, LdInfo, LdPlay, LdRefreshCw, LdUndo,
 };
 use dioxus_free_icons::icons::ld_icons::{LdClock3, LdClock6, LdClock9, LdClock12};
 
@@ -31,6 +32,38 @@ pub fn Navbar(
     let error_count = assembler_errors.read().len();
 
     let mut tick = use_signal(|| 1);
+
+    // Function to handle file download
+    let download_file = move |_| {
+        let content = source.read().clone();
+        let window = web_sys::window().unwrap();
+        let document = window.document().unwrap();
+
+        // Create a blob with the content
+        let array = js_sys::Array::new();
+        array.push(&wasm_bindgen::JsValue::from_str(&content));
+        let blob = web_sys::Blob::new_with_str_sequence(&array).unwrap();
+
+        // Create download URL
+        let url = web_sys::Url::create_object_url_with_blob(&blob).unwrap();
+
+        // Create temporary anchor element
+        let anchor = document.create_element("a").unwrap();
+        let anchor = anchor.dyn_into::<web_sys::HtmlAnchorElement>().unwrap();
+        anchor.set_href(&url);
+        anchor.set_download("code.txt");
+        anchor.style().set_property("display", "none").unwrap();
+
+        // Append to body, click, and remove
+        document.body().unwrap().append_child(&anchor).unwrap();
+        anchor.click();
+        document.body().unwrap().remove_child(&anchor).unwrap();
+
+        // Clean up the URL
+        web_sys::Url::revoke_object_url(&url).unwrap();
+
+        info!("File downloaded successfully");
+    };
 
     rsx! {
         nav { class: "bg-gray-900 text-white w-full flex items-center px-4 justify-between shadow-md border-b-2 border-gray-950",
@@ -183,6 +216,14 @@ pub fn Navbar(
                         },
                         Icon { width: 17, icon: LdUndo }
                         "Undo"
+                    }
+
+                    // Download Button
+                    button {
+                        class: "bg-blue-600 hover:bg-blue-700 text-white font-medium py-1 px-2 rounded transition duration-150 ease-in-out flex items-center gap-x-1 cursor-pointer",
+                        onclick: download_file,
+                        Icon { width: 17, icon: LdDownload }
+                        "Save"
                     }
                 }
             }
