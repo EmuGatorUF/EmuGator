@@ -14,70 +14,72 @@ input: .zero 50
 .text
 main:
     # Example I-type instruction example
-    ADDI x2, x9, value          #   x2 = x9 + 5
-    XORI x3, x2, 0xFF           #   x3 = x2 ^ 0xFF
-    SLLI x9, x2, 2              #   x9 = x2 << 2
+    ADDI x5, x8, value          # x5 (t0) = x8 (s0) + calculated value
+    XORI x6, x5, 0xFF           # x6 (t1) = x5 (t0) ^ 0xFF
+    SLLI x8, x5, 2              # x8 (s0) = x5 (t0) << 2
 
     # U-type instruction example
-    LUI x4, 0xFFF               # (load upper immediate) x4 = 0xFFF << 12
+    LUI x7, 0xFFF               # (load upper immediate) x7 (t2) = 0xFFF << 12
 
     # R-type instruction example
-    SUB x8, x3, x2              # x8 = x3 - x2
+    SUB x9, x6, x5              # x9 (s1) = x6 (t1) - x5 (t0)
 
-    # J-type instruction
-    ADDI x1, x0, message        # x1 = address of message
-    JAL x20, print              # jump to function, storing return address in x20
+    # J-type instruction - prepare function call
+    ADDI x10, x0, message       # x10 (a0) = address of message (first argument register)
+    JAL x1, print               # jump to function, storing return address in x1 (ra)
 
-    ADDI x1, x0, input          # x1 = address of input buffer
-    JAL x20, readline           # jump to function, storing return address in x20
+    ADDI x10, x0, input         # x10 (a0) = address of input buffer
+    JAL x1, readline            # jump to function, storing return address in x1 (ra)
 
-    ADDI x1, x0, input          # x1 = address of input buffer
-    JAL x20, print              # jump to function, storing return address in x20
+    ADDI x10, x0, input         # x10 (a0) = address of input buffer
+    JAL x1, print               # jump to function, storing return address in x1 (ra)
     
-    XOR x3, x3, x3              # will not be executed until after return
-    SW x1, 4(x9)                # store value in x1 to address x9 + 4 
+    XOR x6, x6, x6              # will not be executed until after return
+    SW x10, 4(x8)               # store value in x10 (a0) to address x8 (s0) + 4 
 loop_forever:
-    BNE x3, x2, loop_forever
+    BNE x6, x5, loop_forever
 
 branch_target:
-    ADDI x2, x6, 10             # x2 = x6 + 10
+    ADDI x5, x18, 10            # x5 (t0) = x18 (s2) + 10
     BEQ x0, x0, loop_forever    # branch to infinite loop
 
 # UART Print Function
+# Input: x10 (a0) = string address
 print:
-    ADDI x10, x0, DATA_ADR        # x10 = address of UART Transmit Register
-    ADDI x11, x0, LSR_ADR       # x11 = address of UART Line Status Register
+    ADDI x28, x0, DATA_ADR      # x28 (t3) = address of UART Transmit Register
+    ADDI x29, x0, LSR_ADR       # x29 (t4) = address of UART Line Status Register
 print_loop:
-    LB x2, 0(x1)                # load character
-    BEQ x2, x0, end      # branch to end if character was null ('\0')
+    LB x5, 0(x10)               # load character from string into x5 (t0)
+    BEQ x5, x0, print_end       # branch to end if character was null ('\0')
 
     wait_tx:
-        LB x3, 0(x11)           # load LSR
-        ANDI x4, x3, TX_READY   # check if ready to transmit
-        BEQ x4, x0, wait_tx        # if not, try again
+        LB x6, 0(x29)           # load LSR into x6 (t1)
+        ANDI x7, x6, TX_READY   # check if ready to transmit using x7 (t2)
+        BEQ x7, x0, wait_tx     # if not, try again
     
-    SB x2, 0(x10)               # write byte to TX Register
-    ADDI x1, x1, 1              # message_ptr += 1
+    SB x5, 0(x28)               # write byte to TX Register
+    ADDI x10, x10, 1            # string_ptr += 1
     JAL x0, print_loop
-end:
+print_end:
     EBREAK                      # environment breakpoint
-    JALR x0, x20, 0x0           # return to whence we came
+    JALR x0, x1, 0x0            # return to caller using x1 (ra)
 
 # UART Read Function
+# Input: x10 (a0) = input buffer address
 readline:
-    ADDI x10, x0, DATA_ADR      # x10 = address of UART Receive Register
-    ADDI x11, x0, LSR_ADR       # x11 = address of UART Line Status Register
-    ADDI x12, x0, '\n'          # x12 = newline character
+    ADDI x28, x0, DATA_ADR      # x28 (t3) = address of UART Receive Register
+    ADDI x29, x0, LSR_ADR       # x29 (t4) = address of UART Line Status Register
+    ADDI x30, x0, '\n'          # x30 (t5) = newline character
 read_loop:
     wait_rx:
-        LB x3, 0(x11)           # load LSR
-        ANDI x4, x3, RX_READY   # check if ready to receive
-        BEQ x4, x0, wait_rx     # if not, try again
+        LB x6, 0(x29)           # load LSR into x6 (t1)
+        ANDI x7, x6, RX_READY   # check if ready to receive using x7 (t2)
+        BEQ x7, x0, wait_rx     # if not, try again
     
-    LB x2, 0(x10)               # read byte from RX Register
-    SB x2, 0(x1)                # store byte in input buffer
-    ADDI x1, x1, 1              # input_ptr += 1
+    LB x5, 0(x28)               # read byte from RX Register into x5 (t0)
+    SB x5, 0(x10)               # store byte in input buffer
+    ADDI x10, x10, 1            # input_ptr += 1
 
-    BNE x2, x12, read_loop      # branch to start if character was not newline ('\n')
+    BNE x5, x30, read_loop      # branch to start if character was not newline ('\n')
     EBREAK                      # environment breakpoint
-    JALR x0, x20, 0x0           # return to whence we came
+    JALR x0, x1, 0x0            # return to caller using x1 (ra)
